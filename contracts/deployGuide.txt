@@ -1,0 +1,16 @@
+
+
+
+npx hardhat node --fork https://rpc.v4.testnet.pulsechain.com
+npx hardhat node --fork https://rpc-pulsechain.g4mm4.io
+npx hardhat node --fork https://rpc-pulsechain.g4mm4.io
+npx hardhat node --fork https://pulsechain-rpc.publicnode.com
+npx hardhat node --fork https://rpc.pulsechain.com
+
+
+
+npx hardhat node --fork https://rpc-pulsechain.g4mm4.io --fork-block-number 21512323
+
+LAST
+Contract Address: 0x761dcce67EEE65cE741f3de10C104150B409b147
+Implementation Address: 0x84ADe0350Cb6F481639e2E57e578869533BAAdde

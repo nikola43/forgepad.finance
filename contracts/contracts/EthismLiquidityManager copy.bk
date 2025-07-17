@@ -1,0 +1,374 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import "./v4-core/interfaces/IHooks.sol";
+import "./v4-core/types/Currency.sol";
+import "./v4-core//interfaces/IPoolManager.sol";
+
+import "hardhat/console.sol";
+
+interface IWETH {
+    function deposit() external payable;
+    function withdraw(uint256) external;
+    function balanceOf(address) external view returns (uint256);
+}
+
+contract EthismLiquidityManager is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    IERC721Receiver
+{
+    using CurrencyLibrary for Currency;
+
+    int24 private constant MIN_TICK = -887272;
+    int24 private constant MAX_TICK = -MIN_TICK;
+    int24 private constant TICK_SPACING = 60;
+    uint24 private constant POOL_FEE = 3000;
+
+    IUniswapV2Router02 public routerV2;
+    INonfungiblePositionManager public nonfungiblePositionManager;
+    IUniswapV3Factory public factoryV3;
+    IPoolManager public poolV4Manager;
+    address public universalRouter;
+
+    receive() external payable {}
+
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata
+    ) external returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _routerV2,
+        address _routerV3,
+        address _poolV4Manager,
+        address _universalRouter
+    ) public initializer {
+        __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
+        __Pausable_init();
+
+        routerV2 = IUniswapV2Router02(_routerV2);
+        nonfungiblePositionManager = INonfungiblePositionManager(_routerV3);
+        factoryV3 = IUniswapV3Factory(nonfungiblePositionManager.factory());
+        poolV4Manager = IPoolManager(_poolV4Manager);
+        universalRouter = _universalRouter;
+
+        console.log("EthismLiquidityManager initialized");
+        console.log("RouterV2 address: %s", _routerV2);
+        console.log("RouterV3 address: %s", _routerV3);
+        console.log("PoolV4Manager address: %s", _poolV4Manager);
+    }
+
+    function getRouterV2() external view returns (address) {
+        return address(routerV2);
+    }
+
+    function getAmountsOut(
+        uint amountIn,
+        address[] memory path
+    ) external view returns (uint[] memory amounts) {
+        return routerV2.getAmountsOut(amountIn, path);
+    }
+
+    function WETH() external view returns (address) {
+        return routerV2.WETH();
+    }
+
+    function addLiquidityV2(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    ) external payable returns (address) {
+        require(
+            IERC20(token).allowance(msg.sender, address(this)) >= tokenAmount,
+            "Insufficient allowance"
+        );
+        require(
+            IERC20(token).balanceOf(msg.sender) >= tokenAmount,
+            "Insufficient token balance"
+        );
+
+        // Check contract has enough ETH
+        require(address(this).balance >= ethAmount, "Insufficient ETH balance");
+
+        // Pull tokens from caller to this contract
+        bool success = IERC20(token).transferFrom(
+            msg.sender,
+            address(this),
+            tokenAmount
+        );
+        require(success, "transferFrom to LiquidityManager failed");
+
+        IERC20(token).approve(address(routerV2), tokenAmount);
+        routerV2.addLiquidityETH{value: ethAmount}(
+            token,
+            tokenAmount,
+            0,
+            0,
+            recipient,
+            block.timestamp + 10 minutes
+        );
+
+        address pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
+            token,
+            routerV2.WETH()
+        );
+
+        return pairAddress;
+    }
+
+    function addLiquidityV3(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    )
+        external
+        payable
+        returns (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        uint256 sqrtPriceX96 = calculateSqrtPriceX96(ethAmount, tokenAmount);
+        console.log("sqrtPriceX96: %s", sqrtPriceX96);
+
+        address pool = createPoolV3(token, POOL_FEE, uint160(sqrtPriceX96));
+        console.log("Pool address: %s", pool);
+        IERC20 token0 = IERC20(token);
+        IERC20 token1 = IERC20(routerV2.WETH());
+
+        token0.transferFrom(msg.sender, address(this), tokenAmount);
+        IWETH(routerV2.WETH()).deposit{value: ethAmount}();
+
+        token0.approve(address(nonfungiblePositionManager), tokenAmount);
+        token1.approve(address(nonfungiblePositionManager), ethAmount);
+
+        INonfungiblePositionManager.MintParams
+            memory params = INonfungiblePositionManager.MintParams({
+                token0: token,
+                token1: routerV2.WETH(),
+                fee: POOL_FEE,
+                tickLower: (MIN_TICK / TICK_SPACING) * TICK_SPACING,
+                tickUpper: (MAX_TICK / TICK_SPACING) * TICK_SPACING,
+                amount0Desired: tokenAmount,
+                amount1Desired: ethAmount,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: recipient,
+                deadline: block.timestamp + 10 minutes
+            });
+
+        (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager
+            .mint(params);
+    }
+
+    function calculateSqrtPriceX96(
+        uint256 ethAmount,
+        uint256 tokenAmount
+    ) internal pure returns (uint256) {
+        // Assuming both token and ETH have 18 decimals
+        // Price = ethAmount / tokenAmount (how much ETH per token)
+        // For sqrtPriceX96: sqrt(price) * 2^96
+
+        // Use fixed point arithmetic to avoid zero division
+        uint256 price = (ethAmount * 1e18) / tokenAmount; // Price in 18 decimal fixed point
+        uint256 sqrtPrice = sqrt(price * 1e18); // sqrt of price in 36 decimal fixed point
+        uint256 sqrtPriceX96 = (sqrtPrice * (2 ** 96)) / 1e18; // Convert to X96 format
+
+        // Ensure the result fits in uint160
+        require(sqrtPriceX96 <= type(uint160).max, "sqrtPriceX96 overflow");
+
+        return sqrtPriceX96;
+    }
+
+    function createPoolV3(
+        address token,
+        uint24 fee,
+        uint160 sqrtPriceX96
+    ) public returns (address pool) {
+        address weth = routerV2.WETH();
+
+        // Check if pool already exists
+        pool = factoryV3.getPool(token, weth, fee);
+
+        if (pool == address(0)) {
+            // Create the pool
+            pool = factoryV3.createPool(token, weth, fee);
+            IUniswapV3Pool(pool).initialize(sqrtPriceX96);
+        }
+
+        return pool;
+    }
+
+    function createPoolV4(
+        address token0,
+        address token1,
+        uint24 swapFee,
+        int24 tickSpacing,
+        address hook,
+        uint160 sqrtPriceX96
+    ) internal {
+        // sort your tokens! v4 requires token0 < token1
+        if (token0 > token1) {
+            (token0, token1) = (token1, token0);
+        }
+
+        PoolKey memory pool = PoolKey({
+            currency0: Currency.wrap(token0),
+            currency1: Currency.wrap(token1),
+            fee: swapFee,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(hook)
+        });
+        poolV4Manager.initialize(pool, sqrtPriceX96);
+    }
+
+    function addLiquidityV4(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    ) external payable {
+        require(
+            IERC20(token).allowance(msg.sender, address(this)) >= tokenAmount,
+            "Insufficient allowance"
+        );
+        require(
+            IERC20(token).balanceOf(msg.sender) >= tokenAmount,
+            "Insufficient token balance"
+        );
+
+        // Check contract has enough ETH
+        require(address(this).balance >= ethAmount, "Insufficient ETH balance");
+
+        // Pull tokens from caller to this contract
+        bool success = IERC20(token).transferFrom(
+            msg.sender,
+            address(this),
+            tokenAmount
+        );
+        require(success, "transferFrom to LiquidityManager failed");
+
+        IERC20 token0 = IERC20(token);
+        IERC20 token1 = IERC20(routerV2.WETH());
+
+        token0.approve(universalRouter, tokenAmount);
+        token1.approve(universalRouter, ethAmount);
+        // IWETH(routerV2.WETH()).deposit{value: ethAmount}();
+
+        uint256 sqrtPriceX96 = calculateSqrtPriceX96(ethAmount, tokenAmount);
+        createPoolV4(
+            routerV2.WETH(),
+            token,
+            POOL_FEE,
+            TICK_SPACING,
+            address(0),
+            uint160(sqrtPriceX96)
+        );
+
+        PoolKey memory pool = PoolKey({
+            currency0: Currency.wrap(routerV2.WETH()),
+            currency1: Currency.wrap(token),
+            fee: POOL_FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: IHooks(address(0))
+        });
+    }
+
+    // function addLiquidityV4(
+    //     address token,
+    //     uint256 tokenAmount,
+    //     uint256 ethAmount,
+    //     address recipient
+    // ) external payable {
+    //     require(
+    //         IERC20(token).allowance(msg.sender, address(this)) >= tokenAmount,
+    //         "Insufficient allowance"
+    //     );
+    //     require(
+    //         IERC20(token).balanceOf(msg.sender) >= tokenAmount,
+    //         "Insufficient token balance"
+    //     );
+
+    //     // Check contract has enough ETH
+    //     require(address(this).balance >= ethAmount, "Insufficient ETH balance");
+
+    //     // Pull tokens from caller to this contract
+    //     bool success = IERC20(token).transferFrom(
+    //         msg.sender,
+    //         address(this),
+    //         tokenAmount
+    //     );
+    //     require(success, "transferFrom to LiquidityManager failed");
+
+    //     IERC20 token0 = IERC20(token);
+    //     IERC20 token1 = IERC20(routerV2.WETH());
+
+    //     token0.approve(universalRouter, tokenAmount);
+    //     token1.approve(universalRouter, ethAmount);
+    //     // IWETH(routerV2.WETH()).deposit{value: ethAmount}();
+
+    //     uint256 sqrtPriceX96 = calculateSqrtPriceX96(ethAmount, tokenAmount);
+    //     createPoolV4(
+    //         routerV2.WETH(),
+    //         token,
+    //         POOL_FEE,
+    //         TICK_SPACING,
+    //         address(0),
+    //         uint160(sqrtPriceX96)
+    //     );
+
+    //     PoolKey memory pool = PoolKey({
+    //         currency0: Currency.wrap(routerV2.WETH()),
+    //         currency1: Currency.wrap(token),
+    //         fee: POOL_FEE,
+    //         tickSpacing: TICK_SPACING,
+    //         hooks: IHooks(address(0))
+    //     });
+    // }
+
+    function sqrt(uint x) internal pure returns (uint y) {
+        uint z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+}

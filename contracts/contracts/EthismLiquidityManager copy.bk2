@@ -1,0 +1,845 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IWETH} from "./interfaces/IWETH.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
+import "./v4-core/interfaces/IHooks.sol";
+import "./v4-core/types/Currency.sol";
+import "./v4-core//interfaces/IPoolManager.sol";
+import "./v4-core/libraries/LiquidityAmounts.sol";
+import "./v4-core/libraries/TickMath.sol";
+import "./v4-core/libraries/Actions.sol";
+import "./v4-periphery/interfaces/IPositionManager.sol";
+import "./permit2/interfaces/IPermit2.sol";
+
+import "hardhat/console.sol";
+
+/**
+ * @title EthismLiquidityManager
+ * @author Ethism Protocol
+ * @notice A comprehensive liquidity management contract supporting Uniswap V2, V3, and V4
+ * @dev This contract allows users to add liquidity to different versions of Uniswap protocols
+ *      while maintaining security through upgradeable patterns and reentrancy protection
+ */
+contract EthismLiquidityManager is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    IERC721Receiver
+{
+    using CurrencyLibrary for Currency;
+
+    /*//////////////////////////////////////////////////////////////
+                                CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Minimum tick for Uniswap V3 positions
+    int24 private constant MIN_TICK = -887272;
+
+    /// @dev Maximum tick for Uniswap V3 positions
+    int24 private constant MAX_TICK = -MIN_TICK;
+
+    /// @dev Tick spacing for pool positions
+    int24 private constant TICK_SPACING = 60;
+
+    /// @dev Default pool fee (0.3%)
+    uint24 private constant POOL_FEE = 3000;
+
+    /// @dev Default deadline buffer for transactions
+    uint256 private constant DEADLINE_BUFFER = 10 minutes;
+
+    /// @dev Fixed point precision for calculations
+    uint256 private constant PRECISION = 1e18;
+
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Uniswap V2 Router interface
+    IUniswapV2Router02 public routerV2;
+
+    /// @notice Uniswap V3 Nonfungible Position Manager
+    INonfungiblePositionManager public nonfungiblePositionManager;
+
+    /// @notice Uniswap V3 Factory interface
+    IUniswapV3Factory public factoryV3;
+
+    /// @notice Uniswap V4 Pool Manager interface
+    IPoolManager public poolV4Manager;
+
+    /// @notice Universal Router address for V4 operations
+    address public universalRouter;
+
+    /// @notice Position Manager for V4 operations
+    IPositionManager public positionManager;
+
+    IPermit2 permit2;
+
+    /*//////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Emitted when liquidity is added to a Uniswap V2 pool
+     * @param token The token address
+     * @param tokenAmount Amount of tokens added
+     * @param ethAmount Amount of ETH added
+     * @param pairAddress The created/existing pair address
+     * @param recipient Address receiving LP tokens
+     */
+    event LiquidityAddedV2(
+        address indexed token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address indexed pairAddress,
+        address indexed recipient
+    );
+
+    /**
+     * @notice Emitted when liquidity is added to a Uniswap V3 pool
+     * @param token The token address
+     * @param tokenAmount Amount of tokens added
+     * @param ethAmount Amount of ETH added
+     * @param tokenId The NFT token ID representing the position
+     * @param recipient Address receiving the NFT
+     */
+    event LiquidityAddedV3(
+        address indexed token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        uint256 indexed tokenId,
+        address indexed recipient
+    );
+
+    /**
+     * @notice Emitted when a new Uniswap V3 pool is created
+     * @param token The token address
+     * @param weth The WETH address
+     * @param fee The pool fee
+     * @param pool The created pool address
+     */
+    event PoolCreatedV3(
+        address indexed token,
+        address indexed weth,
+        uint24 fee,
+        address indexed pool
+    );
+
+    /*//////////////////////////////////////////////////////////////
+                                ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error InsufficientAllowance();
+    error InsufficientTokenBalance();
+    error InsufficientETHBalance();
+    error TransferFailed();
+    error SqrtPriceOverflow();
+    error InvalidTokenOrder();
+    error ZeroAmount();
+    error ZeroAddress();
+
+    /*//////////////////////////////////////////////////////////////
+                              INTERFACES
+    //////////////////////////////////////////////////////////////*/
+
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Validates that amounts are greater than zero
+     * @param tokenAmount Token amount to validate
+     * @param ethAmount ETH amount to validate
+     */
+    modifier validAmounts(uint256 tokenAmount, uint256 ethAmount) {
+        if (tokenAmount == 0) revert ZeroAmount();
+        if (ethAmount == 0) revert ZeroAmount();
+        _;
+    }
+
+    /**
+     * @dev Validates that the address is not zero
+     * @param addr Address to validate
+     */
+    modifier notZeroAddress(address addr) {
+        if (addr == address(0)) revert ZeroAddress();
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           CONSTRUCTOR & INIT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Constructor that disables initializers for the implementation contract
+     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initializes the contract with Uniswap protocol addresses
+     * @param _routerV2 Uniswap V2 router address
+     * @param _routerV3 Uniswap V3 position manager address
+     * @param _poolV4Manager Uniswap V4 pool manager address
+     * @param _universalRouter Universal router address for V4 operations
+     * @param _positionManager Position manager for V4 operations
+     * @param _permit2 Permit2 contract address for token approvals
+     */
+    function initialize(
+        address _routerV2,
+        address _routerV3,
+        address _poolV4Manager,
+        address _universalRouter,
+        address _positionManager,
+        address _permit2
+    )
+        public
+        initializer
+        notZeroAddress(_routerV2)
+        notZeroAddress(_routerV3)
+        notZeroAddress(_poolV4Manager)
+        notZeroAddress(_universalRouter)
+        notZeroAddress(_positionManager)
+    {
+        __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
+        __Pausable_init();
+
+        routerV2 = IUniswapV2Router02(_routerV2);
+        nonfungiblePositionManager = INonfungiblePositionManager(_routerV3);
+        factoryV3 = IUniswapV3Factory(nonfungiblePositionManager.factory());
+        poolV4Manager = IPoolManager(_poolV4Manager);
+        universalRouter = _universalRouter;
+        positionManager = IPositionManager(_positionManager);
+
+        console.log("EthismLiquidityManager initialized");
+        console.log("RouterV2 address: %s", _routerV2);
+        console.log("RouterV3 address: %s", _routerV3);
+        console.log("PoolV4Manager address: %s", _poolV4Manager);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            RECEIVE FUNCTION
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Allows the contract to receive ETH
+     */
+    receive() external payable {}
+
+    /**
+     * @notice Handles the receipt of an NFT
+     * @dev Required for receiving Uniswap V3 position NFTs
+     */
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Returns the Uniswap V2 router address
+     * @return The router V2 address
+     */
+    function getRouterV2() external view returns (address) {
+        return address(routerV2);
+    }
+
+    /**
+     * @notice Calculates output amounts for a given input amount and path
+     * @param amountIn Input amount
+     * @param path Array of token addresses representing the swap path
+     * @return amounts Array of output amounts for each step in the path
+     */
+    function getAmountsOut(
+        uint amountIn,
+        address[] memory path
+    ) external view returns (uint[] memory amounts) {
+        return routerV2.getAmountsOut(amountIn, path);
+    }
+
+    /**
+     * @notice Returns the WETH address from the V2 router
+     * @return The WETH address
+     */
+    function WETH() external view returns (address) {
+        return routerV2.WETH();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         UNISWAP V2 FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Adds liquidity to a Uniswap V2 pool
+     * @dev Creates a new pool if one doesn't exist
+     * @param token The ERC20 token address to pair with ETH
+     * @param tokenAmount Amount of tokens to add as liquidity
+     * @param ethAmount Amount of ETH to add as liquidity
+     * @param recipient Address to receive the LP tokens
+     * @return pairAddress The address of the created or existing pair
+     */
+    function addLiquidityV2(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    )
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        validAmounts(tokenAmount, ethAmount)
+        notZeroAddress(token)
+        notZeroAddress(recipient)
+        returns (address pairAddress)
+    {
+        _validateTokenTransfer(token, tokenAmount);
+        _validateETHBalance(ethAmount);
+
+        // Transfer tokens from caller to this contract
+        _transferTokensFrom(token, tokenAmount);
+
+        // Approve router to spend tokens
+        IERC20(token).approve(address(routerV2), tokenAmount);
+
+        // Add liquidity
+        routerV2.addLiquidityETH{value: ethAmount}(
+            token,
+            tokenAmount,
+            0, // Accept any amount of tokens
+            0, // Accept any amount of ETH
+            recipient,
+            block.timestamp + DEADLINE_BUFFER
+        );
+
+        // Get pair address
+        pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
+            token,
+            routerV2.WETH()
+        );
+
+        emit LiquidityAddedV2(
+            token,
+            tokenAmount,
+            ethAmount,
+            pairAddress,
+            recipient
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         UNISWAP V3 FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Adds liquidity to a Uniswap V3 pool
+     * @dev Creates a new pool if one doesn't exist, mints a new NFT position
+     * @param token The ERC20 token address to pair with ETH
+     * @param tokenAmount Amount of tokens to add as liquidity
+     * @param ethAmount Amount of ETH to add as liquidity
+     * @param recipient Address to receive the position NFT
+     * @return tokenId The ID of the minted NFT position
+     * @return liquidity The amount of liquidity added
+     * @return amount0 The amount of token0 actually used
+     * @return amount1 The amount of token1 actually used
+     */
+    function addLiquidityV3(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    )
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        validAmounts(tokenAmount, ethAmount)
+        notZeroAddress(token)
+        notZeroAddress(recipient)
+        returns (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        uint256 sqrtPriceX96 = _calculateSqrtPriceX96(ethAmount, tokenAmount);
+        console.log("sqrtPriceX96: %s", sqrtPriceX96);
+
+        // Create or get existing pool
+        address pool = _createOrGetPoolV3(
+            token,
+            POOL_FEE,
+            uint160(sqrtPriceX96)
+        );
+        console.log("Pool address: %s", pool);
+
+        // Transfer tokens and wrap ETH
+        _transferTokensFrom(token, tokenAmount);
+        IWETH(routerV2.WETH()).deposit{value: ethAmount}();
+
+        // Approve position manager
+        IERC20(token).approve(address(nonfungiblePositionManager), tokenAmount);
+        IERC20(routerV2.WETH()).approve(
+            address(nonfungiblePositionManager),
+            ethAmount
+        );
+
+        // Mint position
+        INonfungiblePositionManager.MintParams memory params = _buildMintParams(
+            token,
+            tokenAmount,
+            ethAmount,
+            recipient
+        );
+
+        (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager
+            .mint(params);
+
+        emit LiquidityAddedV3(
+            token,
+            tokenAmount,
+            ethAmount,
+            tokenId,
+            recipient
+        );
+    }
+
+    /**
+     * @notice Creates a new Uniswap V3 pool or returns existing one
+     * @param token The token address to pair with WETH
+     * @param fee The pool fee tier
+     * @param sqrtPriceX96 The initial price of the pool
+     * @return pool The address of the pool
+     */
+    function createPoolV3(
+        address token,
+        uint24 fee,
+        uint160 sqrtPriceX96
+    ) external notZeroAddress(token) returns (address pool) {
+        return _createOrGetPoolV3(token, fee, sqrtPriceX96);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         UNISWAP V4 FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Adds liquidity to a Uniswap V4 pool
+     * @dev Creates a new V4 pool if one doesn't exist
+     * @param token The ERC20 token address to pair with ETH
+     * @param tokenAmount Amount of tokens to add as liquidity
+     * @param ethAmount Amount of ETH to add as liquidity
+     * @param recipient Address to receive the liquidity position
+     */
+    function addLiquidityV4(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    )
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        validAmounts(tokenAmount, ethAmount)
+        notZeroAddress(token)
+        notZeroAddress(recipient)
+    {
+        _validateTokenTransfer(token, tokenAmount);
+        _validateETHBalance(ethAmount);
+
+        // Transfer tokens from caller
+        _transferTokensFrom(token, tokenAmount);
+
+        address token0Address = token;
+        address token1Address = routerV2.WETH();
+        uint256 token0Amount = tokenAmount;
+        uint256 token1Amount = ethAmount;
+
+        // (Currency currency0, Currency currency1) = _getCurrencies(
+        //     token0Address,
+        //     token1Address
+        // );
+
+        // Sort tokens (V4 requirement: token0 < token1)
+        if (token0Address > token1Address) {
+            (token0Address, token1Address) = (token1Address, token0Address);
+            (token0Amount, token1Amount) = (token1Amount, token0Amount);
+        }
+
+        PoolKey memory poolKey = PoolKey({
+            currency0: Currency.wrap(token0Address),
+            currency1: Currency.wrap(token1Address),
+            fee: POOL_FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: IHooks(address(0))
+        });
+
+        uint256 sqrtPriceX96 = _calculateSqrtPriceX96(ethAmount, tokenAmount);
+        int24 currentTick = TickMath.getTickAtSqrtPrice(uint160(sqrtPriceX96));
+        int24 tickLower = ((currentTick - 750 * TICK_SPACING) / TICK_SPACING) *
+            TICK_SPACING;
+        int24 tickUpper = ((currentTick + 750 * TICK_SPACING) / TICK_SPACING) *
+            TICK_SPACING;
+
+        // Converts token amounts to liquidity units
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            uint160(sqrtPriceX96),
+            TickMath.getSqrtPriceAtTick(tickLower),
+            TickMath.getSqrtPriceAtTick(tickUpper),
+            token0Amount,
+            token1Amount
+        );
+
+        bytes memory hookData = new bytes(0);
+        (
+            bytes memory actions,
+            bytes[] memory mintParams
+        ) = _mintLiquidityParams(
+                poolKey,
+                tickLower,
+                tickUpper,
+                liquidity,
+                token0Amount + 1,
+                token1Amount + 1,
+                recipient,
+                hookData
+            );
+
+        // multicall parameters
+        bytes[] memory params = new bytes[](2);
+
+        // Initialize Pool
+        params[0] = abi.encodeWithSelector(
+            positionManager.initializePool.selector,
+            poolKey,
+            sqrtPriceX96,
+            hookData
+        );
+
+        // Mint Liquidity
+        params[1] = abi.encodeWithSelector(
+            positionManager.modifyLiquidities.selector,
+            abi.encode(actions, mintParams),
+            block.timestamp + 3600
+        );
+
+        // If the pool is an ETH pair, native tokens are to be transferred
+        uint256 valueToPass = Currency.wrap(address(token0Address)).isAddressZero() ? token0Amount + 1 : 0;
+
+        IERC20(token0Address).approve(address(permit2), type(uint256).max);
+        permit2.approve(
+            token0Address,
+            address(positionManager),
+            type(uint160).max,
+            type(uint48).max
+        );
+
+        IERC20(token1Address).approve(address(permit2), type(uint256).max);
+        permit2.approve(
+            token1Address,
+            address(positionManager),
+            type(uint160).max,
+            type(uint48).max
+        );
+
+        positionManager.multicall{value: valueToPass}(params);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Validates token transfer requirements
+     * @param token Token address
+     * @param amount Amount to transfer
+     */
+    function _validateTokenTransfer(
+        address token,
+        uint256 amount
+    ) internal view {
+        if (IERC20(token).allowance(msg.sender, address(this)) < amount) {
+            revert InsufficientAllowance();
+        }
+        if (IERC20(token).balanceOf(msg.sender) < amount) {
+            revert InsufficientTokenBalance();
+        }
+    }
+
+    /**
+     * @dev Validates contract has sufficient ETH balance
+     * @param amount ETH amount required
+     */
+    function _validateETHBalance(uint256 amount) internal view {
+        if (address(this).balance < amount) {
+            revert InsufficientETHBalance();
+        }
+    }
+
+    /**
+     * @dev Transfers tokens from caller to this contract
+     * @param token Token address
+     * @param amount Amount to transfer
+     */
+    function _transferTokensFrom(address token, uint256 amount) internal {
+        bool success = IERC20(token).transferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @dev Calculates sqrt price for Uniswap V3 initialization
+     * @param ethAmount Amount of ETH
+     * @param tokenAmount Amount of tokens
+     * @return sqrtPriceX96 The calculated sqrt price in X96 format
+     */
+    function _calculateSqrtPriceX96(
+        uint256 ethAmount,
+        uint256 tokenAmount
+    ) internal pure returns (uint256 sqrtPriceX96) {
+        // Calculate price: ethAmount / tokenAmount
+        uint256 price = (ethAmount * PRECISION) / tokenAmount;
+        uint256 sqrtPrice = _sqrt(price * PRECISION);
+        sqrtPriceX96 = (sqrtPrice * (2 ** 96)) / PRECISION;
+
+        if (sqrtPriceX96 > type(uint160).max) {
+            revert SqrtPriceOverflow();
+        }
+    }
+
+    /**
+     * @dev Creates or retrieves existing Uniswap V3 pool
+     * @param token Token address
+     * @param fee Pool fee
+     * @param sqrtPriceX96 Initial price
+     * @return pool Pool address
+     */
+    function _createOrGetPoolV3(
+        address token,
+        uint24 fee,
+        uint160 sqrtPriceX96
+    ) internal returns (address pool) {
+        address weth = routerV2.WETH();
+
+        pool = factoryV3.getPool(token, weth, fee);
+
+        if (pool == address(0)) {
+            pool = factoryV3.createPool(token, weth, fee);
+            IUniswapV3Pool(pool).initialize(sqrtPriceX96);
+
+            emit PoolCreatedV3(token, weth, fee, pool);
+        }
+    }
+
+    /**
+     * @dev Builds mint parameters for Uniswap V3 position
+     * @param token Token address
+     * @param tokenAmount Token amount
+     * @param ethAmount ETH amount
+     * @param recipient Recipient address
+     * @return params Mint parameters struct
+     */
+    function _buildMintParams(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient
+    )
+        internal
+        view
+        returns (INonfungiblePositionManager.MintParams memory params)
+    {
+        params = INonfungiblePositionManager.MintParams({
+            token0: token,
+            token1: routerV2.WETH(),
+            fee: POOL_FEE,
+            tickLower: (MIN_TICK / TICK_SPACING) * TICK_SPACING,
+            tickUpper: (MAX_TICK / TICK_SPACING) * TICK_SPACING,
+            amount0Desired: tokenAmount,
+            amount1Desired: ethAmount,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: recipient,
+            deadline: block.timestamp + DEADLINE_BUFFER
+        });
+    }
+
+    /**
+     * @dev Creates a Uniswap V4 pool
+     * @param token0 First token address
+     * @param token1 Second token address
+     * @param swapFee Pool swap fee
+     * @param tickSpacing Tick spacing
+     * @param hook Hook address
+     * @param sqrtPriceX96 Initial price
+     */
+    function _createPoolV4(
+        address token0,
+        address token1,
+        uint24 swapFee,
+        int24 tickSpacing,
+        address hook,
+        uint160 sqrtPriceX96
+    ) internal {
+        // Sort tokens (V4 requirement: token0 < token1)
+        if (token0 > token1) {
+            (token0, token1) = (token1, token0);
+        }
+
+        PoolKey memory pool = PoolKey({
+            currency0: Currency.wrap(token0),
+            currency1: Currency.wrap(token1),
+            fee: swapFee,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(hook)
+        });
+
+        poolV4Manager.initialize(pool, sqrtPriceX96);
+    }
+
+    function _mintLiquidityParams(
+        PoolKey memory poolKey,
+        int24 _tickLower,
+        int24 _tickUpper,
+        uint256 liquidity,
+        uint256 amount0Max,
+        uint256 amount1Max,
+        address recipient,
+        bytes memory hookData
+    ) internal pure returns (bytes memory, bytes[] memory) {
+        bytes memory actions = abi.encodePacked(
+            uint8(Actions.MINT_POSITION),
+            uint8(Actions.SETTLE_PAIR),
+            uint8(Actions.SWEEP),
+            uint8(Actions.SWEEP)
+        );
+
+        bytes[] memory params = new bytes[](4);
+        params[0] = abi.encode(
+            poolKey,
+            _tickLower,
+            _tickUpper,
+            liquidity,
+            amount0Max,
+            amount1Max,
+            recipient,
+            hookData
+        );
+        params[1] = abi.encode(poolKey.currency0, poolKey.currency1);
+        params[2] = abi.encode(poolKey.currency0, recipient);
+        params[3] = abi.encode(poolKey.currency1, recipient);
+
+        return (actions, params);
+    }
+
+    // function _getCurrencies(
+    //     address token0,
+    //     address token1
+    // ) internal pure returns (Currency, Currency) {
+    //     require(token0 != token1);
+
+    //     if (token0 < token1) {
+    //         return (
+    //             Currency.wrap(address(token0)),
+    //             Currency.wrap(address(token1))
+    //         );
+    //     } else {
+    //         return (
+    //             Currency.wrap(address(token1)),
+    //             Currency.wrap(address(token0))
+    //         );
+    //     }
+    // }
+
+    /**
+     * @dev Calculates square root using Babylonian method
+     * @param x Input value
+     * @return y Square root of x
+     */
+    function _sqrt(uint256 x) internal pure returns (uint256 y) {
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         ADMIN FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Pauses the contract (admin only)
+     * @dev Prevents execution of functions with whenNotPaused modifier
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the contract (admin only)
+     * @dev Allows execution of functions with whenNotPaused modifier
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @notice Emergency function to recover stuck ETH (admin only)
+     * @param to Address to send ETH to
+     * @param amount Amount of ETH to send
+     */
+    function recoverETH(address payable to, uint256 amount) external onlyOwner {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount > address(this).balance) revert InsufficientETHBalance();
+
+        (bool success, ) = to.call{value: amount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Emergency function to recover stuck ERC20 tokens (admin only)
+     * @param token Token address to recover
+     * @param to Address to send tokens to
+     * @param amount Amount of tokens to send
+     */
+    function recoverERC20(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        if (token == address(0) || to == address(0)) revert ZeroAddress();
+
+        bool success = IERC20(token).transfer(to, amount);
+        if (!success) revert TransferFailed();
+    }
+}

@@ -1,0 +1,602 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+struct RegistrationParams {
+    string name;
+    bytes encryptedEmail;
+    address upkeepContract;
+    uint32 gasLimit;
+    address adminAddress;
+    uint8 triggerType;
+    bytes checkData;
+    bytes triggerConfig;
+    bytes offchainConfig;
+    uint96 amount;
+}
+
+interface IAutomationRegistrarInterface {
+    function registerUpkeep(
+        RegistrationParams calldata requestParams
+    ) external returns (uint256);
+}
+
+interface IUniversalRouter {
+    function execute(bytes calldata commands, bytes[] calldata inputs) external payable;
+}
+
+interface ILink is IERC20 {
+    function transferAndCall(address to, uint256 value, bytes memory data) external returns (bool);
+}
+
+struct Round {
+    uint256 random;
+    uint8 status;   // 0-none or done, 1-pending, 2-fulfilled
+    uint8 requests;
+    uint8 fulfills;   // number of api fulfilled
+    bytes data;
+    uint256 time;
+}
+
+struct SwapOptions {
+    address router;
+    address token;
+    uint8 version;    
+}
+
+struct APIParams {
+    string url;
+    bytes32 donID;
+    address router;
+    uint64 subscriptionId;
+    uint32 gasLimit;
+}
+
+struct VRFParams {
+    uint256 subscriptionId;
+    bytes32 keyHash;
+    address coordinator;
+    uint32 numWords;
+    uint32 gasLimit;
+    uint16 requestConfirmations;
+    bool nativePayment;
+}
+
+contract ApiClient is FunctionsClient {
+    using FunctionsRequest for FunctionsRequest.Request;
+    // using AddressLib for bytes;
+    // using UintLib for uint256;
+
+    string private url;
+    bytes32 private donID;
+    uint64 private subscriptionId;
+    uint32 private gasLimit = 300000;
+
+    string private source =
+        "const [url, from, to, index] = args;"
+        "const res = await Functions.makeHttpRequest({ url, params: { from, to, index, network: 'mainnet' } });"
+        "if (res.error) { throw Error(res.message) }"
+        "return new Uint8Array(res.data.bytes.match(/.{2}/g).map(b => parseInt(b, 16)))";
+
+    constructor(address _router) FunctionsClient(_router) {
+    }
+
+    function _bytesToShares(
+        bytes memory _data
+    ) internal pure returns (address[] memory, uint32[] memory) {
+        uint256 _length = _data.length;
+        require(_length % 24 == 0, "Invalid packed data length");
+
+        uint256 _count = _length / 24;
+        address[] memory _holders = new address[](_count);
+        uint32[] memory _shares = new uint32[](_count);
+        assembly {
+            let _dataPtr := add(_data, 20)
+            let _holderPtr := add(_holders, 32)
+            let _sharePtr := add(_shares, 32)
+
+            for {
+                let i := 0
+            } lt(i, _count) {
+                i := add(i, 1)
+            } {
+                let _addr := and(
+                    mload(_dataPtr),
+                    0xffffffffffffffffffffffffffffffffffffffff
+                )
+                _dataPtr := add(_dataPtr, 4)
+                let _share := and(
+                    mload(_dataPtr),
+                    0xffffffff
+                )
+                _dataPtr := add(_dataPtr, 20)
+                mstore(_holderPtr, _addr)
+                mstore(_sharePtr, _share)
+                _holderPtr := add(_holderPtr, 32)
+                _sharePtr := add(_sharePtr, 32)
+            }
+        }
+        return (_holders, _shares);
+    }
+
+    function _uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        temp = value;
+        for (uint256 i = digits; i > 0; i--) {
+            buffer[i - 1] = bytes1(uint8(48 + (temp % 10)));
+            temp /= 10;
+        }
+        return string(buffer);
+    }
+
+    function requestAPI(
+        uint256 _timeStart,
+        uint256 _timeEnd,
+        uint256 _index
+    ) internal returns (uint256 requestId) {
+        FunctionsRequest.Request memory request;
+        string[] memory _args = new string[](4);
+        _args[0] = url;
+        _args[1] = _uintToString(_timeStart);
+        _args[2] = _uintToString(_timeEnd);
+        _args[3] = _uintToString(_index);
+        request.setArgs(_args);
+        request.initializeRequestForInlineJavaScript(source);
+        bytes32 _requestId = _sendRequest(
+            request.encodeCBOR(),
+            subscriptionId,
+            gasLimit,
+            donID
+        );
+        return uint256(_requestId);
+    }
+
+    function fulfillRequest(
+        bytes32 _requestId,
+        bytes memory _response,
+        bytes memory _error
+    ) internal override {
+        if (_error.length > 0) {
+            fulfillAPI(uint256(_requestId), bytes(""));
+        } else {
+            fulfillAPI(uint256(_requestId), _response);
+        }
+    }
+
+    function errorAPI(uint256, string memory) internal virtual {
+    }
+
+    function fulfillAPI(uint256, bytes memory) internal virtual {
+    }
+
+    function updateParams(
+        string memory _url,
+        bytes32 _donID,
+        uint64 _subscriptionId,
+        uint32 _gasLimit
+    ) internal {
+        if (bytes(_url).length > 0)
+            url = _url;
+        if (uint256(_donID) > 0)
+            donID = _donID;
+        if (_subscriptionId > 0)
+            subscriptionId = _subscriptionId;
+        if (_gasLimit > 0)
+            gasLimit = _gasLimit;
+    }
+
+    function updateSource(string memory _source) internal {
+        source = _source;
+    }
+
+    function fundAPI(ILink _link, uint256 _amount) internal {
+        _link.transferAndCall(
+            address(i_router), 
+            _amount, 
+            abi.encode(subscriptionId)
+        );
+    }
+}
+
+contract RandomClient is VRFConsumerBaseV2Plus {
+    uint256 private subscriptionId;
+    bytes32 private keyHash =
+        0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
+    uint16 private requestConfirmations = 3;
+    uint32 private numWords = 1;
+    uint32 private gasLimit = 100000;
+    bool private nativePayment = false;
+
+    constructor(address _coordinator) VRFConsumerBaseV2Plus(_coordinator) {
+    }
+
+    function requestVRF() internal returns (uint256) {
+        return
+            s_vrfCoordinator.requestRandomWords(
+                VRFV2PlusClient.RandomWordsRequest({
+                    keyHash: keyHash,
+                    subId: subscriptionId,
+                    requestConfirmations: requestConfirmations,
+                    callbackGasLimit: gasLimit,
+                    numWords: numWords,
+                    extraArgs: VRFV2PlusClient._argsToBytes(
+                        VRFV2PlusClient.ExtraArgsV1({nativePayment: nativePayment})
+                    )
+                })
+            );
+    }
+
+    function fulfillRandomWords(
+        uint256 _requestId,
+        uint256[] calldata _randomWords
+    ) internal override {
+        fulfillVRF(_requestId, _randomWords[0]);
+    }
+
+    function fulfillVRF(uint256, uint256) internal virtual {
+    }
+
+    function updateParams(
+        uint256 _subscriptionId,
+        bytes32 _keyHash,
+        uint16 _requestConfirmations,
+        uint32 _numWords,
+        uint32 _gasLimit,
+        bool _nativePayment
+    ) internal {
+        if (_subscriptionId > 0)
+            subscriptionId = _subscriptionId;
+        if (uint256(_keyHash) > 0)
+            keyHash = _keyHash;
+        if (_requestConfirmations > 0)
+            requestConfirmations = _requestConfirmations;
+        if (_numWords > 0)
+            numWords = _numWords;
+        if (_gasLimit > 0)
+            gasLimit = _gasLimit;
+        nativePayment = _nativePayment;
+    }
+
+    function fundVRF(ILink _link, uint256 _amount) internal {
+        _link.transferAndCall(
+            address(s_vrfCoordinator), 
+            _amount, 
+            abi.encode(subscriptionId)
+        );
+    }
+}
+
+contract Distributor is
+    AutomationCompatibleInterface,
+    RandomClient,
+    ApiClient,
+    Pausable
+{
+    address constant WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+    uint256 private periodId;
+    uint256 public period = 15 minutes; // 1 weeks;
+    uint256 public startTime;
+    uint256 public roundId;
+    uint256 public upkeepID;
+    address private upkeepRegistry;
+    address private upkeepRegistrar;
+    IUniversalRouter private universalRouter;
+    ILink private link;
+    mapping(uint256 => Round) public rounds;
+    mapping(uint256 => uint256) private vrfRequests;
+    mapping(uint256 => uint256) private apiRequests;
+    
+    uint256 public percentForDistribute = 9000; // 90%
+    uint256 public percentForFund = 500; // 90%
+    uint256 private ratioAPI = 5000;
+    uint256 private ratioVRF = 1000;
+
+    constructor(
+        address _universalRouter, 
+        address _link, 
+        address _upkeepRegistry, 
+        address _upkeepRegistrar, 
+        address _vrfCoordinator, 
+        address _apiRouter
+    ) RandomClient(_vrfCoordinator) ApiClient(_apiRouter) { 
+        universalRouter = IUniversalRouter(_universalRouter);
+        link = ILink(_link);
+        upkeepRegistry = _upkeepRegistry;
+        upkeepRegistrar = _upkeepRegistrar;
+        _pause();
+    }
+
+    receive() external payable {
+    }
+
+    function buyLink(uint256 _amount) internal returns (uint256) {
+        uint256 _balance = link.balanceOf(address(this));
+        // {
+        //     address[] memory _path = new address[](2);
+        //     _path[0] = WETH;
+        //     _path[1] = address(link);
+        //     bytes[] memory _inputs = new bytes[](4);
+        //     _inputs[0] = abi.encode(
+        //         address(0x2),
+        //         _amount
+        //     );
+        //     _inputs[1] = abi.encode(
+        //         address(this),
+        //         0,
+        //         uint256(0),
+        //         _path,
+        //         false
+        //     );
+        //     _inputs[2] = abi.encode(
+        //         address(this),
+        //         _amount,
+        //         uint256(0),
+        //         abi.encodePacked(WETH, uint24(3000), address(link)),
+        //         false
+        //     );
+        //     _inputs[3] = abi.encode(
+        //         address(this),
+        //         0
+        //     );
+        //     try universalRouter.execute{ value: _amount }(
+        //         abi.encodePacked(bytes1(0x0b), bytes1(0x88), bytes1(0x80), bytes1(0x0c)), _inputs                
+        //     ) {
+        //         _balance = link.balanceOf(address(this)) - _balance;
+        //         if (_balance > 0)
+        //             return _balance;
+        //     } catch {
+        //     }
+        // }
+        {
+            bytes[] memory _inputs = new bytes[](2);
+            _inputs[0] = abi.encode(
+                address(0x2),
+                _amount
+            );
+            _inputs[1] = abi.encode(
+                address(this),
+                _amount,
+                uint256(0),
+                abi.encodePacked(WETH, uint24(3000), address(link)),
+                false
+            );
+            try universalRouter.execute{ value: _amount }(
+                abi.encodePacked(bytes1(0x0b), bytes1(0x0)), _inputs                
+            ) {
+                _balance = link.balanceOf(address(this)) - _balance;
+                if (_balance > 0)
+                    return _balance;
+            } catch {
+            }
+        }
+        return 0;
+    }
+
+    function fund() internal {
+        uint256 _balance = buyLink(address(this).balance * percentForFund / 10000);
+        uint256 _amountAPI = _balance * uint256(ratioAPI) / 10000;
+        uint256 _amountVRF = _balance * uint256(ratioVRF) / 10000;
+        fundAPI(link, _amountAPI);
+        fundVRF(link, _amountVRF);
+        link.transferAndCall(
+            upkeepRegistry, 
+            _balance - _amountAPI - _amountVRF, 
+            abi.encode(upkeepID)
+        );
+    }
+
+    function startUpkeep(uint256 _startTime) public payable onlyOwner {
+        uint256 _balance = buyLink(msg.value);
+        if (_balance > 0) {
+            RegistrationParams memory _params = RegistrationParams({
+                name: "Ethism Upkeeper",
+                encryptedEmail: bytes(""),
+                upkeepContract: address(this),
+                gasLimit: 5000000,
+                adminAddress: msg.sender,
+                triggerType: 0,
+                checkData: bytes(""),
+                triggerConfig: bytes(""),
+                offchainConfig: bytes(""),
+                amount: uint96(_balance)
+            });
+            link.approve(upkeepRegistrar, _balance);
+            upkeepID = IAutomationRegistrarInterface(upkeepRegistrar).registerUpkeep(_params);
+            restartUpkeep(_startTime);
+        }
+    }
+
+    function checkUpkeep(
+        bytes calldata
+    )
+        external
+        view
+        override
+        whenNotPaused
+        returns (bool upkeepNeeded, bytes memory performData)
+    {
+        if (startTime == 0 || address(this).balance == 0) {
+            upkeepNeeded = false;
+        } else {
+            Round memory round = rounds[roundId];
+            if (round.status == 0) {
+                uint256 _periodId = (block.timestamp - startTime) / period;
+                upkeepNeeded = _periodId > periodId;
+            } else if (round.status == 1) {
+                upkeepNeeded = round.time + period < block.timestamp; // timeout
+            } else if (round.status == 2) {
+                upkeepNeeded = round.random > 0;
+            }
+            if (upkeepNeeded)
+                performData = abi.encodePacked(round.status);
+        }
+    }
+
+    function performUpkeep(
+        bytes calldata performData
+    ) external override whenNotPaused {
+        uint8 action = uint8(performData[0]);
+        if (action != rounds[roundId].status)
+            return;
+        if (action == 0) {
+            uint256 _periodId = (block.timestamp - startTime) / period;
+            if (_periodId > periodId) {
+                fund();
+                roundId += 1;
+                periodId = _periodId;
+                Round storage round = rounds[roundId];
+                round.status = 1;
+                round.time = block.timestamp;
+                uint256 _requestId = requestVRF();
+                vrfRequests[_requestId] = roundId;
+                for (uint256 i = 0; i < 5; i++) {
+                    uint256 _timeEnd = startTime + periodId * period;
+                    _requestId = requestAPI(
+                        0, // _timeEnd - period,
+                        _timeEnd,
+                        i
+                    );
+                    apiRequests[_requestId] = roundId;
+                    round.requests += 1;
+                }
+            }
+        } else if (action == 1) {
+            Round storage round = rounds[roundId];
+            if (round.time + period < block.timestamp) {
+                round.status = 0;
+            }
+        } else if (action == 2) {
+            Round storage round = rounds[roundId];
+            uint256 balance = address(this).balance;
+            if (balance > 0) {
+                (address[] memory _holders, uint32[] memory _shares) = _bytesToShares(round.data);
+                if (_holders.length > 0) {
+                    uint256 amountForDistribute = (balance * percentForDistribute) / 10000;
+                    for (uint256 i = 0; i < _holders.length; i++) {
+                        uint256 _amount = amountForDistribute * uint256(_shares[i]) / (uint256(type(uint32).max) + 1);
+                        transfer(_holders[i], _amount);
+                        balance -= _amount;
+                    }
+                    address winner = _holders[round.random % _holders.length];
+                    transfer(winner, balance);
+                }
+            }
+            round.status = 0;
+        }
+    }
+
+    function restartUpkeep(
+        uint256 _startTime
+    ) public onlyOwner {
+        startTime = _startTime == 0 ? block.timestamp : _startTime;
+        _unpause();
+    }
+
+    function fulfillAPI(
+        uint256 _requestId,
+        bytes memory _response
+    ) internal override {
+        require(apiRequests[_requestId] == roundId && rounds[roundId].status == 1, "Invalid api request");
+        Round storage round = rounds[roundId];
+        round.fulfills += 1;
+        if (_response.length > 0)
+            round.data = abi.encodePacked(round.data, _response);
+        if (round.fulfills == round.requests || _response.length == 0)
+            round.status = 2;
+    }
+
+    function fulfillVRF(
+        uint256 _requestId,
+        uint256 _random
+    ) internal override {
+        Round storage round = rounds[roundId];
+        require(vrfRequests[_requestId] == roundId, "Invalid vrf request");
+        if (_random == 0)
+            _random = 1000;
+        round.random = _random;
+    }
+
+    function transfer(address _to, uint256 _amount) public returns (bool) {
+        if (_amount == 0) return false;
+        (bool success, ) = payable(_to).call{value: _amount}("");
+        return success;
+    }
+
+    function updatePeriod(uint256 _period) public onlyOwner {
+        period = _period;
+    }
+
+    function updatePercentForDistribute(uint256 _percent) public onlyOwner {
+        percentForDistribute = _percent;
+    }
+
+    function updatePercentForFund(uint256 _percent) public onlyOwner {
+        percentForFund = _percent;
+    }
+
+    function updateFundParams(
+        uint256 _ratioAPI, uint256 _ratioVRF
+    ) public onlyOwner {
+        ratioAPI = _ratioAPI;
+        ratioVRF = _ratioVRF;
+    }
+
+    function assignAPI(
+        string memory _url,
+        uint64 _subscriptionId,
+        bytes32 _donID,
+        uint32 _gasLimit
+    ) public onlyOwner {
+        ApiClient.updateParams(_url, _donID, _subscriptionId, _gasLimit);
+    }
+
+    function assignVRF(
+        uint256 _subscriptionId,
+        bytes32 _keyHash,
+        uint16 _requestConfirmations,
+        uint32 _numWords,
+        uint32 _gasLimit,
+        bool _nativePayment
+    ) public onlyOwner {
+        RandomClient.updateParams(_subscriptionId, _keyHash, _requestConfirmations, _numWords, _gasLimit, _nativePayment);
+    }
+
+    function updateScript(string memory _src) public onlyOwner {
+        ApiClient.updateSource(_src);
+    }
+
+    function emergencyWithdraw(address _to) external onlyOwner whenPaused {
+        transfer(_to, address(this).balance);
+    }
+
+    function withdrawToken(
+        address _token,
+        address _to
+    ) external onlyOwner whenPaused {
+        IERC20(_token).transfer(_to, IERC20(_token).balanceOf(address(this)));
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+}

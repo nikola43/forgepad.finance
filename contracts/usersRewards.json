@@ -1,0 +1,3414 @@
+[
+  {
+    "user": "0x31b8f9a85FA9B9258B5b5F1875DBD863999dCA76",
+    "rewards": 68933282.31668516
+  },
+  {
+    "user": "0x20C1A7663F2eEfdCC54238Bd3ef21972ee7Db332",
+    "rewards": 48367853.12731973
+  },
+  {
+    "user": "0x438052132c9984632532fdBf92bA6C9AA9654a39",
+    "rewards": 41510059.22071836
+  },
+  {
+    "user": "0x35115890f22083806E1b321DA247de8d65c1d0D2",
+    "rewards": 23628306.436144195
+  },
+  {
+    "user": "0x263fB20854636e32F3B15350b3560ee16503a225",
+    "rewards": 15828071.524719348
+  },
+  {
+    "user": "0xbe812066F2c61234159B58a5E88BEC38DcBB1D11",
+    "rewards": 15670444.813495142
+  },
+  {
+    "user": "0x6D6aCbF04AC69d14f580c87fe01650A2ac4D1955",
+    "rewards": 11985014.29277258
+  },
+  {
+    "user": "0xC91301b61bC0f59154ec3b65aB66Bb8e67D66D59",
+    "rewards": 10263205.281832099
+  },
+  {
+    "user": "0x9217AAdA66F94C3D0B6041bc86b90DB8998c6C97",
+    "rewards": 7943965.223517817
+  },
+  {
+    "user": "0x25af3f17C93E57Ee864709D1E67897DB11960FAe",
+    "rewards": 7644545.0314539885
+  },
+  {
+    "user": "0xf51D64a8297C92fE23b532212BfAf987D832162A",
+    "rewards": 7631753.871116107
+  },
+  {
+    "user": "0xFD70D777769F7B354b757a6E99BDc3bea69Ead11",
+    "rewards": 7228844.119882471
+  },
+  {
+    "user": "0x2C20e655460AA65E86DF672A7aa549dB7F34b066",
+    "rewards": 6790269.879921535
+  },
+  {
+    "user": "0xbe11Fd27903Fa08B30814C7Fa6789999AEDE605F",
+    "rewards": 6628771.886890003
+  },
+  {
+    "user": "0x691F714e6468b6599c2e69e8Fdf9DF6415aA13B6",
+    "rewards": 5837457.967913212
+  },
+  {
+    "user": "0x91a207AFF938E9E63De4CD756303D5450E1f4BF4",
+    "rewards": 5318642.475798415
+  },
+  {
+    "user": "0x85540C5F68dd3020DE849952FeDD212e0D9C37Cd",
+    "rewards": 5026245.082900369
+  },
+  {
+    "user": "0xF9805267dA3E07851645925F4cdd1f5D1b15F007",
+    "rewards": 4947384.381024107
+  },
+  {
+    "user": "0x8fb907287219A18fE29ed1697FB7B61F859ea5E8",
+    "rewards": 4731743.950060299
+  },
+  {
+    "user": "0x3A2b06b4FA756a722e88EA2b80135a8377bA4c6b",
+    "rewards": 4369327.028082946
+  },
+  {
+    "user": "0xd6ad81cEfb34486887A9520A6B634C8C04c2C3fC",
+    "rewards": 4197780.165843546
+  },
+  {
+    "user": "0xE8993391AA283132d45D302c790712061eF0c84c",
+    "rewards": 4174327.822870204
+  },
+  {
+    "user": "0x1fdEbE3C40972E6a7838B3d3eB72881E5FDF18E8",
+    "rewards": 4018167.6619004444
+  },
+  {
+    "user": "0xFd8A7a27aE4Fb591Bd467A300654002517324C52",
+    "rewards": 3952210.382853884
+  },
+  {
+    "user": "0x90fEdAC6aF52df45512631565369509da7c465da",
+    "rewards": 3830946.1146160974
+  },
+  {
+    "user": "0x5C7513DAd1dEE97F0C52F2a15eA902c1b1C00184",
+    "rewards": 3670176.9767097263
+  },
+  {
+    "user": "0x4dA28ad8adA817e064799a515b9eB8Deb3a9923B",
+    "rewards": 3539932.867867266
+  },
+  {
+    "user": "0xD37ec4C923605Bd14cd83c818531610c1DC8082a",
+    "rewards": 3383696.197220798
+  },
+  {
+    "user": "0x1c556e5ef3545CEF21899a287aE257919b3d5B01",
+    "rewards": 3080687.312494598
+  },
+  {
+    "user": "0x50f6D3e15e02De8B1d2b105afe85ca6c90Ee24E0",
+    "rewards": 2892924.4089519433
+  },
+  {
+    "user": "0x077f51d2D9772284fb6366144C0C72D2230D5c6f",
+    "rewards": 2891818.7811667384
+  },
+  {
+    "user": "0x84b82c36a01e3f9E6f4508a4944D54038e7c2148",
+    "rewards": 2815408.623095386
+  },
+  {
+    "user": "0xee08AaCbc1aDD2A1F49Cb33B4BF663EACB00bEAD",
+    "rewards": 2705858.54096344
+  },
+  {
+    "user": "0x8746866491Fb6520cCB8D67200451907f6333332",
+    "rewards": 2563531.263932512
+  },
+  {
+    "user": "0x7d6ec015351B6D7ec055082188A83A0d4b8094fe",
+    "rewards": 2497625.5200168076
+  },
+  {
+    "user": "0x132477BF1Bf3a530F4ca72D45a8658F3BF3088F0",
+    "rewards": 2487595.7210179386
+  },
+  {
+    "user": "0x07C5544718a1bA174bFcc912A1F000B7CFE0E4c3",
+    "rewards": 2435776.2059962368
+  },
+  {
+    "user": "0xeC097c2296e217f38FaC23CfBE2b12aD2D96379C",
+    "rewards": 2408224.5349669675
+  },
+  {
+    "user": "0x19cAc87BB9aa7715d6e7CF06a85ecadc1C9373D7",
+    "rewards": 2272864.467698819
+  },
+  {
+    "user": "0x1A12Da37Cc97e724aCfF956A0F831eDF66CBeC56",
+    "rewards": 2266612.6394697176
+  },
+  {
+    "user": "0xd04C6CDE3e74D77b5B3C9E5481511B8C2B55c976",
+    "rewards": 2266361.1286833268
+  },
+  {
+    "user": "0xf45a3811e6cA41478B92420DD9dd3116f866d968",
+    "rewards": 2177517.283968023
+  },
+  {
+    "user": "0xdbC24184abE4c3303EEa86a9fdD824ae3677fC36",
+    "rewards": 2177237.7506564953
+  },
+  {
+    "user": "0x3d80D094221c0f2A5594336c0F08C857dd1b2DA4",
+    "rewards": 2173259.148840884
+  },
+  {
+    "user": "0x53b1826b9E4f34B7e6362488A3E2Be69d8b0c23A",
+    "rewards": 2121062.8961487
+  },
+  {
+    "user": "0x3f9A45bB39e80fE9FB4C947E1cc291b012A09f64",
+    "rewards": 2088834.6246548065
+  },
+  {
+    "user": "0x4C61dD60Cd7F1edD98CDA7c1f2aa5D9d0c917cb5",
+    "rewards": 2087052.5464473364
+  },
+  {
+    "user": "0x214a4542E048Ef9c21fecA0980b8500773C1B5D8",
+    "rewards": 2084408.9152106366
+  },
+  {
+    "user": "0x1a8E715207D74E3D5410aa0F71758C43E2a4975b",
+    "rewards": 2083548.4368832232
+  },
+  {
+    "user": "0xF01fb6021e8C8F2E7a4e33CF1Fbb05d1bE6E5fe8",
+    "rewards": 2074130.2877167873
+  },
+  {
+    "user": "0x3D983270bE464eb4a34628FCa73E7371DF36B031",
+    "rewards": 2071539.0961555375
+  },
+  {
+    "user": "0xa60479aeCDd4a27B30F12eFec2AeE294f8F65359",
+    "rewards": 2042309.3026269567
+  },
+  {
+    "user": "0x9aF1d3DEd9c4a2dDBa23aa16Aaf8d229E508610E",
+    "rewards": 2012418.7602197437
+  },
+  {
+    "user": "0x8E0108Bb48aAaeEd86c0f0654E85090c9EBef638",
+    "rewards": 1976337.775458348
+  },
+  {
+    "user": "0x69e6aD0AAde2cCf797F9E0aBD4f45B0e670b3779",
+    "rewards": 1959350.0146318618
+  },
+  {
+    "user": "0xD4E7218b50F06E8D769F55D06113c0984aBc036e",
+    "rewards": 1948450.0150055569
+  },
+  {
+    "user": "0x754eD6423108245bD5C7FF5ACFeb8Aa16D803d51",
+    "rewards": 1929474.1154887122
+  },
+  {
+    "user": "0x3543095C56E6f434805012c38Fc422cE540506c7",
+    "rewards": 1924759.9786067626
+  },
+  {
+    "user": "0x5F70b53F43160CF39c76890488FEBac5eE33Bee7",
+    "rewards": 1922815.852091451
+  },
+  {
+    "user": "0xEd75c056B872AebCFe2E9bCd15Db0bd1A0e14B60",
+    "rewards": 1876889.4562967753
+  },
+  {
+    "user": "0x6D250f509037F1F4C60EAd946C24c31Ee0F61E2e",
+    "rewards": 1850356.8226707063
+  },
+  {
+    "user": "0xC1a0D1a66A495aa83Da81092e7Abc86076809bB2",
+    "rewards": 1831046.8419385748
+  },
+  {
+    "user": "0xb9926B4352F66923cB919B53648B9a57A4995025",
+    "rewards": 1813365.021898655
+  },
+  {
+    "user": "0x587e7D01C060A1037d0bEbc2eF655873B8C06C15",
+    "rewards": 1780245.8240601355
+  },
+  {
+    "user": "0x1370dF683d6CB7751293e191d0938Cb1bef8babA",
+    "rewards": 1710576.9226578933
+  },
+  {
+    "user": "0xD662bdAA93f1FF0Bc6D9173c2042b943cEE9CF0D",
+    "rewards": 1707480.690731226
+  },
+  {
+    "user": "0xFf289A34eb119D20E59572f5da7a7b8cdB5e7314",
+    "rewards": 1694497.4641553324
+  },
+  {
+    "user": "0x66882bc2e33ae15780EFdef9D880286e9560362a",
+    "rewards": 1688105.3698002854
+  },
+  {
+    "user": "0x49bBEFa1d94702C0e9a5EAdDEc7c3C5D3eb9086B",
+    "rewards": 1657539.9965511076
+  },
+  {
+    "user": "0x427c02352DAb38D61520CEe9EdC8Ec8230fC2c2e",
+    "rewards": 1643978.1581174245
+  },
+  {
+    "user": "0x9ba2Eb094BD23b8a9CF0fdfC38181A85ABDdA016",
+    "rewards": 1638071.7748538926
+  },
+  {
+    "user": "0xD66f41b125b72f8C04b8B58298114EE5fA84809E",
+    "rewards": 1620440.3788406802
+  },
+  {
+    "user": "0x12BB07E3d2e1e97E3C7bfDa3aFBbDbd37202B337",
+    "rewards": 1611024.2002505625
+  },
+  {
+    "user": "0xAE9038710796C9e2265eBA468732295ddE66b7Ac",
+    "rewards": 1603474.305139252
+  },
+  {
+    "user": "0x7F2Faf678667d0eD94c789a6dc99fD216d126A97",
+    "rewards": 1602209.8257005971
+  },
+  {
+    "user": "0xa76312F85eAd80ad66133A8678a9A906a5E25851",
+    "rewards": 1595234.030378447
+  },
+  {
+    "user": "0x951898a8794aE6778B3cc781A86be979275abB30",
+    "rewards": 1541780.560699342
+  },
+  {
+    "user": "0x4b86c01E49c70cb7ADbFda7570E627420105a761",
+    "rewards": 1493976.170890204
+  },
+  {
+    "user": "0x3B37a56b81c574c943f5C5617B327Ed3064b349B",
+    "rewards": 1487331.9255040612
+  },
+  {
+    "user": "0x918f78b94A36295F4ad8801951aab55093DC9714",
+    "rewards": 1475345.6499649372
+  },
+  {
+    "user": "0xF9fa3278b32d7f06F5875EbC29c47B9f69803b9F",
+    "rewards": 1471162.92855806
+  },
+  {
+    "user": "0xEF6AEd099865ad66E63706dA6f8cB83E00841bAa",
+    "rewards": 1465140.4466067774
+  },
+  {
+    "user": "0x009C62D06a614a2806184C62a77Bc2f3bAd68D8A",
+    "rewards": 1461753.1368622894
+  },
+  {
+    "user": "0x04779fEABd5D5D538BcE99E5FBF9c5cAd674a763",
+    "rewards": 1453705.6523179219
+  },
+  {
+    "user": "0xbbD851B43228371722F7797AD8339e02Bee29c0b",
+    "rewards": 1430187.5878110225
+  },
+  {
+    "user": "0x02126616A46a349A0BC9C0694E478A9445375A53",
+    "rewards": 1388277.9617984828
+  },
+  {
+    "user": "0x002ed224b3abdd71D1B6d9BDF983D9B2EeBbB2ee",
+    "rewards": 1382560.4769558208
+  },
+  {
+    "user": "0x363808D361C905e575D6D6B6bf5D96301D0894a8",
+    "rewards": 1375951.3580882966
+  },
+  {
+    "user": "0x453D1f53770a901E2bb9583464349AAcaB736a02",
+    "rewards": 1353602.8389575074
+  },
+  {
+    "user": "0xd89E0c4df0C4014794f239b12AC0Cda1D54F821b",
+    "rewards": 1345567.0553364088
+  },
+  {
+    "user": "0xc60C2232a3fb2D686841Cf5F8E809A3e11A94976",
+    "rewards": 1344019.5238252708
+  },
+  {
+    "user": "0xe2214c058692C45d7e78B670A913c95D6e2e3C42",
+    "rewards": 1310649.64983042
+  },
+  {
+    "user": "0xF97eb20765fFF93b1480730a7C7Ea75828e73ED4",
+    "rewards": 1306889.658254855
+  },
+  {
+    "user": "0x510D47eD4C51975f77af2A086794Ef2B0D4B0EE7",
+    "rewards": 1300554.9432255
+  },
+  {
+    "user": "0x05844F1Dd8e39809a1d59D74617B43fF38DF6e3b",
+    "rewards": 1293722.5025313052
+  },
+  {
+    "user": "0x77d96C306bba913B3bB4f735c891510156dd4B49",
+    "rewards": 1284074.2631114756
+  },
+  {
+    "user": "0xEDD6174EC64de887807d1769f56351D0d1621B8d",
+    "rewards": 1279883.205971673
+  },
+  {
+    "user": "0x085d952EFE573daA90557BA7bDEAb0B95cF92459",
+    "rewards": 1269987.3061861186
+  },
+  {
+    "user": "0x6767bE32192244e976e634bC1d6EAF64B18ADd52",
+    "rewards": 1268958.4937391086
+  },
+  {
+    "user": "0xd54B3bB1b58Bc6BB95161eaFf8a0B8189BBbC68b",
+    "rewards": 1254360.5052317518
+  },
+  {
+    "user": "0x9dE1288aD177dA265DbbDBda72fBDf2e4596f5DC",
+    "rewards": 1247822.1738794006
+  },
+  {
+    "user": "0x687d28877E9Ec52B1F9A3C6E04870DE36bBC9576",
+    "rewards": 1239930.625185604
+  },
+  {
+    "user": "0x40C2636148cD1c85FA457C86e6805eB7bD0D769c",
+    "rewards": 1235096.4334670017
+  },
+  {
+    "user": "0x9b7DEb2D53f57e8009be0C5186B2cf1738BfF88a",
+    "rewards": 1231623.3117272812
+  },
+  {
+    "user": "0x99Adb7E71396Aad9A90Ce09c9fD6e0CE7d4b1b8b",
+    "rewards": 1206274.5065716698
+  },
+  {
+    "user": "0x6e6E17b50FCAbE6653D569224DC7178f7B0d9CE0",
+    "rewards": 1197819.962728185
+  },
+  {
+    "user": "0x26d7Af33B064E5c7d1E6D3417d37557acCa26c89",
+    "rewards": 1184626.7514614363
+  },
+  {
+    "user": "0xc7787083EC5f1D5FD6AeCfb021da37a2Ce00a5e5",
+    "rewards": 1173328.7734385093
+  },
+  {
+    "user": "0x21669856Ef8b873166BDb2b8a321DDDA0C8eeD55",
+    "rewards": 1147272.1511228923
+  },
+  {
+    "user": "0xC5F62c4adA53Dfd7f521D32C2E7af520d0F136DE",
+    "rewards": 1130093.7430364343
+  },
+  {
+    "user": "0x36Cd6D0AB1c5cFAc39EAD2139255B9c8478940AA",
+    "rewards": 1124280.7488930952
+  },
+  {
+    "user": "0x51BbAD41b62Bc73c91e9E753e4aF308909682622",
+    "rewards": 1124087.6735286575
+  },
+  {
+    "user": "0x92681268b555f7744252B6516A66f29884E2301E",
+    "rewards": 1118872.937568653
+  },
+  {
+    "user": "0xD21eE439f35671767E9bC3410F54aA10713850db",
+    "rewards": 1117313.1048694414
+  },
+  {
+    "user": "0x239F6C9dfC84E01dCB9DCBcAA7e593FCCFBb9f5B",
+    "rewards": 1113508.1827273027
+  },
+  {
+    "user": "0x1C4cDAa0F6224656c60c8950BA4Ab7726089CA96",
+    "rewards": 1097341.2229300928
+  },
+  {
+    "user": "0xC9F149F221A347426BEE95a6640a73D8387c258C",
+    "rewards": 1075132.2101926147
+  },
+  {
+    "user": "0xb61a8be8F7676C5D2e47af9E2945247c301635ed",
+    "rewards": 1067835.450930398
+  },
+  {
+    "user": "0x959591077F46dc04DeF1bB3E64FbB54C08a71016",
+    "rewards": 1055533.4732138184
+  },
+  {
+    "user": "0xa32cA744F86A91eAf567E2BE4902f64bc33C2813",
+    "rewards": 1048535.7106741882
+  },
+  {
+    "user": "0xc403828341423aB34C10f84a38b0Ba9264CB3b05",
+    "rewards": 1039895.7347748234
+  },
+  {
+    "user": "0x53F7AC76Ea0212753b6C2FeeB21E340643bE5c0e",
+    "rewards": 1037875.7374687576
+  },
+  {
+    "user": "0x75f17E59EF0c97fde04d79F48DCfc444f48885a5",
+    "rewards": 1020010.8894354083
+  },
+  {
+    "user": "0x2079a5C8844583e6f602194E1E45816C5c843d3b",
+    "rewards": 1019288.2595734537
+  },
+  {
+    "user": "0xa24D0e2688AD9344c4413d55768e84904abacc3A",
+    "rewards": 981878.1847674085
+  },
+  {
+    "user": "0x2c99c1F51bdB04B8fb699c56928f80610328874a",
+    "rewards": 974578.5928628248
+  },
+  {
+    "user": "0xEb2A2660c9906b0fE1E77f9eE26a523250F22f43",
+    "rewards": 965862.5529414314
+  },
+  {
+    "user": "0xd9d7D65D5D2F75Cd493c69267c9274Ee7742d9b6",
+    "rewards": 963678.2390386591
+  },
+  {
+    "user": "0x2216F54f7da436D74f0d96f8FeB9C6C2ebc1f617",
+    "rewards": 950424.6883859655
+  },
+  {
+    "user": "0xDbBB940dA223152F22f9bA8DE3DF6808D2B206B5",
+    "rewards": 945779.8237641307
+  },
+  {
+    "user": "0x922E3f97d103dbBCB1a6C322E3Ed82E3553880Ac",
+    "rewards": 942421.3920472087
+  },
+  {
+    "user": "0x18F23d06320753C6e5C0D3A4D5e8F4b27276a4fb",
+    "rewards": 941160.2317725567
+  },
+  {
+    "user": "0xfbE4C84825eDF4644776C0b50C4D5c15910De501",
+    "rewards": 933267.9484468325
+  },
+  {
+    "user": "0x8FfDA542CE12c9ce15B983fFC73aad5928E8e989",
+    "rewards": 924586.7634331647
+  },
+  {
+    "user": "0x5bCf1B386034156856277E960e32007FaCAF7382",
+    "rewards": 921029.1038720073
+  },
+  {
+    "user": "0x70cBAFCa3c3d14380d27Bb90C1c2104FdA3e06b7",
+    "rewards": 918648.8243879548
+  },
+  {
+    "user": "0x88aa59bfcB7Ea5A2203EF25D99C5DCa1CE7c4f4A",
+    "rewards": 893819.5827780529
+  },
+  {
+    "user": "0x94A900d08D349e602ADf137412F64095aA548022",
+    "rewards": 892772.9819343506
+  },
+  {
+    "user": "0xF044EcF0f5b190979f0Fc77eaB358998040b8399",
+    "rewards": 882840.8814492053
+  },
+  {
+    "user": "0xD6cAf684fc9bDdb677B5516d93A7710235a34fF8",
+    "rewards": 877827.2297392454
+  },
+  {
+    "user": "0x94819942a4823af49593808c01e2F0c1BCBaF0f1",
+    "rewards": 873242.3626997393
+  },
+  {
+    "user": "0x492E9fBf4683B515742f5138142116c2651e7447",
+    "rewards": 872291.4196279034
+  },
+  {
+    "user": "0x98e1e9eb2650f6518bA722842792808d4e5a770c",
+    "rewards": 872059.1637962755
+  },
+  {
+    "user": "0xFbD9a4040E100DcDB6C2B7C45085B8a7045f5e9b",
+    "rewards": 871857.3557424855
+  },
+  {
+    "user": "0x60Eec6DE164085d41B2CabC5e8A15244B3fa152B",
+    "rewards": 868540.1140474615
+  },
+  {
+    "user": "0xc38922DAf8435aaFB316F5203551Bbfcc04bbE17",
+    "rewards": 864373.3477802464
+  },
+  {
+    "user": "0x9A1e5e92761b6e8555f0799B52912475cB91260d",
+    "rewards": 856384.2850988142
+  },
+  {
+    "user": "0x74E7Ff13Dadb1A4B65c6E17B0c15c62524978eb6",
+    "rewards": 853743.7216808961
+  },
+  {
+    "user": "0xEc8C702eeB17eD7797a6a95E5eE19E4baCa22FD5",
+    "rewards": 850597.596085182
+  },
+  {
+    "user": "0x0262B36f34D99C5c652EA0717Cf46b0aa96CaBA1",
+    "rewards": 850459.3721210185
+  },
+  {
+    "user": "0x183A60AB7f1B91F56518974e462C7eb58e917E20",
+    "rewards": 846339.6380789729
+  },
+  {
+    "user": "0xCc7A03f0427e9D47244e35Fd1bdD22f45ed50f29",
+    "rewards": 843317.1352023993
+  },
+  {
+    "user": "0x549072184bA4826d2E2bB66c9E2239ab76DF5AC8",
+    "rewards": 839439.5748665553
+  },
+  {
+    "user": "0xFf5441686DbfB61C7E1D6C81b5Bf73fc963f2e84",
+    "rewards": 839149.9719414448
+  },
+  {
+    "user": "0xE89490B790EA4e1CE5196a31841dF117a2d4b019",
+    "rewards": 831287.987203455
+  },
+  {
+    "user": "0x82F28955fa0Ac7d1C2D2D72993932003059782F6",
+    "rewards": 829063.8636245804
+  },
+  {
+    "user": "0x7fB138B65fa0303128EfbC3517a499C618ea32f0",
+    "rewards": 819877.4701961868
+  },
+  {
+    "user": "0xdEE9BfE61fC5b36f95eda95718A71Bba084DDb03",
+    "rewards": 784844.5259528637
+  },
+  {
+    "user": "0x58Db6F263561d29fbdB9CC9B876e60F209d9cC95",
+    "rewards": 777191.5093386712
+  },
+  {
+    "user": "0xCB8A3a5D3cB94622e9996d17b2cb0ADc5450B6aF",
+    "rewards": 773652.1154191344
+  },
+  {
+    "user": "0x54c219F0f24AA795f6a18e8fD99A84C858252Bc0",
+    "rewards": 771226.2258305941
+  },
+  {
+    "user": "0x0be53d9FA63FD5817acd216c5B77514417D138FA",
+    "rewards": 765956.749784476
+  },
+  {
+    "user": "0x1d6b00BD824Ffc027de7FDC42F779Cf1D1d8b004",
+    "rewards": 760064.2773102698
+  },
+  {
+    "user": "0x2D385E887a23BA4512C7b1E6e7c01bc41Eb9de3C",
+    "rewards": 759927.0458582425
+  },
+  {
+    "user": "0x32329210782E8E024005cc89D957871d989E0Df7",
+    "rewards": 747013.4023636713
+  },
+  {
+    "user": "0x054f9062D8e9b1F52BC5e351d083dec8a521fF35",
+    "rewards": 741167.6455771574
+  },
+  {
+    "user": "0xFF5d7a85627Df507EBeD7120AC131D4F7Cc42518",
+    "rewards": 737656.1264953018
+  },
+  {
+    "user": "0xA5b8a0365213FDA3b77A7B9d7FD95dBa44e36395",
+    "rewards": 734771.2703220894
+  },
+  {
+    "user": "0x934430BF1a4EeFc2917dD4A8d7AD9a0E8685BB92",
+    "rewards": 722406.1330840852
+  },
+  {
+    "user": "0x80a85C93AbBEeA05B81016A0eA1019EFf0526269",
+    "rewards": 719267.6595985952
+  },
+  {
+    "user": "0x222160B6C5Fd229832654188593d1321b8D6d906",
+    "rewards": 718479.352602038
+  },
+  {
+    "user": "0x1D9924c5c090Dc5FFD649b1B59059B55bE3bAE94",
+    "rewards": 717115.10762913
+  },
+  {
+    "user": "0xb1141E915E3B31CabbbAd585491580D34c320016",
+    "rewards": 704483.7017149181
+  },
+  {
+    "user": "0xf8Bc8e0fdc9De7b3E00B7C36ed2787BC3aFf659d",
+    "rewards": 701795.7646987983
+  },
+  {
+    "user": "0xdBDd372Aa9386dde2Ae9c3b1240b95cAff778880",
+    "rewards": 701774.4589001337
+  },
+  {
+    "user": "0xb9FfE297bd209b1946de4aE1911c55D874801219",
+    "rewards": 697629.8881094517
+  },
+  {
+    "user": "0xf121149c25C100E838d5DFCc574aDfb91BE6aEB4",
+    "rewards": 694372.8247854938
+  },
+  {
+    "user": "0x20c8bb763aa14A246cc443547f0f15aE4e7A90E5",
+    "rewards": 691703.2437515232
+  },
+  {
+    "user": "0xb68F3056d095733247aB5283761310F6423E92FB",
+    "rewards": 691488.2368978305
+  },
+  {
+    "user": "0x4c8CA58562d765Cc0d5bD7FDdd38b3cA6Ad5Cce3",
+    "rewards": 683474.8332683166
+  },
+  {
+    "user": "0x81dE56E2957Ef7CB5470E451dBF231EBAeFAcB87",
+    "rewards": 680322.8326002536
+  },
+  {
+    "user": "0xB932CD06292634965518735f1725a6a647a2422F",
+    "rewards": 669249.7841920928
+  },
+  {
+    "user": "0xc23087C74afAF4725a8f122304a5fb255De49aAB",
+    "rewards": 664180.8534662981
+  },
+  {
+    "user": "0x1d622a09fC4CAa34D7c3249aC011958c8C2278cC",
+    "rewards": 653486.7686071406
+  },
+  {
+    "user": "0xFA7C763A8f8f4cdfD21b8Eb932FfEF5E4D46a3b1",
+    "rewards": 650962.4227087611
+  },
+  {
+    "user": "0xF7B8400fe8e636f674e48c24BF8Fd220F160ac4B",
+    "rewards": 649428.2169543541
+  },
+  {
+    "user": "0x56e1f9D00680be40bD3Ea9B95486f8a43BEc4620",
+    "rewards": 646479.9528710518
+  },
+  {
+    "user": "0x015F6bb5eBEf7e96b38A20BCb9dB51FD65e48d35",
+    "rewards": 642681.0581556977
+  },
+  {
+    "user": "0x48Bc353aF20506691431079f50F92345C2AbD6A5",
+    "rewards": 642464.9668094679
+  },
+  {
+    "user": "0x3684260267292521D671AB6E1964F96Aa0318524",
+    "rewards": 640406.6946936309
+  },
+  {
+    "user": "0xe38c39c63b20Fc130bA179f18939778a0EC9E581",
+    "rewards": 634566.0986030721
+  },
+  {
+    "user": "0x5714CE2F42893C70Bb5E973169F4348d2E4b20C8",
+    "rewards": 628010.9311516068
+  },
+  {
+    "user": "0x9E2a16AD7098b0aA23a07E49c42fe4987B6496e6",
+    "rewards": 620904.3915499551
+  },
+  {
+    "user": "0x950E6c92e32F2407Db95dDA1B4B7B77bF3091494",
+    "rewards": 619892.4263811262
+  },
+  {
+    "user": "0x22EE890d14f06b5C56A6209EF7a0aD84967BCc19",
+    "rewards": 618948.6112518865
+  },
+  {
+    "user": "0xAe69C49f1ef13fcD1d68d03A135d3f4d383CE96f",
+    "rewards": 618376.4152933339
+  },
+  {
+    "user": "0x8b632Cb6C2343C6db1C61D82b680a71115586fBa",
+    "rewards": 617307.8786728395
+  },
+  {
+    "user": "0x867127f8BdC9b5b1091cA2A70FAC3696492120c4",
+    "rewards": 613156.0280640498
+  },
+  {
+    "user": "0xF2faF6d419448510efFc55EEbf02da894625FEcc",
+    "rewards": 612121.5281698349
+  },
+  {
+    "user": "0xA1DF70F8D685ea29F661544bF6AbCd059cfA21D4",
+    "rewards": 610415.2502660399
+  },
+  {
+    "user": "0xf83B7Cd45bD31065354e93ff5833C8aFEB757765",
+    "rewards": 610188.4535073619
+  },
+  {
+    "user": "0x78580f081Ec801bb590FeFB127456509Ae742f84",
+    "rewards": 606029.4817370492
+  },
+  {
+    "user": "0xf0F31Ac0cd7179c13c030CA692954dD991bb9E31",
+    "rewards": 604965.0399459577
+  },
+  {
+    "user": "0x1ed89d71f4eb73BE0180FF5Ab1448792B5864C3C",
+    "rewards": 601512.9986732188
+  },
+  {
+    "user": "0xcCD775A62fB5758D2B3Ab9Ae26E0dB0509633F6d",
+    "rewards": 599581.3291608553
+  },
+  {
+    "user": "0xaF59cA501Dae42433dA19F44885821A400483110",
+    "rewards": 591444.0476016165
+  },
+  {
+    "user": "0x7b4E0C27fe68D85E258798Fcc7a08BF185b053C6",
+    "rewards": 590412.2817988228
+  },
+  {
+    "user": "0x93b09E064BF3d4A8557fCBCD8e071f86a3D27dE3",
+    "rewards": 588636.2347493559
+  },
+  {
+    "user": "0x62485524efC14D699f419f3F68a2b3d4e0661304",
+    "rewards": 585781.614985218
+  },
+  {
+    "user": "0x04e4C6d79Bc2C56174479Aa43291388dDD05C67A",
+    "rewards": 579922.3573675284
+  },
+  {
+    "user": "0x64392f8f436343a1c505c29B1e31822DB9095dde",
+    "rewards": 578385.4718503363
+  },
+  {
+    "user": "0xb75181B6Dd08927682fd73266dA157C23c42F462",
+    "rewards": 574932.8192094077
+  },
+  {
+    "user": "0xe2F9b73Ad8b0803A1Ed5AeA3C5B57F02e41C1D02",
+    "rewards": 574443.9278589254
+  },
+  {
+    "user": "0xB7cf507C64e4Bc10CBcb7ddFc198B60482A1e8c9",
+    "rewards": 572791.6526212386
+  },
+  {
+    "user": "0xbeC20F756aa5157015EF95273eA9a7F022C17C80",
+    "rewards": 552564.3165302054
+  },
+  {
+    "user": "0xE574009cbaB7C3a071062570ffB5956D4755285c",
+    "rewards": 551043.9732484615
+  },
+  {
+    "user": "0x00DF6a29109FC7A247f8F54E761e5f5DccC0Ddb6",
+    "rewards": 550572.6830237452
+  },
+  {
+    "user": "0x0122C356ee71E36255c5ec22Ae345646CFCEeE5B",
+    "rewards": 548188.6438042105
+  },
+  {
+    "user": "0x328a3867cAf19d64232f7115c0AaBa32c0b48616",
+    "rewards": 543255.24288002
+  },
+  {
+    "user": "0xb2809422cB33dd08d8AbE7B19e0984BC8EF7234b",
+    "rewards": 540082.5261472183
+  },
+  {
+    "user": "0xA72ECA8E67a955E9DB7A4A1b3decF86628857ccC",
+    "rewards": 538370.4274628308
+  },
+  {
+    "user": "0x0B161D43439d3451bB7fC18B917Aa57A650a560e",
+    "rewards": 534158.5081808446
+  },
+  {
+    "user": "0xb452b105062FEb2aDdf6fdAf6f137646f79b5568",
+    "rewards": 533558.2319986945
+  },
+  {
+    "user": "0xF3Dc67b7d74049C1465607F5D074d9fB9c785FF7",
+    "rewards": 530062.7696027536
+  },
+  {
+    "user": "0xD7D235ed794Bc9eCd1711d0e681838888394AaA3",
+    "rewards": 529637.4575215596
+  },
+  {
+    "user": "0x4Efa4aebE9f040BCE95149f8BFf8167D213DABD2",
+    "rewards": 523997.68241351267
+  },
+  {
+    "user": "0x1972dcf1B8E712f058Ce6181b1e8E9BB902d5646",
+    "rewards": 523970.3839624871
+  },
+  {
+    "user": "0x950d03e5b24903331507787f99E5e02378afCFa8",
+    "rewards": 523200.61242262804
+  },
+  {
+    "user": "0xC4eb753fa60380B5D3192F1E4f1e0745C3688f42",
+    "rewards": 521136.6680750977
+  },
+  {
+    "user": "0x1B169E7b1D625CA011D7398ff6430543185d3C20",
+    "rewards": 516896.3574977229
+  },
+  {
+    "user": "0x1356797E2ff9261a6c4F307ed2b63c692943eE8A",
+    "rewards": 503850.50083930744
+  },
+  {
+    "user": "0xAAfbc30d7e59f7A25030130738142aaEa614BF07",
+    "rewards": 502753.73029747367
+  },
+  {
+    "user": "0x630d8a019955EF42A7ca25A3816F90dCE7D58815",
+    "rewards": 500964.01905914175
+  },
+  {
+    "user": "0x0a392731f3B343560f8726F5439F28c024c9E6F6",
+    "rewards": 495617.02868350706
+  },
+  {
+    "user": "0x2cC4924eA8418cEDCd73fAFdc0FdD5dB9fc493ad",
+    "rewards": 490178.5639264563
+  },
+  {
+    "user": "0x3A3a6a721EA1a58efF9763F022819E0Cc0A0B911",
+    "rewards": 473692.2045074753
+  },
+  {
+    "user": "0xA649a7b78071da654E677Cd4Bb7A55949911a483",
+    "rewards": 472788.80997188936
+  },
+  {
+    "user": "0x31c19C467C96C0dD601DB8a31e1B66d15c624039",
+    "rewards": 467572.1795143228
+  },
+  {
+    "user": "0x4B06fc7C198F975575A47b1097145cDB8837DF19",
+    "rewards": 465176.123250261
+  },
+  {
+    "user": "0x183599d87c73B2c183f5E42F914eCDDa37dd2DcE",
+    "rewards": 465045.0547865443
+  },
+  {
+    "user": "0xdf2b0309Cfcd8AA7cE28BBa18eb4690d65a2616B",
+    "rewards": 462693.46970651305
+  },
+  {
+    "user": "0xd0201837904A90AA676Fd61AcdDa15830545f58D",
+    "rewards": 458815.4919737007
+  },
+  {
+    "user": "0x8E40a06CB0Ed8ACEa95c5de2263736297900b2b6",
+    "rewards": 458660.8408387518
+  },
+  {
+    "user": "0x6FC84E3ea52F766Be13bd3F5c70B33923128F527",
+    "rewards": 458108.2475560471
+  },
+  {
+    "user": "0x660400a60A948F62f0c6FD3cA16B26B3fFe788a0",
+    "rewards": 454303.5838737808
+  },
+  {
+    "user": "0x59CcD9ECD73cD9752FA8a46336d0908403daB1aA",
+    "rewards": 453434.7539788701
+  },
+  {
+    "user": "0x938Ba92C096Ca483Dc0d4b4fc2C366804Ce11BBc",
+    "rewards": 453313.65447774815
+  },
+  {
+    "user": "0xb4Aab4AE3C36AD9A8Ab84e57954F6723149Bb4AB",
+    "rewards": 453215.9897598206
+  },
+  {
+    "user": "0x020483457161737fB818F86c848Bde3d87F335F6",
+    "rewards": 451976.44127450336
+  },
+  {
+    "user": "0xb90565A88fB5178A4D8201792d848B0Df9d81ba2",
+    "rewards": 451815.54248360277
+  },
+  {
+    "user": "0xFB42F6E97f0FD1AFf4a3d5D1713e6D8447517d4C",
+    "rewards": 449723.76185229176
+  },
+  {
+    "user": "0x91bEDF27Cb154430Fc5918AA5acb386d40ec8559",
+    "rewards": 444848.3815808349
+  },
+  {
+    "user": "0x1A70644ae6C1BC93383E945C14B2798672AEd2A8",
+    "rewards": 439237.8470179134
+  },
+  {
+    "user": "0xDF7494B3C3aa53EfD45633A38F8d64214ABcF7CF",
+    "rewards": 432815.64902431704
+  },
+  {
+    "user": "0xD1CADde76d741C898a25b163EE103112d98410A1",
+    "rewards": 429983.1976750966
+  },
+  {
+    "user": "0x8525DEC6c7b330234e5b470CA65189e1670DB197",
+    "rewards": 428973.80146170565
+  },
+  {
+    "user": "0x6df0Bf93B280da0C83af18183BA327591Fb67A3c",
+    "rewards": 425182.7215180514
+  },
+  {
+    "user": "0x3996250a00c63DEaF9efD8536CA7f41eD6F26400",
+    "rewards": 424921.5085445943
+  },
+  {
+    "user": "0xeA00E57814C448e1bEc8B4a059Fd272F5D9D1140",
+    "rewards": 424595.67468260496
+  },
+  {
+    "user": "0x06D66CEc581D07660c7BAc9C0Fefc1f708a778Ea",
+    "rewards": 420288.0936172861
+  },
+  {
+    "user": "0xEd20f206DDE0DC1ca8c52f4c2A8368fCd3f9Eb02",
+    "rewards": 413483.31788902613
+  },
+  {
+    "user": "0xD9eb36114D6f6e0AE8F09E2d7Cf219447B033721",
+    "rewards": 409191.9696649582
+  },
+  {
+    "user": "0x46E3C3450Ec4e5b2344Dfde0CB86736486147757",
+    "rewards": 407476.1270723966
+  },
+  {
+    "user": "0x326D00373245E683155ec6BF114C268a7A14570B",
+    "rewards": 405229.4492121588
+  },
+  {
+    "user": "0x6a31Dbc4B4E56421ae7b6A45fC7d7Be6bdfd355d",
+    "rewards": 404741.6925278136
+  },
+  {
+    "user": "0x68e19Da5186f7435Dc23C797593441310871472b",
+    "rewards": 403990.74782373407
+  },
+  {
+    "user": "0xA958345aFE6efC5A58F587C263B491b8ee3A37C8",
+    "rewards": 403940.8276898025
+  },
+  {
+    "user": "0x7e1B7C309CF1F9b173aDD63660b5d296a390f849",
+    "rewards": 401174.0022214823
+  },
+  {
+    "user": "0xF9109E09efcF536aF79566d72e43A8B2c91c6850",
+    "rewards": 399502.39184135414
+  },
+  {
+    "user": "0x8F9dabC146545C5C15265dDc8BDC6Df6976f995D",
+    "rewards": 398024.2067648256
+  },
+  {
+    "user": "0x0909d9B2E965392A494a2B93ab7dc411Dc512e2a",
+    "rewards": 395175.8289343407
+  },
+  {
+    "user": "0xF51863D7580777c8DBcb84e86219622008183dD7",
+    "rewards": 394720.49853408075
+  },
+  {
+    "user": "0x86204Af3AaD5d5518551D1Ef174528fB7d7EAFf4",
+    "rewards": 392646.84952010907
+  },
+  {
+    "user": "0xBf52864FeB04CEc892F4368BB7A285955AFfFcE3",
+    "rewards": 390915.4498316924
+  },
+  {
+    "user": "0xA7A17E0904f4223d93d0C43b11d4c979eA48DFf0",
+    "rewards": 387584.8272696633
+  },
+  {
+    "user": "0xB152F71410A3991C4381B5d609BEdd0Fac027777",
+    "rewards": 387071.826535344
+  },
+  {
+    "user": "0xd75e421a43638f01D2B0f19ae42938B5264591cF",
+    "rewards": 386166.32459741354
+  },
+  {
+    "user": "0x0d01Ab462c80E407D4DC219509B0473AdB23B0f9",
+    "rewards": 386001.80500233034
+  },
+  {
+    "user": "0x02F9b520D07Ac0f3c96d189ec1aee8765D008A23",
+    "rewards": 376453.7134723192
+  },
+  {
+    "user": "0xe66EF175F7D55d592b2D7C249372287cFE258553",
+    "rewards": 370379.5920521706
+  },
+  {
+    "user": "0x3585505423cf5f16AcEC481D8314E58d1D0c4C19",
+    "rewards": 368949.17984863726
+  },
+  {
+    "user": "0x18DaceB616D48681c94b58eC78bdb5DbBAD581e3",
+    "rewards": 362482.40022635116
+  },
+  {
+    "user": "0xEf5cEF82aa5DE4e166D06e180021d60509a59439",
+    "rewards": 356845.74236862105
+  },
+  {
+    "user": "0x210ad6FB934FC48Fcb532156a60B9F9B8ac773bc",
+    "rewards": 355876.9459257528
+  },
+  {
+    "user": "0x29114D76E2636137282949D2F79Af8581F6fF87f",
+    "rewards": 354680.60266031465
+  },
+  {
+    "user": "0xF9659B5d14E11184BEC30a30708e7e18C9620555",
+    "rewards": 353229.63541750226
+  },
+  {
+    "user": "0x82EAbF49dC0A73f234d17f633B3217Cd6E987440",
+    "rewards": 348856.3571004016
+  },
+  {
+    "user": "0x363d878321Ec9bD2c0B00b079B75C81f11328A09",
+    "rewards": 348534.5305080752
+  },
+  {
+    "user": "0x9c50C9cFEc912DdC03bd73C6aa4D2033caAA2562",
+    "rewards": 348509.6360672772
+  },
+  {
+    "user": "0x4b084583ed9F6cDFE4768BBE5A2b2199088C7873",
+    "rewards": 347623.25189018605
+  },
+  {
+    "user": "0x1E021509548093a7073c7B3bC07EE154c18e26Ef",
+    "rewards": 346711.86237397394
+  },
+  {
+    "user": "0xA9f96229E8B1366166fD626319d7bbC39DaD1146",
+    "rewards": 344543.94684840797
+  },
+  {
+    "user": "0xE00334041f856dDBfa693895bdcbff54D5Bff536",
+    "rewards": 342545.1431488415
+  },
+  {
+    "user": "0x5620a757C9B0D735595BeED3a95958a1a582af18",
+    "rewards": 341873.53478586004
+  },
+  {
+    "user": "0xB6dEE7878b7c34FF772aaaC3AD27Cf5bfd92Fb69",
+    "rewards": 339794.42078289774
+  },
+  {
+    "user": "0xFdfF139B421b8036fd760026f8b820Afaf00A0f7",
+    "rewards": 339545.19410022214
+  },
+  {
+    "user": "0x94abA9F81aEF828aBe63905fDb0E95e321FEE531",
+    "rewards": 335316.52306826384
+  },
+  {
+    "user": "0x206aDD6BD45b371752E515Ac38591DF28F425B3f",
+    "rewards": 334860.58034012304
+  },
+  {
+    "user": "0x1a5611A63B286D04BA80e2887379a5701a07f00E",
+    "rewards": 332428.46540884743
+  },
+  {
+    "user": "0xe9144aaC35a158D511C76bC2530Bcf6a7a681234",
+    "rewards": 330656.05005733145
+  },
+  {
+    "user": "0xB32F12461d3fB14454D74a09fA2A0d7C72ea05C0",
+    "rewards": 328941.5915807419
+  },
+  {
+    "user": "0x2e23602c22B7E52008F8dD1A74683ac4454b78f4",
+    "rewards": 328025.2247649629
+  },
+  {
+    "user": "0x21c9a14C2d79327F8a90F6b71E66D9B4F01665D5",
+    "rewards": 320487.84903092723
+  },
+  {
+    "user": "0x45af540F110a5195bA6686EeCeCfE10aA159f123",
+    "rewards": 315677.2356403712
+  },
+  {
+    "user": "0x088A5450136fe2711c0591Be5d3e3C2e1e130313",
+    "rewards": 314134.9180396625
+  },
+  {
+    "user": "0xB271893AE4984E725120a4F10bb7E19bc82de24C",
+    "rewards": 313684.5854040887
+  },
+  {
+    "user": "0x0A8b59cad8Bd0B9EBf56f440a3071E2647992C3c",
+    "rewards": 313232.58248251776
+  },
+  {
+    "user": "0x3E7b8aEf95CFF0ECa66cf3F114e635FD3D42294e",
+    "rewards": 312954.0282917269
+  },
+  {
+    "user": "0x4a6B1be72FE0f8e7C0D701f95F55bc9e3cAC8bA5",
+    "rewards": 312473.2763394324
+  },
+  {
+    "user": "0x8008ef3b1878cb97Dd271D788B484538446b4Da9",
+    "rewards": 310659.97139010055
+  },
+  {
+    "user": "0x3aB4078E9Cf35B17db6808975B040EF39496ED92",
+    "rewards": 309947.930980553
+  },
+  {
+    "user": "0x2596ff011FeeD9330C8E0f0FF611ed9Eec4ACb9d",
+    "rewards": 309652.3075676671
+  },
+  {
+    "user": "0xe5A601d8654de42755ce5ee91703e0dF6cea9365",
+    "rewards": 308658.531208068
+  },
+  {
+    "user": "0x02517B50e8c3AD6f77E8D23A16b417489d41918d",
+    "rewards": 308264.6117323322
+  },
+  {
+    "user": "0x24aB4fF0c4D3933149C060E9949B7F695722FCA7",
+    "rewards": 307083.65393610083
+  },
+  {
+    "user": "0x861f228a312e27Ea699316D305823A6b956cf4c4",
+    "rewards": 305888.8113926744
+  },
+  {
+    "user": "0x32557753C18ab6Cfc7f991Fb327F7BB0a70FBC9E",
+    "rewards": 302959.36495036806
+  },
+  {
+    "user": "0xC8F2E7f715B1A649Cf171603d27A5a0A0CF5Bc36",
+    "rewards": 298329.53904759185
+  },
+  {
+    "user": "0x9048c9Da2cBF41Ea2Fca56CD3c45fF811cf11006",
+    "rewards": 293614.8252990204
+  },
+  {
+    "user": "0x3a65542251d46CF93ecDC3817ac2b2c8776e14EC",
+    "rewards": 293600.4557847469
+  },
+  {
+    "user": "0xcD46a420aaB8e820A6EF044Ad1d8723744E3E596",
+    "rewards": 292178.29502849194
+  },
+  {
+    "user": "0x5CD5ec5734850eE78D5CA7663d05E2A8989e529f",
+    "rewards": 291181.6477831223
+  },
+  {
+    "user": "0x5bAd64437A089A5cb8BB1B5443504700a1d76061",
+    "rewards": 288436.2892283425
+  },
+  {
+    "user": "0x03aEBE6eB44378D2691136bb70082526C33c037c",
+    "rewards": 286757.8546472191
+  },
+  {
+    "user": "0xDfF871be81DeFed21F33e1720416BFA958D8F96E",
+    "rewards": 286134.49654478044
+  },
+  {
+    "user": "0x0D84d6Dbb26bd12760Aa2E849f0DA259Fe1f2Ff0",
+    "rewards": 282551.12863881607
+  },
+  {
+    "user": "0xeeC0e212f0A3B9FEe57D805b2eEA609ffE3A03B6",
+    "rewards": 279594.63648733334
+  },
+  {
+    "user": "0x5A700EB0A46913b77a7Bb3E96838a27658B0F7c5",
+    "rewards": 278845.2168439395
+  },
+  {
+    "user": "0x39A4C34fa32Ea5Aa24a2516fADfD3850d3b24271",
+    "rewards": 278830.71858783637
+  },
+  {
+    "user": "0x21567EbB3478BA040960B421534274FA8529B525",
+    "rewards": 276500.5942703277
+  },
+  {
+    "user": "0x9F607bC8Cba9d6678d32Ab4fc2C0259daD6e03c1",
+    "rewards": 274969.43783484714
+  },
+  {
+    "user": "0x1Ca00E336BE41327Fe4eC8FaE220b7b8B117529C",
+    "rewards": 273785.4408490442
+  },
+  {
+    "user": "0xB7fada70446a3D743023b4a1dDD5Eef2243b971B",
+    "rewards": 273153.5028828086
+  },
+  {
+    "user": "0x7a0204f13c8160C506529498cCC63F696adb9D98",
+    "rewards": 272947.32488562306
+  },
+  {
+    "user": "0x9375274EF0dE1e741B6b838D246E0A23128e7773",
+    "rewards": 272560.2154373481
+  },
+  {
+    "user": "0x020f7E5974Cb701119E0038014CBdd3C209C951d",
+    "rewards": 270959.80474634713
+  },
+  {
+    "user": "0x71B2aDe7DBB5B35Ac59c53092B725DA1FD97c900",
+    "rewards": 269763.41128829465
+  },
+  {
+    "user": "0x1b81bE0591C2203643F00f1D836719c842b409Dc",
+    "rewards": 265192.0836117247
+  },
+  {
+    "user": "0x2D5aC213398993C0EC596fb91aDFC975E7ECf5a5",
+    "rewards": 264548.5493919802
+  },
+  {
+    "user": "0x0beB59E82540977Ee71aFfDE1831c52d44635cE3",
+    "rewards": 261240.78676817188
+  },
+  {
+    "user": "0x597276948cEEf6E5413981cbbB42F73B730C40bB",
+    "rewards": 259308.4203489984
+  },
+  {
+    "user": "0xC7d49Ab4b016d07a2ACdCe8aE0f72702B658332d",
+    "rewards": 256935.2055250306
+  },
+  {
+    "user": "0xa0d254a39Ea8645FFc79A9353c32f02504c5F3e7",
+    "rewards": 255611.55802997772
+  },
+  {
+    "user": "0x7d2507da856E44bf5894f3eF503f94587bd74407",
+    "rewards": 254940.48710237848
+  },
+  {
+    "user": "0x25842bf655711C1D79EC2EB6831D1DEd71AA6a06",
+    "rewards": 254844.79301797695
+  },
+  {
+    "user": "0xF65EDE55439AD279a1E12dA9c7da3B74fA074dF8",
+    "rewards": 253699.98409635227
+  },
+  {
+    "user": "0xC4C737817c5E6dED41fF756087D45B70fa299c35",
+    "rewards": 249802.4298816914
+  },
+  {
+    "user": "0x15D574800a762853D3985787EB751aF7acae195d",
+    "rewards": 249730.73603374744
+  },
+  {
+    "user": "0x1985c72d3d184F7096489d46b0239ce3EAb8f6a7",
+    "rewards": 248344.75991694606
+  },
+  {
+    "user": "0xe89b6D860194d1C2A0b329e959bf9445Ee77D899",
+    "rewards": 248343.38122679814
+  },
+  {
+    "user": "0x1fA25bC9D71A5f1df87D26D4401E56462c7D4288",
+    "rewards": 247952.01493381543
+  },
+  {
+    "user": "0xB7a32A428A388E9d48aBF54D4500dC5D92F1778B",
+    "rewards": 246705.97367396016
+  },
+  {
+    "user": "0x0f9Bc27821E9CE66820C3952E30b92797cEE49e2",
+    "rewards": 245532.62321195944
+  },
+  {
+    "user": "0x3A229cc52E7Da16878339707cdA9C6DAfcdB159d",
+    "rewards": 244757.01649701621
+  },
+  {
+    "user": "0xd2DFC551F1584a5f6668db1425cD1eB402F0Fcaa",
+    "rewards": 244288.2842417378
+  },
+  {
+    "user": "0xdE7dd8b5680baa8F0cE20845B0fbE6cB7424EAFa",
+    "rewards": 243872.5724727852
+  },
+  {
+    "user": "0xd4d40e2AEb9Fde55b948B7ec3CaEd56FdDF8C8e2",
+    "rewards": 243589.0738511541
+  },
+  {
+    "user": "0xEB8A424eeD512857037D91f69db5c282ebBc181e",
+    "rewards": 243428.2468428202
+  },
+  {
+    "user": "0x431a00d324538127B0eD27fcc97C0b403fF0518E",
+    "rewards": 242906.38267819458
+  },
+  {
+    "user": "0x2759c3d4E5fba1103FD43ba7cd68c93F6403EfcA",
+    "rewards": 239984.86324703897
+  },
+  {
+    "user": "0x16366055Fde44Ca646DBF25bf729972D83604aca",
+    "rewards": 239173.7510004537
+  },
+  {
+    "user": "0x059319499D44abBF421341825Ac045dd8979cd34",
+    "rewards": 238136.31775694824
+  },
+  {
+    "user": "0x4dd8883460bB9a75238600Fea718dfEDEF5f807d",
+    "rewards": 237092.44309915384
+  },
+  {
+    "user": "0x75b017D5A6D92cE0654484bD31B5170D3766b3e0",
+    "rewards": 237092.44309915384
+  },
+  {
+    "user": "0xB1057b0E8D42479074C0908fa7db4c9a45Af234e",
+    "rewards": 235865.5498158951
+  },
+  {
+    "user": "0x60989a7B6ef22E09948FD2eE899D08CA3076989F",
+    "rewards": 234047.65474474372
+  },
+  {
+    "user": "0x8315E5BE134404EF24eB8dE62387559ecFAc100a",
+    "rewards": 233721.71201284011
+  },
+  {
+    "user": "0x0D90CA3900D40eF0cceC1a42dF463A11876BC1e7",
+    "rewards": 233575.74266427054
+  },
+  {
+    "user": "0x5cC808B4F67ec254cf34f7Acc198593991054b6b",
+    "rewards": 233122.05019385833
+  },
+  {
+    "user": "0x04CDe7FB3B21898eF71fc1b4Ea2a7A0542944Bd3",
+    "rewards": 229251.5611381243
+  },
+  {
+    "user": "0x65B1737A6Ce2F7b67bDDCdd77C9c814296105d2e",
+    "rewards": 229085.04849178623
+  },
+  {
+    "user": "0xF42Ed683F6C76E6840F40894D0c0471471341162",
+    "rewards": 228764.98874560895
+  },
+  {
+    "user": "0xE4CFe9434449AEEeAB66AB98D72f538E1937271E",
+    "rewards": 222670.71262394803
+  },
+  {
+    "user": "0x2a9Ab00d9ffa0FA7219E66d2852F94b10905a418",
+    "rewards": 222367.51165256355
+  },
+  {
+    "user": "0x1042C39ac4c7100D8fC207c4BbFD5b3abca1a5Be",
+    "rewards": 212968.72891306743
+  },
+  {
+    "user": "0x43185ADF4005D7045f99B7f7e08e62680980f14c",
+    "rewards": 212018.8885792544
+  },
+  {
+    "user": "0x2c579D28826Ec23A29aB4b5fdfFb0dc9cDfa7015",
+    "rewards": 211747.2832950134
+  },
+  {
+    "user": "0xBD953a191a942622134793eD80b17D17db1EF2DE",
+    "rewards": 209384.8118721544
+  },
+  {
+    "user": "0x1A6dBdF14BcdFC78C7Ce8A87F22380e9D16CfB8a",
+    "rewards": 208854.57940160105
+  },
+  {
+    "user": "0xf55b498BCBa43EaE6340B348a0abb69273Fe13b5",
+    "rewards": 208509.39293189507
+  },
+  {
+    "user": "0x14532B95B8c3623b9Bf3472B3E706A74cc6a62f2",
+    "rewards": 207503.49531488086
+  },
+  {
+    "user": "0x68Ae261E6eE6c25206b4F78DF6fA645D79d38a66",
+    "rewards": 206612.7469316698
+  },
+  {
+    "user": "0x3cf0FdEC7292E6fe382eb54EAf4003f5A1C398E1",
+    "rewards": 204755.160315618
+  },
+  {
+    "user": "0xACCD69A43Cd473A42F5B642257287301f6ed4C7E",
+    "rewards": 204606.7561920375
+  },
+  {
+    "user": "0x2b0935Ee95453B227c6a89F90E03Be001A0003Cc",
+    "rewards": 203930.4656340951
+  },
+  {
+    "user": "0x811357efFacE2742843Cc7A6e87f53198c77c14E",
+    "rewards": 203294.3279644442
+  },
+  {
+    "user": "0xa42C300Ca81414B41bed10415d517A40715FDE29",
+    "rewards": 202800.67490118797
+  },
+  {
+    "user": "0x3044bec82a502f3d08AB8dC4F377c3B3e28683e3",
+    "rewards": 202617.42426348908
+  },
+  {
+    "user": "0xff2c4FC6DF7738F9e99b8cD17c66b7fa68f9c5af",
+    "rewards": 200685.33247559407
+  },
+  {
+    "user": "0xf6180099D57908811fC02846093B52CAA076Ef90",
+    "rewards": 198233.36874477885
+  },
+  {
+    "user": "0x90472d7aA82Ed843509225F83fC18a08b86c35a4",
+    "rewards": 196519.6200340116
+  },
+  {
+    "user": "0x46455f2FEc29f31f058A50CC70621FFAcCFd030A",
+    "rewards": 195627.93073297126
+  },
+  {
+    "user": "0x216e2F2345c6903E9ba5D92894998d75E5A25383",
+    "rewards": 193964.28627403904
+  },
+  {
+    "user": "0x0343EF006c59ED9bc98eE05b26f746666903303a",
+    "rewards": 192729.26292084847
+  },
+  {
+    "user": "0xBbAfD89153Bf075fc9c012F679b86aa483b7D953",
+    "rewards": 186251.530871766
+  },
+  {
+    "user": "0x90F0642B0fA0c97099a428866BC3048A691F1052",
+    "rewards": 186063.75105441548
+  },
+  {
+    "user": "0x03b8af1F1804E44971B3791f756F38c41748bFd8",
+    "rewards": 185086.36718310806
+  },
+  {
+    "user": "0x7AB813F8dBbf9F0AD0917aCdaacc989949EF0493",
+    "rewards": 184305.1941686137
+  },
+  {
+    "user": "0x7af860532A492EcE1bc54C4c748F244843991865",
+    "rewards": 182940.45446122106
+  },
+  {
+    "user": "0x514b2E63015167504E42cc82335ee4d8AcB8DeaC",
+    "rewards": 181524.97799700912
+  },
+  {
+    "user": "0xFbf19160c49B45324287A8E5D6269D2B384ED526",
+    "rewards": 181480.39597766267
+  },
+  {
+    "user": "0x39Bb73Bd6BE81C192B64b390fCD08F42525339e6",
+    "rewards": 178374.03723568845
+  },
+  {
+    "user": "0x510B92C476Fc53B5514033C3d73805DeB1824337",
+    "rewards": 178140.6869264337
+  },
+  {
+    "user": "0xe7B965393d775F0e5fBf941635Eb1cf0191e6A2b",
+    "rewards": 175583.50382390994
+  },
+  {
+    "user": "0x56113E1a3dB81beE43928f68f540B1A18c836e60",
+    "rewards": 174760.32737005473
+  },
+  {
+    "user": "0x24B23bB643082026227e945C7833B81426057b10",
+    "rewards": 174363.6834538136
+  },
+  {
+    "user": "0xDc0011e205585d8c5B1488bC580139e4398F08Bc",
+    "rewards": 173841.63092995933
+  },
+  {
+    "user": "0x14882f9a40db4253ed3c8EE8CAac2C422B64AB33",
+    "rewards": 172060.72678162216
+  },
+  {
+    "user": "0xa1E0a34aD57F6d2D34ae4Bf4B6fAf4692907786D",
+    "rewards": 171174.18185581648
+  },
+  {
+    "user": "0x5233B831c5Fb169DDCbc2327b346b2B32Cb4a9C9",
+    "rewards": 170342.93691314242
+  },
+  {
+    "user": "0x6F736814D8044602a58adee51289330cF1a2c0aa",
+    "rewards": 168981.01343706634
+  },
+  {
+    "user": "0x8AA6eA8726FcE9c030e2cE756B39f1249F1f6B55",
+    "rewards": 168318.91110830175
+  },
+  {
+    "user": "0x6f0eE05A90efE9001B63c273860dD3c7eB577Ed1",
+    "rewards": 164977.36929100397
+  },
+  {
+    "user": "0x648f73b09DDEA378D4Ad859B939A346adb35A566",
+    "rewards": 164715.85599721508
+  },
+  {
+    "user": "0x9Efd8C22d8FEcAA5d0077854c2755E04Ef0018C6",
+    "rewards": 164644.7051670756
+  },
+  {
+    "user": "0x29d5AC65E839879c87ee5208F9b4b821299492A5",
+    "rewards": 164161.08950877117
+  },
+  {
+    "user": "0x5970B19bBfB9bB23FB718A5516C8bCb4e3b50Bb3",
+    "rewards": 163880.15243265074
+  },
+  {
+    "user": "0xd1C95c08411A46987e195A0353e5DD955a162C27",
+    "rewards": 163032.65672963418
+  },
+  {
+    "user": "0x8341D5Fb9b984088B244a70d0f8b99E0f067d68D",
+    "rewards": 162131.99308389018
+  },
+  {
+    "user": "0x0cAD9BA1301714fBFD058153440Bb246e033C745",
+    "rewards": 162088.10371629885
+  },
+  {
+    "user": "0xae75dA6b2CB5641342Aec648B67e40baF7cEa94A",
+    "rewards": 161947.79754221175
+  },
+  {
+    "user": "0x13E2d48907cFB0E99A9B1e9F859DcAD99EF340a2",
+    "rewards": 161885.70638599744
+  },
+  {
+    "user": "0xC5884A455463A1a04946f62259c7dbEf701B529B",
+    "rewards": 158297.81328514172
+  },
+  {
+    "user": "0xEf750a119b3dB807b93bb422fDB798dc0785eF8C",
+    "rewards": 157830.5679316702
+  },
+  {
+    "user": "0xD8384717947AF3018F69c1b641c9236b5Eb3674e",
+    "rewards": 156641.145977257
+  },
+  {
+    "user": "0xD885576B5E25a4c63b78DdA8926936bC019Df3f4",
+    "rewards": 155186.03082056248
+  },
+  {
+    "user": "0xf821A4E64344AB3fDee54b57ce01DA6efA772205",
+    "rewards": 154781.02359162824
+  },
+  {
+    "user": "0x97be0621788FF8b9bb5F430Bafed1aF0c734D109",
+    "rewards": 154512.88188568866
+  },
+  {
+    "user": "0xf9dCa837A611804aE12c8639400a6C4B596489Df",
+    "rewards": 153876.33861092024
+  },
+  {
+    "user": "0x6582b7C80dF319553a988F62436b8A1be6b2B24C",
+    "rewards": 153779.31999102174
+  },
+  {
+    "user": "0xd57dD51035Ff8dbD9883460968A0c70819F92963",
+    "rewards": 152808.51159327585
+  },
+  {
+    "user": "0xa4BE7846cF4Bb753d8830C6A6Ab2092397Bd7a87",
+    "rewards": 152235.50326148915
+  },
+  {
+    "user": "0x488B3Ae9B55bac6622D6cB60871e97979F404DC9",
+    "rewards": 150994.82244049813
+  },
+  {
+    "user": "0xA18bA01E0c9058c0D2A283A8867bc28ac9D66981",
+    "rewards": 149850.0307957147
+  },
+  {
+    "user": "0xc76Fa2d2862FB4b627892D13b4393069e4B0DCE6",
+    "rewards": 147949.28411179318
+  },
+  {
+    "user": "0x4cceA44106ED8aF5AB884c33008263195C105903",
+    "rewards": 146962.40206582972
+  },
+  {
+    "user": "0xCa597fa47Fa1FF897AF109cD8Cbd98aF23c00000",
+    "rewards": 146517.1895151764
+  },
+  {
+    "user": "0xdEc69E4D8d0cED74b1B45b270B908973A098f750",
+    "rewards": 146219.55448559127
+  },
+  {
+    "user": "0x0Bfb556eA745aA6d28D2F9E3Db802C39a7068fEc",
+    "rewards": 145746.89525811336
+  },
+  {
+    "user": "0x1F4b43A4bb8Df23889B99Bb62873F12B6B1B00e7",
+    "rewards": 145590.82389156116
+  },
+  {
+    "user": "0x5e4FECe91686015B10dc24923CfA1530B0889b45",
+    "rewards": 143787.11864354153
+  },
+  {
+    "user": "0x2Cc60aac1Ba5852f07eC418Cb7A8a075481C5890",
+    "rewards": 142669.78944339335
+  },
+  {
+    "user": "0x9776dBe09b8Ef900b0AB2068AAA84b5A0F349B80",
+    "rewards": 142476.58131762152
+  },
+  {
+    "user": "0xF33223e42aA80123442D8154CC00B69Ba1141ef6",
+    "rewards": 141421.77597703517
+  },
+  {
+    "user": "0xa28f309EB20e3988d6c3e288C37BC5D66f704dEf",
+    "rewards": 140466.70800919723
+  },
+  {
+    "user": "0xFa29D2109afb9610a09001da54fd7EAD72e58BE2",
+    "rewards": 139316.3493158667
+  },
+  {
+    "user": "0xE5555F58aC152D58bCd8e6b63248a04Af038A5B6",
+    "rewards": 139180.73638603662
+  },
+  {
+    "user": "0x2ab364422d5191694971720BF2c7126cEAe72C41",
+    "rewards": 136527.82595889946
+  },
+  {
+    "user": "0x235605C287104DCa9F99Ee318b4c0AC553d75B44",
+    "rewards": 136483.9373892512
+  },
+  {
+    "user": "0x38f250B10051DE7fBF414A92afCa0Fc0C63628Ef",
+    "rewards": 136136.0557766352
+  },
+  {
+    "user": "0xf85642D2e867B122f0e1b250c5281b1EF6b26A27",
+    "rewards": 135179.3301637654
+  },
+  {
+    "user": "0xCfD5fa3b3Cc5E8fEDe67c5DEA61df4fD4613E3ab",
+    "rewards": 133222.83404365164
+  },
+  {
+    "user": "0x37CE07C03Af4Ce3635d5FD0A8c302d283A25504D",
+    "rewards": 132397.90477093507
+  },
+  {
+    "user": "0xd7a8bDb208261016B222EF10cA81BCB375515BE1",
+    "rewards": 131870.21372081267
+  },
+  {
+    "user": "0xcF9654E4a14c5BAc95e0e10483F79332D2Aac128",
+    "rewards": 131428.27740527972
+  },
+  {
+    "user": "0xc6225136CEdD77f26D46a4Dc36135E2aE1A27CF5",
+    "rewards": 130801.64167671865
+  },
+  {
+    "user": "0xCcC673617c1cF4238b72E16DD06538dcbBc45B6d",
+    "rewards": 130378.46958616466
+  },
+  {
+    "user": "0x3619462f22bDb0d6bAD2F68627299c14f7Cb274D",
+    "rewards": 128718.55710521596
+  },
+  {
+    "user": "0x2Db4BaE24b3300586926c0862d1c229051fa80cE",
+    "rewards": 127835.88992182721
+  },
+  {
+    "user": "0xD27e990A09CE69381C84EAe23cFa440Ca05C6018",
+    "rewards": 127798.2265379976
+  },
+  {
+    "user": "0xdA6fC72eF34C1568A64DFBf4A6bA328aF5aE1482",
+    "rewards": 127629.52386434295
+  },
+  {
+    "user": "0x1bA5D862894862794388aAdf83D483facF4AB8D5",
+    "rewards": 126473.62317794019
+  },
+  {
+    "user": "0x2a05d886A8da22DC92cC0bf613bDbaE5087bfBC9",
+    "rewards": 126340.23267419366
+  },
+  {
+    "user": "0x94d3620abB4d41e9558876F94e5f6691721EB065",
+    "rewards": 126219.17580480441
+  },
+  {
+    "user": "0x4aA9bD1F225feF649480E11a5042D8F7cc7Fbe37",
+    "rewards": 125880.0404803143
+  },
+  {
+    "user": "0x92FFba9cDB5e144A4Eac98D1C0F777433b12B196",
+    "rewards": 125551.33201236342
+  },
+  {
+    "user": "0xd6e3e4E2d58d8Cf8280ae65f51feE84572fBBA35",
+    "rewards": 124247.28968666555
+  },
+  {
+    "user": "0xbfA3757Fe212B8B3f34CAA2B7d354877Bbb38c0F",
+    "rewards": 123855.88080246886
+  },
+  {
+    "user": "0x3E7245D74411e956Fe578f931203835728939c7C",
+    "rewards": 122712.33788713568
+  },
+  {
+    "user": "0xD2242e533dA63fA0f5dF92F0c12A30DD59290194",
+    "rewards": 122239.45445465922
+  },
+  {
+    "user": "0x99B55651763A0C1e8075bEaBcd9544b513C85b97",
+    "rewards": 120237.39193068523
+  },
+  {
+    "user": "0x60Fb3Debee97b1eB9778f965e2E584ab14FC9f1A",
+    "rewards": 119764.12211857249
+  },
+  {
+    "user": "0x89F52Ff55046E75B4b47554B7A17267C51916658",
+    "rewards": 119490.29772698277
+  },
+  {
+    "user": "0x1085af1acDeF2dC3763F00e63E0367B8EE5f3cEb",
+    "rewards": 119432.65189478137
+  },
+  {
+    "user": "0x5aF09B02E6513d05E2E6663Ba824B56B5539DC8B",
+    "rewards": 118664.06918356004
+  },
+  {
+    "user": "0x2815d444A80eaD8C689B7e82A0F6F30F41e11b4c",
+    "rewards": 118304.83596983705
+  },
+  {
+    "user": "0x38aDE4c4d4E0b873FccDFbC39a3E721533625d0B",
+    "rewards": 117981.15196017461
+  },
+  {
+    "user": "0x2589eCe7a6E4d35a3b21C8d60036026DD06247C5",
+    "rewards": 117960.9992691301
+  },
+  {
+    "user": "0x6d249A9c165eB822169653C01B9175b6d2C10710",
+    "rewards": 117555.26275489767
+  },
+  {
+    "user": "0xCfFE6865F30DD90D58439751929605D6fA979698",
+    "rewards": 117480.85948294275
+  },
+  {
+    "user": "0x4608e0f70Ae80E4a85b83cD47477fc5a0C606BF5",
+    "rewards": 117012.05343517794
+  },
+  {
+    "user": "0xc8A9a26c097d4E0D91Ecb21336ae4c866154Ef1E",
+    "rewards": 115722.98498286535
+  },
+  {
+    "user": "0x13af5EBd5E7C369D6a8d487Ed66873D6eD8d6261",
+    "rewards": 115644.48362847473
+  },
+  {
+    "user": "0x4932A37F0818ff7D67a62f74F66BC625D59A0442",
+    "rewards": 115643.81074906283
+  },
+  {
+    "user": "0x44ab2D6310fe054A0b43E9bc3CEd6f88c66582fB",
+    "rewards": 115105.97428440677
+  },
+  {
+    "user": "0x64053a089fe339f68F429FdFF95D629C8983bFD9",
+    "rewards": 114269.92336485811
+  },
+  {
+    "user": "0xE465199c7BCfbf45DB653c7c4c4677B808AaE733",
+    "rewards": 113537.66820516715
+  },
+  {
+    "user": "0xd4259EEba01BB59e4999D2bA1B167acEc4AD71Df",
+    "rewards": 113012.00466080045
+  },
+  {
+    "user": "0x08492EF9ADAFCba7dC94607d9fDb005559f633F3",
+    "rewards": 112832.88851595989
+  },
+  {
+    "user": "0xf7cF59B4584ef77B6Cb4fbD621CF4113154002C4",
+    "rewards": 111675.11847629272
+  },
+  {
+    "user": "0x1879609a255ECdF6A2E079a885F291d3cB610aa7",
+    "rewards": 111335.18053376225
+  },
+  {
+    "user": "0x790203C524d4295FcaFd50B81103dFD9EB5528d1",
+    "rewards": 111030.55423478488
+  },
+  {
+    "user": "0xC50AbF0FC86C488Abb2d483719f927C0BEf977dD",
+    "rewards": 109795.46074556996
+  },
+  {
+    "user": "0x6ee4d2E17fCd7155886cD317bB700B55EE815Ea5",
+    "rewards": 109224.09112954226
+  },
+  {
+    "user": "0xdB5209FF5Bb6037AF30b27d26Be710Cdf8821325",
+    "rewards": 106369.33484800566
+  },
+  {
+    "user": "0xe0B6785DBad8C4F299621145eece1E6fD9603B00",
+    "rewards": 105578.62528990784
+  },
+  {
+    "user": "0x20fE484742479f44C1F9eE4Ed6182a271E6f52A2",
+    "rewards": 104582.64484188486
+  },
+  {
+    "user": "0xae3cb890dc6B6c94c65f586FaAcE90AFcCA6eC8F",
+    "rewards": 103307.6618573562
+  },
+  {
+    "user": "0x3f7957dcdcFabA4794768864156707fdA1E26303",
+    "rewards": 102839.20796547353
+  },
+  {
+    "user": "0xb5f1D9Fe4abC5b894327DaE3c9EAae4aD11Eda7f",
+    "rewards": 102740.33310215682
+  },
+  {
+    "user": "0xE18779b704a017D87FF5C23298ABf1e72b7970F0",
+    "rewards": 101135.12280408114
+  },
+  {
+    "user": "0xf7C5F0417e9C8a260D83FeF58576D2443d89d2D7",
+    "rewards": 99321.63851561464
+  },
+  {
+    "user": "0x68206Dd0e0293c4c2E71eC056B5a496C4f36d57a",
+    "rewards": 99316.43519887299
+  },
+  {
+    "user": "0xb10D4993A92f71AC13F3C279Bc7B1daebD000E34",
+    "rewards": 98790.88569122402
+  },
+  {
+    "user": "0x730BBC6Ad00eaFB67e2695DDd96c7B6BABe25266",
+    "rewards": 98438.37544356116
+  },
+  {
+    "user": "0x478550C4C4F0E9C00ae1F75d7719fDdC3F926836",
+    "rewards": 98333.70579488351
+  },
+  {
+    "user": "0x380E99f99A55530C04fb89F58877e043f21316DD",
+    "rewards": 98013.2970919736
+  },
+  {
+    "user": "0xB6daE8e764FD26b743291640aB11e5eD147a7303",
+    "rewards": 97848.93997128142
+  },
+  {
+    "user": "0x0046b889412661ca7f0221366255bB26cF1D9c30",
+    "rewards": 97707.89789739037
+  },
+  {
+    "user": "0x0cc1366666586AfF380C36A7fA36a0AB543e8112",
+    "rewards": 97273.15636780368
+  },
+  {
+    "user": "0xbA35ca34f26Ce4ED2f19d397a05018D998351259",
+    "rewards": 96738.71473463504
+  },
+  {
+    "user": "0x3F51dEC8F9F7d2F24dd100Cb6d7F9d636236f167",
+    "rewards": 96494.55601815124
+  },
+  {
+    "user": "0x13B75B7DC4A4ba72754fD82d2c47D3BB7317E59C",
+    "rewards": 94781.01673573388
+  },
+  {
+    "user": "0x31C9c2AB59b585c5F57BCe8F770263154f64725C",
+    "rewards": 93273.51462030105
+  },
+  {
+    "user": "0x96503B7A2E3d329b7e9087d6b016A26a5E9A9607",
+    "rewards": 93269.45200205405
+  },
+  {
+    "user": "0x598a16A71de38e96C10C42F385A24B9d18d020f2",
+    "rewards": 92613.99978841098
+  },
+  {
+    "user": "0xBbfeFC2662c6E367eE671E956b47a9B58A2BF8fc",
+    "rewards": 91728.05775510504
+  },
+  {
+    "user": "0xe65c30f89869aF2459074A15f8964Eb73a62A37f",
+    "rewards": 91707.34463863219
+  },
+  {
+    "user": "0xf95695df485E16a65BEb76e4ba9c7BB4752Be777",
+    "rewards": 89363.96999290783
+  },
+  {
+    "user": "0x6541CE0eaD10bf666F127869bD76F91392cAceB5",
+    "rewards": 88950.93752863618
+  },
+  {
+    "user": "0xea7E4991Ac6Da8afD069ce6079813f346b0bB01d",
+    "rewards": 87315.42225591985
+  },
+  {
+    "user": "0x77E0800D2ac973Ea1DB05a72c099bF391035A459",
+    "rewards": 85926.19834366842
+  },
+  {
+    "user": "0x518324bBAb3385f985c12a2cf9FFDDF7A9717555",
+    "rewards": 85353.400313694
+  },
+  {
+    "user": "0xA7b137d4F72fFF6d3F4d88b95ecbD61029a6b8F2",
+    "rewards": 85344.01735353048
+  },
+  {
+    "user": "0x31Ee9226A29025295BD8727df2c334B5C402665B",
+    "rewards": 85229.58640458476
+  },
+  {
+    "user": "0x7c631AED9106D36e27F225a5294B3E08285d2692",
+    "rewards": 85168.98124032909
+  },
+  {
+    "user": "0x96b76a29Cf68394F5a4961f70bC588ee4Ff9CC86",
+    "rewards": 85119.0333516682
+  },
+  {
+    "user": "0xE577D89c6E599E6016414d611B15aD8966D8Ff32",
+    "rewards": 84898.54500826464
+  },
+  {
+    "user": "0xd4E96657C5e269Af257CC0809Fc8A8573fE9A056",
+    "rewards": 84799.45024743867
+  },
+  {
+    "user": "0xfB064915f5216BF0F626a66759536108b01C4Fac",
+    "rewards": 83921.46464815421
+  },
+  {
+    "user": "0x2033fafB17f872da20182F185886c56dC5902118",
+    "rewards": 82934.2189132188
+  },
+  {
+    "user": "0x7bc208A1389AAe134944d9d2F1f8E0cAE453d3b8",
+    "rewards": 82290.02343221685
+  },
+  {
+    "user": "0xcF01066AD35429862c25B12BE8c3de3fcDDd6831",
+    "rewards": 82155.63149836421
+  },
+  {
+    "user": "0x3255db9aDFe3D2c95118D58d94C6Ee98d4c98933",
+    "rewards": 82096.54349394195
+  },
+  {
+    "user": "0x85B2dBdd2E4A2967BacD5EF346a2F340571D4A68",
+    "rewards": 81701.78169486034
+  },
+  {
+    "user": "0x2B1C1222EB359f673bD0ebf23FcE5A060DC0C67A",
+    "rewards": 81474.02589446261
+  },
+  {
+    "user": "0xEDf8a8ad044f5F8aF49BB3a1E55e61a24AdB2925",
+    "rewards": 81362.01297829552
+  },
+  {
+    "user": "0xCaF88361edD46a25d7CC09F3330321B8E4e8ad95",
+    "rewards": 81293.84211667247
+  },
+  {
+    "user": "0x3e4Bbc4A8B8B003396f8160De193bAFEFE7caA5d",
+    "rewards": 80074.95314035864
+  },
+  {
+    "user": "0x53D9caA4f541EAddfFE694631FE53DD1A3E843cf",
+    "rewards": 79097.09040400587
+  },
+  {
+    "user": "0x2c8C0471De898a779e1E71b3C6fa962585f71173",
+    "rewards": 78822.16650950702
+  },
+  {
+    "user": "0x6dab3FCcBE8246EBFb87a6767De6e5484D6018B2",
+    "rewards": 78108.10703559185
+  },
+  {
+    "user": "0x350fE458119CFB86e2932480f52FA04163B31481",
+    "rewards": 78032.3037539643
+  },
+  {
+    "user": "0xa325aCdFFb754a0915cfA6bf9135e44Bc1A33BBd",
+    "rewards": 78004.78551304153
+  },
+  {
+    "user": "0xbda26721284763e9622A3C6C960c8A81eD684E92",
+    "rewards": 77118.06291337816
+  },
+  {
+    "user": "0xd14167A1a62FDc84AabaBb7ee4CF94d95662d882",
+    "rewards": 76342.31758658086
+  },
+  {
+    "user": "0x009388bE2dAE7110B8a6707A66bD4ce1eb8ad9C3",
+    "rewards": 74367.53502920161
+  },
+  {
+    "user": "0x85f67CF442768B56C0FFf44F5367C06A60BbbF39",
+    "rewards": 74356.68381697393
+  },
+  {
+    "user": "0x38449Df26181C4Ff8E5d153258E8E040C98fd015",
+    "rewards": 74310.67052991834
+  },
+  {
+    "user": "0xA54D94b20970BC8DE0fA5F7F6F68F681113c743a",
+    "rewards": 74149.44952133065
+  },
+  {
+    "user": "0x86F2b32B858cAa2382aaf3ff30B5a850D8A2eC26",
+    "rewards": 73514.32631982974
+  },
+  {
+    "user": "0x88fF68db1a17509E54eE337f52689cc797CEB065",
+    "rewards": 73454.7534528251
+  },
+  {
+    "user": "0xA67F4D6DD924Cd89587FC742365970716f9A8f51",
+    "rewards": 72429.11313481664
+  },
+  {
+    "user": "0x8f7c3ECB9977EF32e386ac7E7AE6717F262b29F3",
+    "rewards": 72197.47581531307
+  },
+  {
+    "user": "0x14f60315Ae476D6dB938b836A75e733006875396",
+    "rewards": 70685.89040956278
+  },
+  {
+    "user": "0xAB063f52b380237579D357F82ADCF9F69e3563A6",
+    "rewards": 70614.64091022241
+  },
+  {
+    "user": "0x19C1BB001fAa97bD0a07AC75719F380787Ae4759",
+    "rewards": 68245.62704930475
+  },
+  {
+    "user": "0x6A522994329C3b1640a86809e2E7c2070e14632D",
+    "rewards": 67940.86324853213
+  },
+  {
+    "user": "0xCA46e8Ed7eB1581C11cC705503EE3c73F6e3F7EB",
+    "rewards": 67288.62003213941
+  },
+  {
+    "user": "0x09Af3C71e7eCE7D160F90bBF8CA72A41a790cF1f",
+    "rewards": 66805.28469669707
+  },
+  {
+    "user": "0x54d646A7045eC3297a86f155AA63273f313472cD",
+    "rewards": 66359.71592084024
+  },
+  {
+    "user": "0x4C51A5540Ce5C612120476554630ce35cc767B3d",
+    "rewards": 65434.35288784703
+  },
+  {
+    "user": "0x48964EcD0799fcb6CBc3E59D5949a853749B9F23",
+    "rewards": 65423.26704952279
+  },
+  {
+    "user": "0x648e155929523ca716D04F84Fe5d25BF06A2D04E",
+    "rewards": 63800.87773308903
+  },
+  {
+    "user": "0x825545985473742dD3d56adE53c008580A462BD1",
+    "rewards": 63799.990809391675
+  },
+  {
+    "user": "0xFd4845D35F3890FcA826C05FdBb1923C95ba49cd",
+    "rewards": 63572.74835571049
+  },
+  {
+    "user": "0x9675DDCbC4c72CF163c5539AC9B37B58b7Fa00C7",
+    "rewards": 62457.34592592819
+  },
+  {
+    "user": "0xdadb821DeB8D39a61207d25b39cD8105183107e1",
+    "rewards": 62148.99025479821
+  },
+  {
+    "user": "0x5a8AA605ECAb14566812CDDa0D6D5D98c2F000C9",
+    "rewards": 61832.57221210396
+  },
+  {
+    "user": "0x5E7EdF1Dd58597718407a6Bd200D49675fE2b24F",
+    "rewards": 61699.58274330997
+  },
+  {
+    "user": "0x7BF14A957c9D8d64f5FD8aeee63fAA1bc83Ac6A9",
+    "rewards": 61185.21818006443
+  },
+  {
+    "user": "0xB5370825d141bd007598DC2bB009Ecc192E0366d",
+    "rewards": 61181.03078973909
+  },
+  {
+    "user": "0x4A09B4B47D04f54E877f61Ab659301ED8dAd330d",
+    "rewards": 60692.496302104875
+  },
+  {
+    "user": "0xf5353A299Dfa7a7205CE6850B191F8E461f85A1a",
+    "rewards": 60574.08136936413
+  },
+  {
+    "user": "0x1F6d9816ee2e987B386905aD4A77e7bc7a531c3F",
+    "rewards": 59958.13291608552
+  },
+  {
+    "user": "0x0Caba74BABbcF8508a109082c24854A9d7A2f1f4",
+    "rewards": 59950.67326465421
+  },
+  {
+    "user": "0x367cD9Ff6237B4ddeAaDbe9E3bc33D2B7Df9aa9C",
+    "rewards": 59282.30711988307
+  },
+  {
+    "user": "0xD248CF49ea0e80853fc52DcEa951EA78c4d0C2C9",
+    "rewards": 58540.45099122654
+  },
+  {
+    "user": "0x0E35102597cF0C64e740b5057F57F7a929810375",
+    "rewards": 58095.756504511155
+  },
+  {
+    "user": "0x0f2A864Dba126dcfb18bD0d801E75729627DCF22",
+    "rewards": 56833.455732604125
+  },
+  {
+    "user": "0x2929E5c93Ca27Afc55FC4B9388ff0E9DC1148935",
+    "rewards": 56272.46271404486
+  },
+  {
+    "user": "0x28Cb2E5e5359c6e33cfd92562a3ECca8554b5145",
+    "rewards": 53341.444537391864
+  },
+  {
+    "user": "0xB78232F48C729296a60515a1fE4F0D9961d6bef4",
+    "rewards": 53230.48737860624
+  },
+  {
+    "user": "0x14127a1E6758A9f694ce83961Cd9343610F956B8",
+    "rewards": 52871.452895534676
+  },
+  {
+    "user": "0x4f96e6B768E696b4d53aC1C0009bC9f6964703C8",
+    "rewards": 52497.02592252266
+  },
+  {
+    "user": "0x16F008C816ec52388cb7D9eaD10B158bAc538887",
+    "rewards": 52476.8544510801
+  },
+  {
+    "user": "0x8EDD3371C6FC8A5FA618f5Cb4Bf06357450108ff",
+    "rewards": 52318.74415219898
+  },
+  {
+    "user": "0x13a6c72A6E2dDed3D2d88BB638492AEc14e17ef2",
+    "rewards": 52259.83897033989
+  },
+  {
+    "user": "0xA7a51aBAD8c55D6aCCd3A908406DbAB68E6b8C73",
+    "rewards": 51246.80479721586
+  },
+  {
+    "user": "0xcF37927783729C710dd56F711F7B533cF211C4eb",
+    "rewards": 51224.65190062115
+  },
+  {
+    "user": "0x988c5C039b6A560632317736e73F7e5fc721763C",
+    "rewards": 51071.420011000926
+  },
+  {
+    "user": "0x8C6D4beAF291D508575cE5d6b47Ce81A34E9e1EB",
+    "rewards": 51071.420011000926
+  },
+  {
+    "user": "0x7D1037884E194F128576487C56A96C706b6561a7",
+    "rewards": 50824.89415073426
+  },
+  {
+    "user": "0x93a15D0B7ce76aa8E0dc037e577AD56627d8BdfE",
+    "rewards": 50519.76132600023
+  },
+  {
+    "user": "0x851710A5b836632384Cd1E585A52F3855b689e79",
+    "rewards": 50196.959513853115
+  },
+  {
+    "user": "0x267DC34949FE9A4b51cd35527F4766C196B6cEA6",
+    "rewards": 50196.959513853115
+  },
+  {
+    "user": "0x04Afe24c0773b9bCE4abDbD29B8cD1dd5DA352Af",
+    "rewards": 49958.830833575754
+  },
+  {
+    "user": "0x4EB5E0C928b5347A9C631C2a1e41eF2629c9F458",
+    "rewards": 49787.48367952859
+  },
+  {
+    "user": "0xEf53FB4cc487Cb8D091e767D742Ea66d910D46ed",
+    "rewards": 48767.3646194999
+  },
+  {
+    "user": "0x3593b6D61613611ed8D11B10cDF8e747503b62D0",
+    "rewards": 48117.09115398303
+  },
+  {
+    "user": "0xdd4B49bEeDf3632bcBb4A952021Aec760C66638b",
+    "rewards": 47604.37931261138
+  },
+  {
+    "user": "0x9ce0ECf09aA4F82688c1D0A7F05567b174B637Eb",
+    "rewards": 46826.011792923826
+  },
+  {
+    "user": "0x2066bb11Ca96D0C543f9740Ea78f0Ec5274a32d6",
+    "rewards": 46685.34924565726
+  },
+  {
+    "user": "0x67EfD22a0021E0B2A8BA5182d6438CE7d82aedC0",
+    "rewards": 46254.861026291226
+  },
+  {
+    "user": "0x9C1FE8d7894A88372316BF338201019CCC3b5829",
+    "rewards": 46199.35455356366
+  },
+  {
+    "user": "0x96b953EC6F6DD6F5C3786fae10990BB8A20a824A",
+    "rewards": 46025.628949453145
+  },
+  {
+    "user": "0x0748B7Ac8181151F16045272aEcB592aAcB1eae8",
+    "rewards": 45752.299050498375
+  },
+  {
+    "user": "0x49a1735B60dc777b79E55AE0b64cC04Ee230aFA1",
+    "rewards": 45403.37515383289
+  },
+  {
+    "user": "0x5662045AE117a02B48cb0b9E645B7E8D9f615ffc",
+    "rewards": 44898.138262981854
+  },
+  {
+    "user": "0x4f95e6323780b14FF498012a1c3b2c2D4f281666",
+    "rewards": 44772.88606039414
+  },
+  {
+    "user": "0xBfA58c2516cB64C7f6E19c0B3690158C38E4d0f7",
+    "rewards": 44727.16498332131
+  },
+  {
+    "user": "0xF17Fc11Ecc5B95A66EB2cA50bdCeF41Bf040d1CE",
+    "rewards": 44581.62890144914
+  },
+  {
+    "user": "0xA17237A12495fC04dEfcDD3Fc6B922dd07095ce7",
+    "rewards": 44445.010579235975
+  },
+  {
+    "user": "0x8BB37b3954587fa44C7c9eEb7d3E9a861737F7A3",
+    "rewards": 43677.24716746834
+  },
+  {
+    "user": "0xcFF69866f2d63Ff28A4ac920De1b32E7DA23CE71",
+    "rewards": 43067.593357399346
+  },
+  {
+    "user": "0x6542E3B4A1B37FCcECfF17E17D886BaC2d60ffAF",
+    "rewards": 42640.84386704206
+  },
+  {
+    "user": "0x07774d698acb16c680cAADCfA608854361051636",
+    "rewards": 42533.12406200962
+  },
+  {
+    "user": "0x46144CAfd55a06e4749DEc9dbC50227571E030bc",
+    "rewards": 42490.16727526584
+  },
+  {
+    "user": "0x7E3EA601939AD586762f9e375Bd0a79b4B3C5C3B",
+    "rewards": 42451.538445440914
+  },
+  {
+    "user": "0xf860E97Bbc83151BC306C82c11f02b8C316c0E28",
+    "rewards": 42174.07160542297
+  },
+  {
+    "user": "0x6f29Efd5cd0FF2C1F5f7a8731CE308FFa1B8cA1c",
+    "rewards": 42157.63728535152
+  },
+  {
+    "user": "0xc60443071A7256b996CD312eCf537A55c7D03afE",
+    "rewards": 41994.940214923976
+  },
+  {
+    "user": "0x85c1b5d0F041a6A5e478C10aACBFAE07aDeC7481",
+    "rewards": 41944.77333096941
+  },
+  {
+    "user": "0x5488Bd949fE09FefFC0306AB991486F3afc2Cee1",
+    "rewards": 41893.65115504753
+  },
+  {
+    "user": "0xcf79b206933198655027ED487c6AA1896e31aDd6",
+    "rewards": 41496.96893179368
+  },
+  {
+    "user": "0x06132F4E2ec3d72fD8058551D7747d6C705dD431",
+    "rewards": 40762.68307828729
+  },
+  {
+    "user": "0x3e1349eb312D901F8ce8bd3311347b728a602b81",
+    "rewards": 40691.51851156301
+  },
+  {
+    "user": "0xd844dA86713E5031e14Cf2900e30e18151552BA3",
+    "rewards": 40645.31142510538
+  },
+  {
+    "user": "0x8C435e081A30d643e1683b0EA9DbD104CAA6D7ED",
+    "rewards": 40006.11843655542
+  },
+  {
+    "user": "0x4759F59eb61196866126893949E2afe3785c00c0",
+    "rewards": 39869.82573329855
+  },
+  {
+    "user": "0x523d24c7EE65a1eff6D330Bb3Bfd9b274e1E8485",
+    "rewards": 39859.284783225114
+  },
+  {
+    "user": "0xcE7CC5b29Ba1cd2bBb7f3Bbd02e5f0583656cC7A",
+    "rewards": 39515.53470810265
+  },
+  {
+    "user": "0x1947e25872D4AD818a4dAc43c2B5d7f7b5FA1a10",
+    "rewards": 39506.01935043848
+  },
+  {
+    "user": "0x79b8408e795f0a5946F0A0943e3d2F805F3db805",
+    "rewards": 39459.03040434044
+  },
+  {
+    "user": "0xdC80DEea5c95B1A87135206303843BB67c7b1007",
+    "rewards": 39457.30118473373
+  },
+  {
+    "user": "0xCf8430B63141F5e03F49676a59E03Ccf91F5CE0D",
+    "rewards": 39352.94037812994
+  },
+  {
+    "user": "0x8B67D040c2818eBD12249340C4d564692C9062c5",
+    "rewards": 38558.35857727718
+  },
+  {
+    "user": "0xB3aDc104A4F8Fb47d0529e701a759D6Ad3265C9B",
+    "rewards": 38544.12368293317
+  },
+  {
+    "user": "0x2D263a7d2f5a5246aE2d948733bc75151481F0D0",
+    "rewards": 38544.12368293317
+  },
+  {
+    "user": "0xdD9fF0B387a614bc4251B23a4b5E4BCcE6fF6c0A",
+    "rewards": 37977.98261027697
+  },
+  {
+    "user": "0x0CAEf45164DfE4AE60E999a2b75eA457e3feb98C",
+    "rewards": 37673.18053485955
+  },
+  {
+    "user": "0xF58c8eA0E6d392c5Ff9bF87E5c78b39b4216cd06",
+    "rewards": 37263.18082923065
+  },
+  {
+    "user": "0x10aB9D355cF3923FEaFfC56Df4d423afd7A72287",
+    "rewards": 37190.294447700566
+  },
+  {
+    "user": "0xa7660698077D3a5ee23E06752f38dedBe7875971",
+    "rewards": 36741.9471936522
+  },
+  {
+    "user": "0xC1564D7A8e409F6BE54a96501621E30981e195b8",
+    "rewards": 36546.065649171105
+  },
+  {
+    "user": "0x4669fa8CE11C6A32F57203dB0Ee55a6505940fC1",
+    "rewards": 36283.802420497836
+  },
+  {
+    "user": "0xE62C333384B96902e411Fb1cD4F9F94aE15d0dB5",
+    "rewards": 34247.73940679379
+  },
+  {
+    "user": "0xC444C7dA98D39e436Fcd0c4CAB5C3Fee7d5BDf41",
+    "rewards": 33771.32238296487
+  },
+  {
+    "user": "0x5C11De06132f31FEb0e3E24591AE1B8956d87F4a",
+    "rewards": 33704.62262365266
+  },
+  {
+    "user": "0x053422305eA27A39674BBea30C6D125Eb984a554",
+    "rewards": 33192.32088449341
+  },
+  {
+    "user": "0xCD78119a96CE37a7ed72705F155F55B5b5A3b3D0",
+    "rewards": 33041.27858185895
+  },
+  {
+    "user": "0xC09eda530bF9F1112A07094574CF3Db04EC6bbd3",
+    "rewards": 32711.99700366409
+  },
+  {
+    "user": "0x4Ea94d5ABa6e38B19Fe79cF205996Afd1dBD226D",
+    "rewards": 32583.66406059387
+  },
+  {
+    "user": "0x2F9E91b4993c769baAA91229A839604681e110Ae",
+    "rewards": 32335.25325293389
+  },
+  {
+    "user": "0x915a3ac81dB68025C591996CA237b16df9b97638",
+    "rewards": 32265.042921479744
+  },
+  {
+    "user": "0xaa2C2FEFaf30cc5E6558Fd9d657396d32FdAE03E",
+    "rewards": 31234.1935509979
+  },
+  {
+    "user": "0xD97ae03E25e78413194F7d5Deb4Bc4BfF34A7Bd7",
+    "rewards": 30440.63195959512
+  },
+  {
+    "user": "0xcC88c39b47F6F8fDb90c1870Ef16d7bC1cb7D7b7",
+    "rewards": 30396.56516007896
+  },
+  {
+    "user": "0x07cCF7447188B44DA874F3a87773989628d3081e",
+    "rewards": 30129.857239802794
+  },
+  {
+    "user": "0x033a975b8e3B829C9ccB4A59aa361289af406b4B",
+    "rewards": 28925.370196007647
+  },
+  {
+    "user": "0xEF3c2286202f53ef20E1Bb7ECF4F4a05498af624",
+    "rewards": 28846.783554724985
+  },
+  {
+    "user": "0x6Af176886c6DC86f6A7c606d7C61cec9360eb916",
+    "rewards": 28317.17965134839
+  },
+  {
+    "user": "0x8688B5BC2789Bc3Eeb72358082A4469747fE5AA8",
+    "rewards": 27830.36492261669
+  },
+  {
+    "user": "0xa15b5a066A1d01622722A812AA83C6764714c27D",
+    "rewards": 27678.146953646283
+  },
+  {
+    "user": "0x567A68B057D8BfB18202C5eaad8521645dfC57E6",
+    "rewards": 25691.565368832456
+  },
+  {
+    "user": "0x02Df07b11D192CfA6dDAdb58bE99C58d0873e12c",
+    "rewards": 25655.08345722294
+  },
+  {
+    "user": "0x2bE26273F94554c54d974B86cCB0F078e7F2aCed",
+    "rewards": 25432.79876531361
+  },
+  {
+    "user": "0x23Ccd7F2EB65152567BbBCA6cbFa836b02E359De",
+    "rewards": 25098.595906502243
+  },
+  {
+    "user": "0x79905a92b3a01010C55d126B60179f20d188A80F",
+    "rewards": 24974.784549676806
+  },
+  {
+    "user": "0x87250c1fFe62f528BBF7EDe4E59E58F8f6970b29",
+    "rewards": 24939.710473886407
+  },
+  {
+    "user": "0xf2C579082fE10d57331d0Cd66843C4D6777eA48a",
+    "rewards": 24891.77739351857
+  },
+  {
+    "user": "0x9Bf7666c05d6592f2EbA6BC45662E4fb4A20F3D3",
+    "rewards": 24871.79388170301
+  },
+  {
+    "user": "0x3A9b501C84405b47487455CDE7e6904F4d2CCED6",
+    "rewards": 24598.521493152577
+  },
+  {
+    "user": "0xFcaDE5C581D2655d40080B6Cd24D49478Ec2d559",
+    "rewards": 24414.911106937805
+  },
+  {
+    "user": "0x1F5505D6E52FD4a8426c9b08c0c32A1Ce0Ecb297",
+    "rewards": 24055.706731414542
+  },
+  {
+    "user": "0x18ef76796288592557C32C7E1f1c059DC87B6f5A",
+    "rewards": 23285.894216348937
+  },
+  {
+    "user": "0xB9635eEEd15321e26Ce40f5c38B3455801a15C3d",
+    "rewards": 23232.543228234106
+  },
+  {
+    "user": "0x6391042e16517e2F05e2C337F19c25E8923A3Aa2",
+    "rewards": 22829.45986861882
+  },
+  {
+    "user": "0x138610EEBc312EA632f649b04Ca5B0334A63A104",
+    "rewards": 22707.66370263317
+  },
+  {
+    "user": "0x0304ea5bFa8669fa4521C9cADc0A5219CE86A43a",
+    "rewards": 22701.464519233916
+  },
+  {
+    "user": "0x03B5617d875496B016C30259E8A15BAE6100A692",
+    "rewards": 22570.123873065855
+  },
+  {
+    "user": "0x87E07A5dCf142eD14F7d4387D5a54B7009D1C973",
+    "rewards": 22300.306833551884
+  },
+  {
+    "user": "0x928E4555bf186C881483d098AdE371D5ADaC8C3f",
+    "rewards": 22203.70601356922
+  },
+  {
+    "user": "0xa6F3cce07D14aEc066586B91B33FD368c941B36b",
+    "rewards": 22177.949923557622
+  },
+  {
+    "user": "0x805380e0372031d2a54E761aa9A053aD673B9e26",
+    "rewards": 21726.011410260075
+  },
+  {
+    "user": "0x41c540320AA7040aEa649845bd0fb7E49deEa8c0",
+    "rewards": 21344.44753316782
+  },
+  {
+    "user": "0x0E4716CdcB5b96fD96fdfb1110b0775a083a648B",
+    "rewards": 20989.569476304026
+  },
+  {
+    "user": "0xd00A839d51B35734C0322C069873501E2E855991",
+    "rewards": 20930.955298139877
+  },
+  {
+    "user": "0x531a4C14189c07aF7ad7361b77B39EfA1534139C",
+    "rewards": 20888.901347635187
+  },
+  {
+    "user": "0xB1A7Fe276cA916d8e7349Fa78ef805F64705331E",
+    "rewards": 20847.81114957818
+  },
+  {
+    "user": "0x46ABCc6935bD690ed41F9D7AC0788cA8815F75B6",
+    "rewards": 20622.359402742277
+  },
+  {
+    "user": "0x945eAcA2d62ADCBa6741f47552bB2CF51fA11543",
+    "rewards": 20580.74076334401
+  },
+  {
+    "user": "0x6E439FA245A5f522992236BeD97a9d143865e31f",
+    "rewards": 20409.63957371318
+  },
+  {
+    "user": "0xFeDc84d0cd5FE6dB2B2f8aC31c7e31e49B665e5c",
+    "rewards": 20309.08160977378
+  },
+  {
+    "user": "0x3FfC2099Db9D883Fac5c95F6C0fF1DA8b3616866",
+    "rewards": 20111.633302539798
+  },
+  {
+    "user": "0xb403B32AD0BBf8A13CBFdbd4642cbe7dF99E43a5",
+    "rewards": 19689.535900233932
+  },
+  {
+    "user": "0x8A3F2D114e12FD377ba17082D93B60751731DC7e",
+    "rewards": 19370.166682398976
+  },
+  {
+    "user": "0x030e8b3e395699e004c3524376a3F14284929996",
+    "rewards": 19248.515260622833
+  },
+  {
+    "user": "0x96F93f374A7851B6a99Ef28b3bF2aab340c52642",
+    "rewards": 18472.585014276014
+  },
+  {
+    "user": "0x64ca8551f7ECD40565A2c3936cDCE9DFE6f10275",
+    "rewards": 18279.36099173843
+  },
+  {
+    "user": "0xAECB49498C682F527be1305af15b66A8F6dF3852",
+    "rewards": 18087.68535906264
+  },
+  {
+    "user": "0x2eEEBaC9B192C6a70329e21984524C295B526Dd8",
+    "rewards": 17923.235642679705
+  },
+  {
+    "user": "0x5f83598db476D4648E9b5Be37dbdA13530E86014",
+    "rewards": 17310.032000158746
+  },
+  {
+    "user": "0x3066512695Fe0396b837DC6A20b4872503D4F9FF",
+    "rewards": 17271.996171835395
+  },
+  {
+    "user": "0xc77d948d084035eA88a367B37e2f97772476527C",
+    "rewards": 17056.879065205725
+  },
+  {
+    "user": "0xA087C1638e9bf6BB55fdf642FA0d53DE87aA1A06",
+    "rewards": 17023.80667033364
+  },
+  {
+    "user": "0x2dc617f2EdCf3aeE85904dE2A4569e9039Da80C8",
+    "rewards": 17002.52938998921
+  },
+  {
+    "user": "0xCC4CBd591D59A83079Cd4314C993002754B641a5",
+    "rewards": 16551.211912302966
+  },
+  {
+    "user": "0xB1B22aD1F7e5013308D80269E6e2f94682EcB463",
+    "rewards": 16417.100215906237
+  },
+  {
+    "user": "0xc2ef1173a4B051BbCc4474c407BBb2ac7E02e363",
+    "rewards": 16316.542398373316
+  },
+  {
+    "user": "0xFE9c29924773dCcA2F5939526A5f9DcFacFc2188",
+    "rewards": 16222.188581131382
+  },
+  {
+    "user": "0x6Ac54b36e2d09478D3a62f960Ba002def8aebEf1",
+    "rewards": 15820.941801138046
+  },
+  {
+    "user": "0x455cd98D405432e5431a2FaEF1D3d14585c15700",
+    "rewards": 15765.540750304235
+  },
+  {
+    "user": "0x022b1E28A06bF629E6D6CeC9E9F64ADFDfDA4716",
+    "rewards": 15508.334258930608
+  },
+  {
+    "user": "0x0DD49A5e1b510A207EcF3aC5eed5B2cF99eADAA0",
+    "rewards": 15506.83529566985
+  },
+  {
+    "user": "0x286aDd03E3C81643C61AdF1A652873fef3424e82",
+    "rewards": 15496.133345919181
+  },
+  {
+    "user": "0xDE51044D8b10C656D4061BC2E7b1263a5B0dd9E9",
+    "rewards": 15435.957295738817
+  },
+  {
+    "user": "0x179d8379c1D6fC2f23c5d8e3005E797F5D90C2b1",
+    "rewards": 15270.365069521766
+  },
+  {
+    "user": "0x16a8C61cC1904a08091deA571469753886d0fBF4",
+    "rewards": 15049.071959097842
+  },
+  {
+    "user": "0x22f829330Bd6ad83F0fFEe861Bc2f94b33a69E51",
+    "rewards": 14903.527659321082
+  },
+  {
+    "user": "0x4D5B22Ddd1FD10979D0b8158131eb088b34A7d6F",
+    "rewards": 14642.868465162117
+  },
+  {
+    "user": "0xeb1B89b2625044b63093EC57E11205D3b134622D",
+    "rewards": 14600.975427159115
+  },
+  {
+    "user": "0x974e2B33A417477739F80AEb0328BfCdBC05b1Bb",
+    "rewards": 14555.845176450428
+  },
+  {
+    "user": "0x4F5Ff3475802a61be0BDfe0efD622336FaeBCd26",
+    "rewards": 14225.369463120562
+  },
+  {
+    "user": "0x08CbA700Bd246eaD2EA3F039180bBbCDBB376839",
+    "rewards": 13782.726073206248
+  },
+  {
+    "user": "0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA",
+    "rewards": 13625.887338431743
+  },
+  {
+    "user": "0xaAfd8b6411268Bd8b5667089825ed66f0D4e39Fe",
+    "rewards": 13326.933798329075
+  },
+  {
+    "user": "0x8F7eBd90C40aB3a9bA735D5028BC32AE7bc9F9cA",
+    "rewards": 12916.094218763263
+  },
+  {
+    "user": "0x4264b8e4486959163B14330622362206c3d275C7",
+    "rewards": 12872.749324728522
+  },
+  {
+    "user": "0x7A7c820e4Fb7d49a249fA384963dc8C9a0b6662E",
+    "rewards": 12601.263244697897
+  },
+  {
+    "user": "0x845a318923BB7f8269cfD33b9Aa72f28Fcba3Ab3",
+    "rewards": 12264.243309303269
+  },
+  {
+    "user": "0x813955Dc5Ea01697c0c0853BD76882988D736832",
+    "rewards": 12105.528277490619
+  },
+  {
+    "user": "0x991b099D57c07CF8fe484E4AaC7dB782221B2854",
+    "rewards": 11818.427041040168
+  },
+  {
+    "user": "0x8928F06712B9fF8a876A4f0b5DC0f656a80ED68A",
+    "rewards": 11686.21780219926
+  },
+  {
+    "user": "0xd0Ac986C436d1B99428f6Ef2129a030B1800D0D4",
+    "rewards": 11496.264935842395
+  },
+  {
+    "user": "0xA5df93949f0bb173D4227D3f5B7ac9373C6c6fAD",
+    "rewards": 11479.072342233465
+  },
+  {
+    "user": "0x6492DE23e7687Cd58503f7816ef7dCE731e7921B",
+    "rewards": 11367.373673531634
+  },
+  {
+    "user": "0x71c557274780bD836ECdF1578B80142c0bE0E5EF",
+    "rewards": 10968.25598208938
+  },
+  {
+    "user": "0x052f1fA632faa5CB1cCDa800409FD8366093B3E6",
+    "rewards": 10512.45072123516
+  },
+  {
+    "user": "0x97A11411eE97ec889510c6132bcaD62467B7A4e7",
+    "rewards": 10367.955549110615
+  },
+  {
+    "user": "0xCBA387DF172fe53471112b45Dba52D037c45b52a",
+    "rewards": 10266.341666255503
+  },
+  {
+    "user": "0x17A5bC1e2C82CEE1F16C5D75943b605a5Fe34097",
+    "rewards": 10096.409677257683
+  },
+  {
+    "user": "0xBc17D64c3D68a5d1a5433b778207a4849C969C87",
+    "rewards": 10086.104492248123
+  },
+  {
+    "user": "0xd061F4882F6fd16b2C7cE6C59Fd03121F597d92E",
+    "rewards": 9844.767950116966
+  },
+  {
+    "user": "0xA6BE06E9DF39e9cdD3FdED783921eb8c9ac5E9c8",
+    "rewards": 9681.880740167371
+  },
+  {
+    "user": "0x9AC2258431F8dc37119543Db23e80B0f2E750b4B",
+    "rewards": 9507.51316744408
+  },
+  {
+    "user": "0x0265565615f51c42EcCbac0F0C8dc67A9eced465",
+    "rewards": 9170.379114943935
+  },
+  {
+    "user": "0x48C59ccFd8514e7f4556fC7a7074E176A54e899D",
+    "rewards": 8983.089453527453
+  },
+  {
+    "user": "0xE6E62E5A194a480D29e15a286a337e2CD89cb7C3",
+    "rewards": 8812.98844018067
+  },
+  {
+    "user": "0xcfBbE671B07E3A4DEe704F59b25E93518d77F611",
+    "rewards": 8655.983331874944
+  },
+  {
+    "user": "0xe288159F4904ADc1207585A4860282A51892160B",
+    "rewards": 8565.447559440789
+  },
+  {
+    "user": "0x127502E6F1F186B161e53D69eC990d7EBb3F7B5D",
+    "rewards": 8511.90333516682
+  },
+  {
+    "user": "0xd68acbEbCdE23aeF84AC30dA8cf16Bf267C9D77b",
+    "rewards": 8499.459849076362
+  },
+  {
+    "user": "0xF54dCC8c8271dfc9D75DbEb499659A43A8825477",
+    "rewards": 8498.430170891885
+  },
+  {
+    "user": "0x0D020ac68Ad827D9B945041DD164560DC291062e",
+    "rewards": 8388.326439014703
+  },
+  {
+    "user": "0x4d5877b49eC13C0Ae23B96f2e473872E9C11CF72",
+    "rewards": 8365.444702611796
+  },
+  {
+    "user": "0xEa0f97678dCad0826676CF4a796A65A8BffB6F51",
+    "rewards": 8299.393786358738
+  },
+  {
+    "user": "0x482c71316FBd718c389172ee9d21dA5796B77003",
+    "rewards": 8270.176786426073
+  },
+  {
+    "user": "0x23088d60f27DEC692Aa062B03ed3B8356364397d",
+    "rewards": 8263.535612959118
+  },
+  {
+    "user": "0xA9623aD5C440Ff9F2eED103B373da658532Ec4f4",
+    "rewards": 8236.05795294069
+  },
+  {
+    "user": "0x209708ceb3Ca6dd39151e2643e4DAf6821e1ba24",
+    "rewards": 8193.534219317715
+  },
+  {
+    "user": "0x3f43F6371Fb37a3ed3836f9B5E48E70B7778BDB0",
+    "rewards": 8141.383057633479
+  },
+  {
+    "user": "0xAD2CE56EfC80757a01eA34Ceb44461759B24A415",
+    "rewards": 8106.855944123465
+  },
+  {
+    "user": "0x41374A344c69dEb8e2c271DB8176d25f0E7Abb3D",
+    "rewards": 8105.4487272413135
+  },
+  {
+    "user": "0x1772ceC78961792e05a38Cf971AFabC7E80587E9",
+    "rewards": 7881.620597993325
+  },
+  {
+    "user": "0x0B7d5Db584206E6BBb1Ee987578Bec99F1F713Da",
+    "rewards": 7816.212283985868
+  },
+  {
+    "user": "0x536223085482D17449620EaeBbDb7260bCCdf4ce",
+    "rewards": 7735.945708863536
+  },
+  {
+    "user": "0x8599A6cab9617FFb12E6f11aD119caeE7323a2c4",
+    "rewards": 7562.169693145831
+  },
+  {
+    "user": "0x1fF463DfB761fb46D9e7397f97Ba79ecBcb2a66C",
+    "rewards": 7558.795039300107
+  },
+  {
+    "user": "0xdD403F9524F3e868CB8813128b032E40eb1Aa46a",
+    "rewards": 7506.928099744569
+  },
+  {
+    "user": "0x7a5a8c559F95fCCaf11d5938456b1D2A691382f8",
+    "rewards": 7498.000431426882
+  },
+  {
+    "user": "0x514FbfE81A7D27cc7a9C06f34C277741cda5a438",
+    "rewards": 7320.3377630699615
+  },
+  {
+    "user": "0x09ed6FcED3De6f8fBfF6f2A2152db7724295497E",
+    "rewards": 7108.576255180043
+  },
+  {
+    "user": "0x335ea878801e85CD874d059Ba686ba0cbCCD12E6",
+    "rewards": 7005.790414539425
+  },
+  {
+    "user": "0xEC4C15765C88090d6fD5f11251700ffF6Be12b4c",
+    "rewards": 7003.089998762663
+  },
+  {
+    "user": "0xEE18AEe21136BE4aBa7f88aE4772ecf7D40DE20a",
+    "rewards": 6791.700401341499
+  },
+  {
+    "user": "0x477296895e9dcA17376a1e6AA02150E6754029a8",
+    "rewards": 6546.262396656862
+  },
+  {
+    "user": "0x03b8Af185016aee70c85681A93560Df9F302c607",
+    "rewards": 6470.914907065747
+  },
+  {
+    "user": "0xA2320A5D5E3Aa42A7C893bE051Ad0b24df853EBA",
+    "rewards": 6349.524494932575
+  },
+  {
+    "user": "0x50d8F339e6CE3ca6999e26Aa5F95c04a04Fc78EC",
+    "rewards": 6347.677859018019
+  },
+  {
+    "user": "0x1666465F9BEA8aEA21883De4622963C3D2731ab5",
+    "rewards": 6090.667742444591
+  },
+  {
+    "user": "0x892A7c8A0c5Db50BF087236123D4d11637C447d7",
+    "rewards": 5963.592300120409
+  },
+  {
+    "user": "0x165b791Eb34133d188c1336e27d1a19210f7aa83",
+    "rewards": 5531.577261897873
+  },
+  {
+    "user": "0x441Eb1d0C61b2775496AEc086FD651CF4749B156",
+    "rewards": 5197.985032134183
+  },
+  {
+    "user": "0xA2110629df045e45E7Db317D88c63C7054508CDA",
+    "rewards": 5159.025758566997
+  },
+  {
+    "user": "0x5C2bF1Fd0eD8BB3465315529649486F04fe79FEb",
+    "rewards": 5145.729799199393
+  },
+  {
+    "user": "0xddd5B3A5B6836Eb9A579F7E6D06A7a0d92c52519",
+    "rewards": 4543.907772610426
+  },
+  {
+    "user": "0x140e7AAB562241Ff022e3A366D27AC007AB51124",
+    "rewards": 4487.19062121131
+  },
+  {
+    "user": "0xcFB92C1A70EE9c84366B56ECb46B9b0C404d3b76",
+    "rewards": 4173.649935670297
+  },
+  {
+    "user": "0xA0428Ce5f8b044AFCa936186036388c1C0777cD1",
+    "rewards": 4170.344265818468
+  },
+  {
+    "user": "0xfc78F07986381160033383562A0B208CFD00DbA2",
+    "rewards": 4149.557678991647
+  },
+  {
+    "user": "0x0f24805121d01aC083e4A4f54eeF11283ccc7E58",
+    "rewards": 4140.5898856422045
+  },
+  {
+    "user": "0xbD925135F1f9aA2a3802984F39d385d1b9640Bbb",
+    "rewards": 4088.093348768755
+  },
+  {
+    "user": "0x37C1fD9B062A506B0bE7bd0a6D1C174E02a256D6",
+    "rewards": 4063.933739180398
+  },
+  {
+    "user": "0x6C6d687dDDCd31aABE1994234064bC8e182BBeFE",
+    "rewards": 4051.1101864848365
+  },
+  {
+    "user": "0x74fbA3e2856600887aF13b716BBb9D19c8B9273b",
+    "rewards": 3920.6664403305113
+  },
+  {
+    "user": "0x66c68878529BB21a2e4DDB1aeA08b26c9a96703C",
+    "rewards": 3920.6664403305113
+  },
+  {
+    "user": "0xE6c74fc82bf1cBd683b5BD5D030B37122404F153",
+    "rewards": 3800.706245636228
+  },
+  {
+    "user": "0x87b9D684fF8c4249FfD4aE13BE6B74Fb6024eF7c",
+    "rewards": 3588.1163195505774
+  },
+  {
+    "user": "0x248FD3d2875a33d205ee891D1A2658D6860BfB9D",
+    "rewards": 3578.810981654509
+  },
+  {
+    "user": "0xFFD3eeb9e64Ebd6371949bfBe107342a170Ff32a",
+    "rewards": 3356.2227686312267
+  },
+  {
+    "user": "0x448D16e61aD6683CE8DAF8D9E4580F33e350F6CB",
+    "rewards": 3129.2909966462516
+  },
+  {
+    "user": "0xE710F8D9815bd13667A16bb2150FFe4696E7BaFd",
+    "rewards": 3033.560911363532
+  },
+  {
+    "user": "0x96da7872537965c81bfFa982f426ce31B034DE8c",
+    "rewards": 2968.8809683531335
+  },
+  {
+    "user": "0x1a32297c1F05395FB3a18f10F154C57d58FFd738",
+    "rewards": 2930.4966762459394
+  },
+  {
+    "user": "0x3Ca29AEAfd3D97C13e5c46e8ce893F41a333ae90",
+    "rewards": 2827.1875183645993
+  },
+  {
+    "user": "0x2c80eb4f819Ebdb72b4135d2368f81977DA31c8f",
+    "rewards": 2784.9595405655314
+  },
+  {
+    "user": "0x459C3741adb8b7A9C5c4139Ead1aFf70aD00Fd43",
+    "rewards": 2781.4796587750757
+  },
+  {
+    "user": "0xD70e596FEc1CB98F0eD81b4238ea13d35c819F17",
+    "rewards": 2531.2427234042098
+  },
+  {
+    "user": "0x2859A82Cf81bcF867879dC4235e66BaE1dF350A9",
+    "rewards": 2361.8510680804607
+  },
+  {
+    "user": "0xef38981FF4faA866Dfb1Ece23EdF46b176839a9b",
+    "rewards": 2349.224249160441
+  },
+  {
+    "user": "0x9b8F0f700E0B6ED03aF632776562f559E1282686",
+    "rewards": 2170.665010939479
+  },
+  {
+    "user": "0x7008d209d803b130DB14Ee6495262990b6E6E3Cf",
+    "rewards": 2127.276304135887
+  },
+  {
+    "user": "0xa78fc7090cB8b685a7cCdAB316C68dfaBBCa6f07",
+    "rewards": 2120.349066838721
+  },
+  {
+    "user": "0x97988d23302452730e7951aabf1A573eC88070Ec",
+    "rewards": 2085.912502895943
+  },
+  {
+    "user": "0x61ea278d42717ec9a1226E5c2534d242c744B53e",
+    "rewards": 2085.172132909234
+  },
+  {
+    "user": "0xa64eFcaC50ebCa92D985f3865230d1Bf3325663C",
+    "rewards": 1956.181217770537
+  },
+  {
+    "user": "0x05c1f078219fCA95B80eD2693512766179F0A053",
+    "rewards": 1869.405949778
+  },
+  {
+    "user": "0xb1bF48A78054C38296652A49197Cbce4bC209494",
+    "rewards": 1866.1042061099672
+  },
+  {
+    "user": "0xE4AAABe1B494ba5e7EB40a96292e516878405A44",
+    "rewards": 1677.1194584632174
+  },
+  {
+    "user": "0xa8BAa16C67085Ab5C11cEEb8E45f7a6891A25348",
+    "rewards": 1364.1904889197845
+  },
+  {
+    "user": "0x494FdBA3F9C78f527180fE310D9b3d28C9263a45",
+    "rewards": 1277.5347186049362
+  },
+  {
+    "user": "0xCafe4879fB85631E7FB5f29C32fee167CCc55C7a",
+    "rewards": 1108.6568912926077
+  },
+  {
+    "user": "0x4B0BFcBb18B7B94561cFb367F047eBd56F4405aC",
+    "rewards": 896.7821300440509
+  },
+  {
+    "user": "0x81134166c117ae6C8366C36BE9e886B0F7147faE",
+    "rewards": 854.6262368088247
+  },
+  {
+    "user": "0x76Fa4E4CC6Eae519c3c0A086E6df73b926Ea65e5",
+    "rewards": 849.8430170891886
+  },
+  {
+    "user": "0x53C73b35eD06c2132f37C42598f8d327CD3f80A8",
+    "rewards": 838.9993641787191
+  },
+  {
+    "user": "0x1C5a7710078C2f6e18D91E8f23D9020e085C8851",
+    "rewards": 834.9561727957121
+  },
+  {
+    "user": "0x1Bf51150C59e1284a82B3201DaB22a174D84dBC4",
+    "rewards": 832.4069295208617
+  },
+  {
+    "user": "0x9b231e031f0c7997bcAaFD8c8008511c9cDDF712",
+    "rewards": 814.7964982998541
+  },
+  {
+    "user": "0x5d0f8447CF026aE8DEF9967b60A14B81CCf172a6",
+    "rewards": 778.6768105488995
+  },
+  {
+    "user": "0xF635cda09766dFEC047F9A27c7793145042140C1",
+    "rewards": 740.3555916811832
+  },
+  {
+    "user": "0x82A249CF1CdC3E041cc106b2494b8039e0ce6cC9",
+    "rewards": 733.8958648740918
+  },
+  {
+    "user": "0xF848D2DEd87E7A1E5FE4dcA043C0FdaCbDEf6bf3",
+    "rewards": 685.3635624150126
+  },
+  {
+    "user": "0x9Cb7AFf24057a8d1f81093C0c99b0977B6654d8d",
+    "rewards": 662.7061126316561
+  },
+  {
+    "user": "0x1e9E62c5E9c982CC783707531387EdF3f538Bff8",
+    "rewards": 430.0109731004429
+  },
+  {
+    "user": "0x52ab6C2Deb99172D04Df49263C3c182dD97d345f",
+    "rewards": 393.89390116281174
+  },
+  {
+    "user": "0x40394F926875FEeD32fEF789daD73460e6C340f4",
+    "rewards": 334.2935528646255
+  },
+  {
+    "user": "0x45686996F171Dea97e2C355e98f66aCe0eCeba01",
+    "rewards": 308.5492930188585
+  },
+  {
+    "user": "0x5823a5c9d0b5628dc297754bbBD7415942beF5a0",
+    "rewards": 302.49130761777764
+  },
+  {
+    "user": "0xCE2c6bbF68238bf54623da337EDEB80e967CF75c",
+    "rewards": 243.42803266218715
+  },
+  {
+    "user": "0x789a09BBdF75F655c6B2ca9B0c1C01d2603DBC37",
+    "rewards": 179.10875293194454
+  },
+  {
+    "user": "0xCFe2cbb3AD47513A6e4Aa6Dc403C8C9CA2C9D49d",
+    "rewards": 166.30194981473142
+  },
+  {
+    "user": "0x17dfe70653da3b1e3b9f442c959A26d80d11124A",
+    "rewards": 164.9855704709086
+  },
+  {
+    "user": "0x19cc815Cc3EaE7691020213ca68b2483b4BbA376",
+    "rewards": 158.2538419585646
+  },
+  {
+    "user": "0xFDC22A94EF670AFB5E4DD5187F87f8028Aa02b32",
+    "rewards": 128.0873416751926
+  },
+  {
+    "user": "0x7709faCa08b6Bd254C540F74Fe6174B01cBc5321",
+    "rewards": 85.16898124032906
+  },
+  {
+    "user": "0x86eF95882D24922Ebc164b18796aB377e3E2dc9F",
+    "rewards": 46.633114316216684
+  },
+  {
+    "user": "0x195B2C705F68DE06A44F98dbff2D2D4528f98BC5",
+    "rewards": 40.4621149830313
+  },
+  {
+    "user": "0x0B962755d87Dc50f49DEb45D5b0E7717db11DC71",
+    "rewards": 10.278027763150934
+  },
+  {
+    "user": "0x5E07BE9BE534bD3942D0A3eE3f3bda1e6bb70f99",
+    "rewards": 8.177718334831255
+  },
+  {
+    "user": "0x22CEeF63FBbD5885520FDD5946c5055A29564df8",
+    "rewards": 4.083435405491826
+  },
+  {
+    "user": "0x9ab119b9c4Cf99f2AcC0EaC0A24A36B3e84Ab2a6",
+    "rewards": 0.8072349113859938
+  }
+]

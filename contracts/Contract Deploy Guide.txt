@@ -1,0 +1,38 @@
+=============Deployed Contract address=====================
+Base:
+Arbitrum:
+Avax:
+Sepolia: 
+==============Uniswap Router Addresss on Each network=====================================
+Base:     0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24
+Arbitrum:  0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24
+Avax:     0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24
+Sepolia: 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008
+================USDT  addresses on Each network==============================================
+USDC address on base:    0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
+USDT address on Arbitrum:   0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9
+USDT address on Avax: 0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7
+USDT address on Sepolia:  0x7169d38820dfd117c3fa1f22a697dba58d90ba06
+=========================Parameters when deploy====================================================
+_uniswapRouter: use above address on each network
+_usdtAddress: use above address on each network
+_feePercent: 3
+_targetMaretCap: 69000
+_targetLPAmount: 12000
+_totalSupply: 1000000000
+
+
+
+
+
+npx hardhat node --fork https://arbitrum.drpc.org
+npx hardhat node --fork https://base.llamarpc.com
+npx hardhat node --fork https://api.avax.network/ext/bc/C/rpc
+
+
+
+Arbitrum
+FairLaunch: 0x4389e4c2964Dde43BE100889FEe7C11f95280997
+
+Base
+FairLaunch: 0xacDda6c128B524Aa09d6dFDC1313A204dE9448eb

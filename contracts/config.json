@@ -1,0 +1,32 @@
+{
+  "0xa4b1": {
+    "chainName": "Arbitrum",
+    "chainId": 42161,
+    "router": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
+    "usdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+  },
+  "0x2105": {
+    "chainName": "Base",
+    "chainId": 8453,
+    "router": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
+    "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
+  "0xa86a": {
+    "chainName": "Avalanche",
+    "chainId": 43114,
+    "router": "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+    "usdc": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
+  },
+  "0x3AF": {
+    "chainName": "Pulsechain Testnet",
+    "chainId": 943,
+    "router": "0x99c2d4937756Cf66D04f7db362B87604f4303969",
+    "usdc": "0x0Becabdf71037848BCf96a4923A1764710e71E6A"
+  },
+  "0x171": {
+    "chainName": "Pulsechain Mainnet",
+    "chainId": 369,
+    "router": "0xeB45a3c4aedd0F47F345fB4c8A1802BB5740d725",
+    "usdc": "0x15D38573d2feeb82e7ad5187aB8c1D52810B1f07"
+  }
+}

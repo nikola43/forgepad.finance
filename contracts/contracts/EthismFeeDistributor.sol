@@ -1,0 +1,533 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
+// import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+// import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+
+/**
+ * @title WeeklyDistributionContract
+ * @dev Distributes 90% of contract balance weekly to all users and 10% to a random user
+ * Uses Chainlink Automation for weekly triggers and VRF for random selection
+ */
+contract EthismFeeDistributor is
+    AutomationCompatibleInterface,
+    VRFConsumerBaseV2Plus,
+    FunctionsClient
+{
+    using FunctionsRequest for FunctionsRequest.Request;
+
+    // VRFCoordinatorV2Interface private COORDINATOR;
+    uint256 private s_subscriptionId;
+    bytes32 private s_keyHash;
+    uint32 private callbackGasLimit = 200000;
+    uint16 private requestConfirmations = 3;
+    uint32 private numWords = 1;
+
+    // Contract state variables
+    address[] public registeredUsers;
+    mapping(address => bool) public isRegistered;
+    mapping(address => uint256) public userIndex;
+
+    uint256 public lastDistributionTime;
+    uint256 public distributionInterval = 120 seconds;
+    uint256 public distributionPercent = 90;
+
+    bool public distributionInProgress;
+    uint256 public pendingVRFRequest;
+    uint256 public totalDistributed;
+    uint256 public distributionCount;
+
+    // State variables to store the last request ID, response, and error
+    bytes32 public s_lastRequestId;
+    bytes public s_lastResponse;
+    bytes public s_lastError;
+
+    // State variable to store the returned character information
+    string public character;
+
+    //Callback gas limit
+    uint32 gasLimit = 300000;
+
+    // donID - Hardcoded for Sepolia
+    // Check to get the donID for your supported network https://docs.chain.link/chainlink-functions/supported-networks
+    bytes32 donID =
+        0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
+
+    // Custom error type
+    error UnexpectedRequestID(bytes32 requestId);
+
+    // Event to log responses
+    event Response(
+        bytes32 indexed requestId,
+        string character,
+        bytes response,
+        bytes err
+    );
+
+    // Events
+    event UserRegistered(address indexed user);
+    event UserUnregistered(address indexed user);
+    event RegularDistribution(
+        uint256 amount,
+        uint256 usersCount,
+        uint256 amountPerUser
+    );
+    event BonusDistribution(address indexed winner, uint256 amount);
+    event VRFRequestSent(uint256 requestId);
+    event DistributionCompleted(uint256 totalAmount, uint256 timestamp);
+    event FundsDeposited(address indexed from, uint256 amount);
+
+    event RequestSent(uint256 requestId, uint32 numWords);
+    event RequestFulfilled(uint256 requestId, uint256[] randomWords);
+
+    struct RequestStatus {
+        bool fulfilled; // whether the request has been successfully fulfilled
+        bool exists; // whether a requestId exists
+        uint256[] randomWords;
+    }
+    mapping(uint256 => RequestStatus)
+        public s_requests; /* requestId --> requestStatus */
+
+    // Past request IDs.
+    uint256[] public requestIds;
+    uint256 public lastRequestId;
+
+    constructor(
+        address _router,
+        uint256 subscriptionId,
+        address vrfCoordinator,
+        bytes32 keyHash
+    ) VRFConsumerBaseV2Plus(vrfCoordinator) FunctionsClient(_router) {
+        s_subscriptionId = subscriptionId;
+        s_keyHash = keyHash;
+        lastDistributionTime = block.timestamp;
+    }
+
+    // Router address - Hardcoded for Sepolia
+    // Check to get the router address for your supported network https://docs.chain.link/chainlink-functions/supported-networks
+    address router = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
+
+    // JavaScript source code
+    // Fetch character name from the Star Wars API.
+    // Documentation: https://swapi.info/people
+    string source =
+        "const characterId = args[0];"
+        "const apiResponse = await Functions.makeHttpRequest({"
+        "url: `https://swapi.info/api/people/${characterId}/`"
+        "});"
+        "if (apiResponse.error) {"
+        "throw Error('Request failed');"
+        "}"
+        "const { data } = apiResponse;"
+        "return Functions.encodeString(data.name);";
+
+    /**
+     * @dev Allows users to deposit ETH into the contract
+     */
+    receive() external payable {
+        emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Sends an HTTP request for character information
+     * @param subscriptionId The ID for the Chainlink subscription
+     * @param args The arguments to pass to the HTTP request
+     * @return requestId The ID of the request
+     */
+    function sendRequest(
+        uint64 subscriptionId,
+        string[] calldata args
+    ) external onlyOwner returns (bytes32 requestId) {
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(source); // Initialize the request with JS code
+        if (args.length > 0) req.setArgs(args); // Set the arguments for the request
+
+        // Send the request and store the request ID
+        s_lastRequestId = _sendRequest(
+            req.encodeCBOR(),
+            subscriptionId,
+            gasLimit,
+            donID
+        );
+
+        return s_lastRequestId;
+    }
+
+    /**
+     * @dev Register a user for distributions
+     */
+    function registerUser() external {
+        require(!isRegistered[msg.sender], "User already registered");
+
+        registeredUsers.push(msg.sender);
+        isRegistered[msg.sender] = true;
+        userIndex[msg.sender] = registeredUsers.length - 1;
+
+        emit UserRegistered(msg.sender);
+    }
+
+    function clearRegisteredUsers() external onlyOwner {
+        for (uint256 i = 0; i < registeredUsers.length; i++) {
+            delete isRegistered[registeredUsers[i]];
+            delete userIndex[registeredUsers[i]];
+        }
+        delete registeredUsers;
+        lastDistributionTime = block.timestamp;
+        distributionInProgress = false;
+        pendingVRFRequest = 0;
+        totalDistributed = 0;
+        distributionCount = 0;
+    }
+
+    /**
+     * @dev Unregister a user from distributions
+     */
+    function unregisterUser() external {
+        require(isRegistered[msg.sender], "User not registered");
+
+        uint256 index = userIndex[msg.sender];
+        uint256 lastIndex = registeredUsers.length - 1;
+
+        // Move the last user to the position of the user being removed
+        if (index != lastIndex) {
+            address lastUser = registeredUsers[lastIndex];
+            registeredUsers[index] = lastUser;
+            userIndex[lastUser] = index;
+        }
+
+        registeredUsers.pop();
+        delete isRegistered[msg.sender];
+        delete userIndex[msg.sender];
+
+        emit UserUnregistered(msg.sender);
+    }
+
+    /**
+     * @dev Chainlink Automation - Check if upkeep is needed
+     */
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    )
+        external
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
+        upkeepNeeded = (block.timestamp >=
+            (lastDistributionTime + distributionInterval) &&
+            !distributionInProgress &&
+            registeredUsers.length > 0 &&
+            address(this).balance > 0);
+    }
+
+    /**
+     * @dev Chainlink Automation - Perform upkeep (start distribution)
+     */
+    function performUpkeep(bytes calldata /* performData */) external override {
+        require(
+            block.timestamp >= (lastDistributionTime + distributionInterval),
+            "Distribution interval not reached"
+        );
+        require(!distributionInProgress, "Distribution already in progress");
+        require(registeredUsers.length > 0, "No registered users");
+        require(address(this).balance > 0, "No balance to distribute");
+
+        distributionInProgress = true;
+        _performRegularDistribution();
+        distributionInProgress = false;
+        lastDistributionTime = block.timestamp;
+        this.requestRandomWords(true);
+    }
+
+    /**
+     * @dev Distribute 90% of balance equally among all registered users
+     */
+    function _performRegularDistribution() internal {
+        uint256 totalBalance = address(this).balance;
+        uint256 regularDistributionAmount = (totalBalance *
+            distributionPercent) / 100;
+        uint256 amountPerUser = regularDistributionAmount /
+            registeredUsers.length;
+
+        if (amountPerUser > 0) {
+            for (uint256 i = 0; i < registeredUsers.length; i++) {
+                (bool success, ) = payable(registeredUsers[i]).call{
+                    value: amountPerUser
+                }("");
+                require(success, "Transfer failed");
+            }
+
+            totalDistributed += regularDistributionAmount;
+            emit RegularDistribution(
+                regularDistributionAmount,
+                registeredUsers.length,
+                amountPerUser
+            );
+        }
+    }
+
+    // Assumes the subscription is funded sufficiently.
+    // @param enableNativePayment: Set to `true` to enable payment in native tokens, or
+    // `false` to pay in LINK
+    function requestRandomWords(
+        bool enableNativePayment
+    ) external onlyOwner returns (uint256 requestId) {
+        // Will revert if subscription is not set and funded.
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: numWords,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({
+                        nativePayment: enableNativePayment
+                    })
+                )
+            })
+        );
+        s_requests[requestId] = RequestStatus({
+            randomWords: new uint256[](0),
+            exists: true,
+            fulfilled: false
+        });
+        requestIds.push(requestId);
+        lastRequestId = requestId;
+        emit RequestSent(requestId, numWords);
+        return requestId;
+    }
+
+    function fulfillRandomWords(
+        uint256 _requestId,
+        uint256[] calldata _randomWords
+    ) internal override {
+        require(s_requests[_requestId].exists, "request not found");
+        s_requests[_requestId].fulfilled = true;
+        s_requests[_requestId].randomWords = _randomWords;
+
+        // require(requestId == pendingVRFRequest, "Invalid request ID");
+        require(distributionInProgress, "No distribution in progress");
+
+        // Select random winner
+        uint256 winnerIndex = _randomWords[0] % registeredUsers.length;
+        address winner = registeredUsers[winnerIndex];
+
+        // Send bonus amount (remaining balance should be ~10% of original)
+        uint256 bonusAmount = address(this).balance;
+        if (bonusAmount > 0) {
+            (bool success, ) = payable(winner).call{value: bonusAmount}("");
+            require(success, "Transfer failed");
+            totalDistributed += bonusAmount;
+            emit BonusDistribution(winner, bonusAmount);
+        }
+
+        // Complete distribution
+        lastDistributionTime = block.timestamp;
+        distributionInProgress = false;
+        distributionCount++;
+        pendingVRFRequest = 0;
+
+        emit DistributionCompleted(totalDistributed, block.timestamp);
+
+        emit RequestFulfilled(_requestId, _randomWords);
+    }
+
+    function getRequestStatus(
+        uint256 _requestId
+    ) external view returns (bool fulfilled, uint256[] memory randomWords) {
+        require(s_requests[_requestId].exists, "request not found");
+        RequestStatus memory request = s_requests[_requestId];
+        return (request.fulfilled, request.randomWords);
+    }
+
+    /**
+     * @notice Callback function for fulfilling a request
+     * @param requestId The ID of the request to fulfill
+     * @param response The HTTP response data
+     * @param err Any errors from the Functions request
+     */
+    function fulfillRequest(
+        bytes32 requestId,
+        bytes memory response,
+        bytes memory err
+    ) internal override {
+        if (s_lastRequestId != requestId) {
+            revert UnexpectedRequestID(requestId); // Check if request IDs match
+        }
+        // Update the contract's state variables with the response and any errors
+        s_lastResponse = response;
+        character = string(response);
+        s_lastError = err;
+
+        // Emit an event to log the response
+        emit Response(requestId, character, s_lastResponse, s_lastError);
+    }
+
+    // /**
+    //  * @dev Callback function for Chainlink VRF
+    //  */
+    // function fulfillRandomWords(
+    //     uint256 requestId,
+    //     uint256[] memory randomWords
+    // ) internal override {
+    //     require(requestId == pendingVRFRequest, "Invalid request ID");
+    //     require(distributionInProgress, "No distribution in progress");
+
+    //     // Select random winner
+    //     uint256 winnerIndex = randomWords[0] % registeredUsers.length;
+    //     address winner = registeredUsers[winnerIndex];
+
+    //     // Send bonus amount (remaining balance should be ~10% of original)
+    //     uint256 bonusAmount = address(this).balance;
+    //     if (bonusAmount > 0) {
+    //         (bool success, ) = payable(winner).call{value: bonusAmount}("");
+    //         require(success, "Transfer failed");
+    //         totalDistributed += bonusAmount;
+    //         emit BonusDistribution(winner, bonusAmount);
+    //     }
+
+    //     // Complete distribution
+    //     lastDistributionTime = block.timestamp;
+    //     distributionInProgress = false;
+    //     distributionCount++;
+    //     pendingVRFRequest = 0;
+
+    //     emit DistributionCompleted(totalDistributed, block.timestamp);
+    // }
+
+    /**
+     * @dev Get list of all registered users
+     */
+    function getRegisteredUsers() external view returns (address[] memory) {
+        return registeredUsers;
+    }
+
+    /**
+     * @dev Get number of registered users
+     */
+    function getRegisteredUsersCount() external view returns (uint256) {
+        return registeredUsers.length;
+    }
+
+    /**
+     * @dev Get time until next distribution
+     */
+    function getTimeUntilNextDistribution() external view returns (uint256) {
+        uint256 nextDistributionTime = lastDistributionTime +
+            distributionInterval;
+        if (block.timestamp >= nextDistributionTime) {
+            return 0;
+        }
+        return nextDistributionTime - block.timestamp;
+    }
+
+    /**
+     * @dev Owner can update VRF parameters
+     */
+    function updateVRFConfig(
+        uint64 subscriptionId,
+        bytes32 keyHash,
+        uint32 callbackGas
+    ) external onlyOwner {
+        s_subscriptionId = subscriptionId;
+        s_keyHash = keyHash;
+        callbackGasLimit = callbackGas;
+    }
+
+    /**
+     * @dev Emergency function to manually trigger distribution (owner only)
+     */
+    function emergencyDistribution() external onlyOwner {
+        require(!distributionInProgress, "Distribution already in progress");
+        require(registeredUsers.length > 0, "No registered users");
+        require(address(this).balance > 0, "No balance to distribute");
+
+        distributionInProgress = true;
+        _performRegularDistribution();
+        this.requestRandomWords(true);
+    }
+
+    /**
+     * @dev Emergency withdrawal function (owner only)
+     */
+    function emergencyWithdraw() external onlyOwner {
+        require(!distributionInProgress, "Cannot withdraw during distribution");
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    /**
+     * @dev Get contract status information
+     */
+    function getContractStatus()
+        external
+        view
+        returns (
+            uint256 balance,
+            uint256 usersCount,
+            uint256 timeUntilNext,
+            bool inProgress,
+            uint256 totalDist,
+            uint256 distCount
+        )
+    {
+        uint256 nextDistributionTime = lastDistributionTime +
+            distributionInterval;
+        uint256 timeUntilNextDist = block.timestamp >= nextDistributionTime
+            ? 0
+            : nextDistributionTime - block.timestamp;
+
+        return (
+            address(this).balance,
+            registeredUsers.length,
+            timeUntilNextDist,
+            distributionInProgress,
+            totalDistributed,
+            distributionCount
+        );
+    }
+
+    function setGasLimit(uint32 _gasLimit) external onlyOwner {
+        gasLimit = _gasLimit;
+    }
+
+    function setRouter(address _router) external onlyOwner {
+        router = _router;
+    }
+
+    function setDonID(bytes32 _donID) external onlyOwner {
+        donID = _donID;
+    }
+
+    function setSubscriptionId(uint64 _subscriptionId) external onlyOwner {
+        s_subscriptionId = _subscriptionId;
+    }
+    function setKeyHash(bytes32 _keyHash) external onlyOwner {
+        s_keyHash = _keyHash;
+    }
+    function setCallbackGasLimit(uint32 _callbackGasLimit) external onlyOwner {
+        callbackGasLimit = _callbackGasLimit;
+    }
+    function setRequestConfirmations(
+        uint16 _requestConfirmations
+    ) external onlyOwner {
+        requestConfirmations = _requestConfirmations;
+    }
+    function setNumWords(uint32 _numWords) external onlyOwner {
+        numWords = _numWords;
+    }
+
+    function setDistributionInterval(uint256 _interval) external onlyOwner {
+        distributionInterval = _interval;
+    }
+    function setDistributionPercent(uint256 _percent) external onlyOwner {
+        require(_percent <= 100, "Percent must be <= 100");
+        distributionPercent = _percent;
+    }
+}
