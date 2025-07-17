@@ -167,7 +167,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         // initialTokenLPAmount = 5_000_000_000 ether;
 
         initialEthLPAmount = 5 ether;
-        initialTokenLPAmount = 600_000_000 ether;
+        initialTokenLPAmount = 900_000_000 ether;
 
         firstBuyFeeUSD = 0;
         // firstBuyFeeUSD = 3 ether;
