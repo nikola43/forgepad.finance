@@ -93,7 +93,7 @@ main .tradingview-widget-copyright {
   background: linear-gradient(90deg, #FF8E08 0.14%, #FDFFB3 11.87%, #FFED4C 23.15%, #FBE4A8 54.37%, #F8D185 74.22%, #E66606 79.32%, #FCF3A0 86.96%, #FF7629 100%);
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-fill-color: transparent;
+  /* text-fill-color: transparent; */
 }
 
 .MuiDialog-root .MuiDialogContent-root {
@@ -188,7 +188,7 @@ main .tradingview-widget-copyright {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, #FF9D0015, transparent);
   transition: left 0.8s ease;
 }
 
