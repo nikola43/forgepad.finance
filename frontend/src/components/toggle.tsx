@@ -18,7 +18,7 @@ const Toggle = styled(Box)<{ inner?: "true" }>`
         text-align: center;
         flex: 1;
         &.active {
-            background: white;
+            background: #FF9D00;
             color: black;
             font-weight: bold;
         }

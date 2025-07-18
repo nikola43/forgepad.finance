@@ -1,6 +1,5 @@
 'use client'
 
-import { InfoList } from "@/components/InfoList";
 import { useMainContext } from "@/context";
 import { Box, IconButton, InputAdornment, Pagination, PaginationItem, Stack, styled, TextField, Typography, useMediaQuery } from "@mui/material";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -208,41 +207,8 @@ export default function Home() {
     };
 
     return (
-        <PageBox mt={isMobile ? 0 : "-92px"}>
-            <Box
-                position="sticky"
-                top={isMobile ? '80px' : 14}
-                pl={isMobile ? 0 : '430px'}
-                display="flex"
-                gap={{ xs: "8px", sm: "8px", md: "16px" }}
-                alignItems="stretch"
-                mb={1}
-                zIndex={2}
-            >
-                {
-                    !inSearch &&
-                    <CreateButton href="/forge" className="effect-button" style={isMobile ? { flex: 1 } : {}}>
-                        Create a token!
-                    </CreateButton>
-                }
-                {
-                    (!isMobile || inSearch) &&
-                    <SearchToken
-                        placeholder="Search for token"
-                        value={searchWord}
-                        fullWidth={inSearch}
-                        onChange={(e) => setSearchWord(e.target.value)}
-                        InputProps={searchTokenInputProps}
-                    />
-                }
-                {
-                    isMobile && !inSearch &&
-                    <SearchButton onClick={() => setInSearch(true)}>
-                        <SearchIcon />
-                    </SearchButton>
-                }
-            </Box>
-            <Box display="flex" gap="8px" p="4px 16px" mx={{ xs: 0, sm: "-8px", md: "-15px"}} my={2} alignItems="center" bgcolor="black">
+        <PageBox>
+            <Box display="flex" gap="8px" p="0 16px" mx={{ xs: 0, sm: "-8px", md: "-15px"}} my={2} alignItems="center" bgcolor="black">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M3.375 15L1.5 6.375L5.25 8.25L9 3L12.75 8.25L16.5 6.375L14.625 15H3.375Z" fill="#D6DEC7" stroke="#D6DEC7" strokeWidth="1.66667" strokeLinejoin="round" />
                     <path d="M8.99902 8.25C10.4073 8.25 11.5487 9.39159 11.5488 10.7998C11.5488 12.2081 10.4073 13.3496 8.99902 13.3496C7.5908 13.3495 6.44922 12.208 6.44922 10.7998C6.44932 9.39165 7.59087 8.25011 8.99902 8.25Z" fill="#6CFF32" stroke="black" strokeWidth="1.5" strokeLinejoin="round" />
@@ -263,14 +229,14 @@ export default function Home() {
                 }
             </CardGrid>
             <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap="8px" my={2} alignItems="center">
-                <ComboBox label="Sort" values={{
+                <ComboBox label="Sort" border="1px solid #FF9D00" values={{
                     bump: 'Trending',
                     marketcap: 'Market cap',
                     creationTime: 'Creation time',
                     volume: 'Trading volume',
                     // progress: 'Progress' 
                 }} value={orderType} onChange={setOrderType} />
-                <ComboBox label="Network" values={{
+                <ComboBox label="Network" border="1px solid #FF9D00" values={{
                     all: 'All',
                     ...(
                         chains?.reduce((networks, c) => ({
@@ -297,15 +263,17 @@ export default function Home() {
                         <Pagination
                             variant="text"
                             shape="circular"
+                            siblingCount={0}
+                            boundaryCount={1}
                             count={totalPage}
                             page={pageNumber}  // current page
                             onChange={handleChange}  // handle page change
-                            renderItem={(data) => (
-                                <PaginationItem
-                                    slots={{ previous: ArrowBackIcon, next: ArrowForwardIcon }}
-                                    {...data}
-                                />
-                            )}
+                            // renderItem={(data) => (
+                            //     <PaginationItem
+                            //         slots={{ previous: ArrowBackIcon, next: ArrowForwardIcon }}
+                            //         {...data}
+                            //     />
+                            // )}
                         />
                     </Stack>
                 </Box>

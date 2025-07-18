@@ -9,6 +9,11 @@ import { useState } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
+import imgForge3 from '@/assets/images/forge3.png'
+import imgForge4 from '@/assets/images/forge4.png'
+import CloseIcon from "@mui/icons-material/Close";
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 interface Props {
   minimized: boolean
@@ -119,17 +124,17 @@ const Button = styled.button`
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #FFA600;
   border: none;
   outline: none;
   border-radius: 8px;
-  color: white;
-  font-size: 16px;
+  color: black;
+  font-family: "Londrina Solid";
+  font-size: 24px;
   cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
   justify-content: flex-start;
-  font-family: Arial;
   font-weight: 400;
   
   svg {
@@ -137,11 +142,6 @@ const Button = styled.button`
     width: 20px;
     height: 20px;
     fill: currentColor;
-  }
-  
-  &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
   }
 `
 
@@ -155,8 +155,26 @@ const StyledLink = styled(Link)`
 const HowDialog = styled(Dialog)`
   & .MuiDialog-paper {
     max-width: 700px;
-    padding: 24px;
+    padding-top: 24px;
   }
+`
+
+const CloseButton = styled.button`
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #232325;
+    border: none;
+    outline: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
 `
 
 export const HomeIcon = () => (
@@ -195,40 +213,29 @@ export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: ()
     onClose={onClose}
   >
     <DialogContent>
-      <Box display="flex" flexDirection="column" gap="16px" alignItems="center" pt="16px" fontFamily="Arial">
-        {
-          isMobile &&
-          <LogoWrapper style={{ width: "120px", minWidth: "120px", height: "140px" }}>
-            <Image src={imgLogo} style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={242} alt="logo" />
-          </LogoWrapper>
-        }
-        <Typography fontSize={18} fontWeight="bold" fontFamily="inherit">How Ethism works</Typography>
-        <Typography fontSize={14} textAlign="center" fontFamily="inherit">Ethism lets anyone launch a token on ETH chain.</Typography>
-        <Typography fontSize={14} textAlign="center" fontFamily="inherit">Every token created on Ethism is a fair launch - everyone can buy and sell from the same starting point.</Typography>
-        <Box display="flex" justifyContent="center" gap="20px">
-          {
-            !isMobile &&
-            <LogoWrapper style={{ width: "120px", minWidth: "120px", height: "140px" }}>
-              <Image src={imgLogo} style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={242} alt="logo" />
-            </LogoWrapper>
-          }
-          <Box display="flex" flexDirection="column" gap="16px" alignItems="center">
-            <Typography fontSize={14} textAlign="center" fontFamily="inherit">Step 1: Choose a token you want href buy.</Typography>
-            <Typography fontSize={14} textAlign="center" fontFamily="inherit">
-              Step 2: You can sell the token you bought through the bonding curve or once it hits Dex href secure profits or cut loss
-            </Typography>
-            <Typography fontSize={14} textAlign="center" fontFamily="inherit">
-              Step 3: Always DYOR and have fun trading through Ethism!
-            </Typography>
-            <Button style={{ justifyContent: 'center' }} className="effect-button" onClick={onClose}>Start the fun</Button>
-          </Box>
-          {
-            !isMobile &&
-            <LogoWrapper style={{ width: "120px", minWidth: "120px", height: "140px" }}>
-              <Image src={imgLogo} style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={242} alt="logo" />
-            </LogoWrapper>
-          }
+      {
+        isMobile
+        ? <Image src={imgForge3} width={431} height={22} style={{ maxWidth: "100%" }} alt="" />
+        : <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Image src={imgForge3} width={431} height={22} alt="" />
+          <CloseButton onClick={onClose}>
+              <CloseIcon style={{ color: "#FF9D00" }} />
+          </CloseButton>
         </Box>
+      }
+      <Box display="flex" flexDirection="column" gap="16px" alignItems="center" pt="16px" fontFamily="Arial">
+        <Image src={imgForge4} width={isMobile ? 300 : 351} height={isMobile ? 160 : 198} alt="logo" />
+        <Box display="flex" flexDirection={["column", "column", "row"]} gap="8px" alignItems="center">
+          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>💡 idea</Typography>
+          { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
+          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🧪 token</Typography>
+          { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
+          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🏛️ conviction</Typography>
+          { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
+          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🧑 cult classic</Typography>
+        </Box>
+        <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>repeat until decentralized.</Typography>
+        <Button style={{ justifyContent: 'center' }} onClick={onClose}>Let's START</Button>
       </Box>
     </DialogContent>
   </HowDialog>

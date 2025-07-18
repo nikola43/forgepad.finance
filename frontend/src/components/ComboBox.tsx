@@ -33,6 +33,7 @@ const ComboBoxRoot = styled(Box)`
   }
   & ul {
     background: #232325;
+    border: 1px solid #FF9D00;
     list-style: none;
     padding: 0.4em 0;
     margin: 0;
@@ -74,8 +75,8 @@ const ComboBoxRoot = styled(Box)`
 
 export default function ComboBox(props: any) {
     const [open, setOpen] = useState(false)
-    return <ComboBoxRoot onClick={() => setOpen(!open)} {...props}>
-        <Box component="label" display="flex" gap="4px" alignItems="center">
+    return <ComboBoxRoot onClick={() => setOpen(!open)}>
+        <Box component="label" {...props} display="flex" gap="4px" alignItems="center">
             <Typography component="span" fontSize={14}>{props.label}: </Typography>
             <Typography component="span" fontSize={14}>{props.values[props.value]}</Typography>
             <ArrowDownIcon sx={{ ml: 'auto' }} />

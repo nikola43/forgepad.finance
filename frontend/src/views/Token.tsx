@@ -446,7 +446,6 @@ const SwapContent = ({
 export default function Token() {
     const { address } = useAppKitAccount()
     const { network, address: id } = useParams()
-    console.log(network, id)
     // const [detailData, setDetailData] = React.useState<any>(null);
     // const [chatList, setChatList] = React.useState<any[]>([]);
     // const [tradeData, setTradeData] = React.useState<any>([]);
@@ -488,7 +487,6 @@ export default function Token() {
     const { userInfo } = useUserInfo()
     // const { ethismContract } = useContractInfo()
     const { tokenInfo, reload: reloadTokenInfo } = useTokenInfo(id as string, network as string, pageOfTrades, pageSize)
-
     const ethBalance = useMemo(() => userInfo?.balance ?? 0, [userInfo])
     const { balance: tokenBalance, allowance: tokenAllowance, curveBalance: lpBalance } = useMemo(() => tokenInfo ?? { balance: 0n, allowance: 0n, curveBalance: 0n }, [tokenInfo])
     const poolInfo = useMemo(() => tokenInfo?.poolInfo, [tokenInfo])
@@ -736,7 +734,7 @@ export default function Token() {
     // }, [detailData, poolInfo])
 
     return (
-        <PageBox display="flex" flexDirection="column" justifyContent="space-between" gap="1.5em" maxWidth="100%" overflow="hidden">
+        <PageBox display="flex" flexDirection="column" justifyContent="space-between" gap="1.5em" maxWidth="100%" overflow="hidden" pt={6} bgcolor="#101012">
             {/* {!!detailData?.tokenBanner && (
                 <Banner src={`${IPFS_GATEWAY_URL}/${detailData.tokenBanner}`} />
             )} */}
@@ -909,7 +907,7 @@ export default function Token() {
                                 }
                             </Box>
                         } */}
-                        <TVChartContainerAdvanced token={id} network={detailData?.network} dex={selectedDex} />
+                        <TVChartContainerAdvanced token={id} network={network} dex={selectedDex} />
                         <Box mt="2em">
                             <Box display="flex" justifyContent="space-between" flexDirection={{ xs: 'column', sm: 'row' }}>
                                 <Toggle inner="true">

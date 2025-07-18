@@ -15,8 +15,8 @@ import { useRouter } from "next/navigation";
 
 const Menu = styled.div`
     position: fixed;
-    top: 17px;
-    left: 12px;
+    top: 22px;
+    right: 12px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -42,7 +42,7 @@ const MenuButton = styled.button`
 `
 
 const MenuBack = styled.div`
-    background: #121212;
+    background: #101012;
     position: fixed;
     top: 0;
     left: 0;
@@ -96,6 +96,7 @@ const LogoWrapper = styled.div`
     justify-content: center;
     overflow: hidden;
     height: 260px;
+    margin-top: 40px;
 `
 
 const Buttons = styled.div`
@@ -112,7 +113,7 @@ const Button = styled.button`
     gap: 12px;
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.1);
-    border: none;
+    border: 1px solid #FF9D00;
     outline: none;
     border-radius: 8px;
     color: white;
@@ -150,10 +151,10 @@ const SocialLinks = styled.div`
     justify-content: center;
     gap: 24px;
     a {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        width: 40px;
-        height: 40px;
+        // background: rgba(255, 255, 255, 0.1);
+        // border-radius: 8px;
+        // width: 40px;
+        // height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -188,7 +189,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
         return <Menu>
             <MenuButton className="effect-button" onClick={() => onMenuOpen(true)}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 6H4M20 12H4M20 18H4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M20 6H4M20 12H4M20 18H4" stroke="#FF9D00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             </MenuButton>
             {
@@ -206,11 +207,11 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
     return <MenuBack>
         <Menu>
             <MenuButton className="effect-button" onClick={() => onMenuOpen(false)}>
-                <CloseIcon />
+                <CloseIcon style={{ color: "#FF9D00" }} />
             </MenuButton>
         </Menu>
         <LogoWrapper>
-            <Image src={imgLogo} style={{ objectFit: 'contain' }} width={422} height={320} alt="logo" />
+            <Image src={imgLogo} style={{ objectFit: 'contain' }} width={220} height={220} alt="logo" />
         </LogoWrapper>
         <Buttons>
             <StyledLink href="/">
@@ -230,7 +231,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
 
             <Button className="effect-button" onClick={() => setModal('how')}>
                 <CubeIcon />
-                How Ethism works
+                How it works
             </Button>
 
             <Link href="/forge" style={{ textDecoration: 'none' }} >
@@ -251,10 +252,10 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
 
         <SocialLinks>
             <Link href={ETHISM_TELEGRAM_URL} target="_blank">
-                <Image src={TelegramIcon} width={24} height={24} alt="telegramCommunity" />
+                <Image src={TelegramIcon} width={45} height={45} alt="telegramCommunity" />
             </Link>
             <Link href={ETHISM_TWITTER_URL} target="_blank">
-                <Image src={TwitterIcon} width={20} height={20} alt="twitter" />
+                <Image src={TwitterIcon} width={45} height={45} alt="twitter" />
             </Link>
         </SocialLinks>
 

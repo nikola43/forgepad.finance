@@ -15,7 +15,8 @@ const Flex = styled.div`
     align-items: center;
     justify-content: space-between;
     gap: 40px;
-    color: white;
+    color: #FFA600;
+    font-family: Arial;
 `
 
 const Links = styled.ul`
@@ -42,7 +43,7 @@ const SocialLinks = styled.div`
 
 export default function Footer() {
     return <Flex>
-        <span>@ Ethism 2025</span>
+        <span>@ Forge 2025</span>
         {/* <Links>
             <li><Link to="/privacy">privacy policy</Link></li>
             <li>|</li>

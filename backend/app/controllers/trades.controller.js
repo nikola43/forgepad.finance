@@ -44,7 +44,7 @@ module.exports = {
                     }
                 } : undefined,
                 order: [['date', 'DESC']],
-                limit: latestTradeId > 0 ? undefined : 10
+                limit: latestTradeId > 0 ? undefined : 50
             });
             tokenTable.hasOne(userTable, { sourceKey: 'creatorAddress', foreignKey: 'address' })
             const tokens = await tokenTable.findAll({

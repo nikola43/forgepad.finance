@@ -19,14 +19,15 @@ import { useMainContext } from "@/context";
 
 const StyledCard = styled(Box)`
   position: relative;
-  border-radius: 4px;
-  border: 1px solid transparent;
+  border-radius: 8px;
+  border: 1px solid #FFA600;
   background: #18181D;
   overflow: hidden;
   height: 100%;
   box-sizing: border-box;
   gap: 8px;
   display: flex;
+  flex-direction: column;
   text-decoration: none;
   overflow: hidden;
   cursor: pointer;
@@ -113,11 +114,11 @@ function TokenCard({ token, mode, ...props }: any) {
 
   if (mode === "trends") {
     return (
-      <StyledCard {...props} className="effect-button" p="16px" flexDirection="column" alignItems="stretch" onClick={() => router.push(`/${token.network}/${token.tokenAddress}`)}>
+      <StyledCard {...props} className="effect-button" p="16px" alignItems="stretch" onClick={() => router.push(`/${token.network}/${token.tokenAddress}`)}>
         <Box mx="auto" position="relative">
           <TokenLogo logo={token.tokenImage} size="150px" style={{ borderRadius: '8px' }} />
-          <Image src={`/networks/${token.network}.svg`} width={24} height={24} alt="" style={{ position: "absolute", top: -8, right: -8 }} />
         </Box>
+        <Image src={`/networks/${token.network}.svg`} width={24} height={24} alt="" style={{ position: "absolute", top: 8, right: 8 }} />
         <PriceChange negative={token.priceChange < 0 ? "true" : undefined} fontSize={10} left="-16px">
           {token.priceChange ? token.priceChange > 0 ? '+' : '-' : ''}{Math.abs(Number(token.priceChange ?? 0)).toFixed(2)}%
         </PriceChange>
@@ -156,61 +157,69 @@ function TokenCard({ token, mode, ...props }: any) {
 
   return (
     <StyledCard {...props} className="effect-button" p="8px 16px 8px 8px" onClick={() => router.push(`/${token.network}/${token.tokenAddress}`)}>
-      <Box display="flex" flexDirection="column" alignItems="center" gap="8px">
-        <TokenLogo logo={token.tokenImage} size="64px" style={{ margin: '4px', borderRadius: '8px' }} />
-        <Box display="flex" gap="8px" alignItems="center">
-          <Image src={`/networks/${token.network}.svg`} width={16} height={16} alt="" />
-          <Box display="flex" px="4px" justifyContent="center" alignItems="flex-end" bgcolor="white" borderRadius="10px">
-            <Avatar src={`/pools/${pool?.name}.png`} sx={{ width: 16, height: 16 }} alt="unitswap" />
-            <Typography fontSize={10} color="#ff1383" fontWeight="bold">{pool?.version}</Typography>
-          </Box>
-        </Box>
-      </Box>
-      <Box flex={1}>
-        <Box display="flex" gap="8px" alignItems="center" mt={0.5}>
-          <Typography color="white" fontSize={14} fontWeight="bold">
-            {token.tokenName.length > 20 ? `${token.tokenName.substring(0, 10)}...` : token.tokenName}
-          </Typography>
-          <Typography color="#B5B7AC" fontSize={12}>
-            {token.tokenSymbol.length > 20 ? `${token.tokenSymbol.substring(0, 10)}...` : token.tokenSymbol}
-          </Typography>
-          <Box display="flex" gap="4px" alignItems="center" ml="auto">
-            {!!token.telegramLink && <Link href={token.telegramLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TelegramIcon} width={16} height={16} alt="telegram" /></Link>}
-            {!!token.twitterLink && <Link href={token.twitterLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TwitterIcon} width={16} height={16} alt="twitter" /></Link>}
-            {!!token.webLink && <Link href={token.webLink} target="_blank" style={{ opacity: 0.5 }}><Image src={WebsiteIcon} width={16} height={16} alt="website" /></Link>}
-          </Box>
+      <Box display="flex" gap="8px">
+        <Box display="flex" flexDirection="column" alignItems="center" gap="8px">
+          <TokenLogo logo={token.tokenImage} size="64px" style={{ margin: '4px', borderRadius: '8px' }} />
           {
-            !!token.priceChange &&
-            <PriceChange negative={token.priceChange < 0 ? "true" : undefined} fontSize={10} ends="true" right="-16px" top="-8px">
-              {token.priceChange > 0 ? '+' : '-'}{Math.abs(Number(token.priceChange)).toFixed(2)}%
-            </PriceChange>
+            !token.launchedAt &&
+            <Box display="flex" gap="8px" alignItems="center">
+              <Image src={`/networks/${token.network}.svg`} width={16} height={16} alt="" />
+              <Box display="flex" px="4px" justifyContent="center" alignItems="flex-end" bgcolor="white" borderRadius="10px">
+                <Avatar src={`/pools/${pool?.name}.png`} sx={{ width: 16, height: 16 }} alt="unitswap" />
+                <Typography fontSize={10} color="#ff1383" fontWeight="bold">{pool?.version}</Typography>
+              </Box>
+            </Box>
           }
         </Box>
-        <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={1} ml={1}>
-          <Typography color="#B5B7AC" fontSize={12}>
-            Created by:
-          </Typography>
-          <Box display="flex" alignItems="center">
-            <CreatorName token={token} size="16px" fontSize={12} />
-          </Box>
-        </Box>
-        <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={0.5} ml={1}>
-          <Typography color="#B5B7AC" fontSize={12}>
-            Market cap:
-          </Typography>
-          <Typography color="#B5B7AC" fontSize={12}>
-            ${priceFormatter(token.marketcap, 2)}
-          </Typography>
-        </Box>
-        {
-          token.launchedAt
-            ? <Box display="flex" alignItems="center" mt={1} ml={1}>
-              <Image width={20} height={20} alt="mc" src={marketcapIcon} />
-              <Typography color="#FBFF00" fontSize={11}>Bonding Complete and Listed on swap</Typography>
+        <Box flex={1}>
+          <Box display="flex" gap="8px" alignItems="center" mt={0.5}>
+            <Typography color="white" fontSize={14} fontWeight="bold">
+              {token.tokenName.length > 20 ? `${token.tokenName.substring(0, 10)}...` : token.tokenName}
+            </Typography>
+            <Typography color="#B5B7AC" fontSize={12}>
+              {token.tokenSymbol.length > 20 ? `${token.tokenSymbol.substring(0, 10)}...` : token.tokenSymbol}
+            </Typography>
+            <Box display="flex" gap="4px" alignItems="center" ml="auto">
+              {!!token.telegramLink && <Link href={token.telegramLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TelegramIcon} width={16} height={16} alt="telegram" /></Link>}
+              {!!token.twitterLink && <Link href={token.twitterLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TwitterIcon} width={16} height={16} alt="twitter" /></Link>}
+              {!!token.webLink && <Link href={token.webLink} target="_blank" style={{ opacity: 0.5 }}><Image src={WebsiteIcon} width={16} height={16} alt="website" /></Link>}
             </Box>
-            : <Progress value={Number(token.progress ?? 0)} />
-        }
+            {
+              !!token.priceChange &&
+              <PriceChange negative={token.priceChange < 0 ? "true" : undefined} fontSize={10} ends="true" right="-16px" top="-8px">
+                {token.priceChange > 0 ? '+' : '-'}{Math.abs(Number(token.priceChange)).toFixed(2)}%
+              </PriceChange>
+            }
+          </Box>
+          <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={1} ml={1}>
+            <Typography color="#B5B7AC" fontSize={12}>
+              Created by:
+            </Typography>
+            <Box display="flex" alignItems="center">
+              <CreatorName token={token} size="16px" fontSize={12} />
+            </Box>
+          </Box>
+          <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={0.5} ml={1}>
+            <Typography color="#B5B7AC" fontSize={12}>
+              Market cap:
+            </Typography>
+            <Typography color="#B5B7AC" fontSize={12}>
+              ${priceFormatter(token.marketcap, 2)}
+            </Typography>
+          </Box>
+          {
+            !token.launchedAt &&
+            <Progress value={Number(token.progress ?? 0)} />
+          }
+        </Box>
       </Box>
+      {
+        token.launchedAt &&
+        <Box display="flex" gap="8px" alignItems="center" alignSelf="center">
+          <Image width={20} height={20} alt="mc" src={marketcapIcon} />
+          <Typography color="#FBFF00" fontSize={11}>Bonding Complete and Listed on swap</Typography>
+        </Box>
+      }
     </StyledCard>
   );
 }

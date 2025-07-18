@@ -23,6 +23,12 @@ import { useHandlers } from "@/hooks/token";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "../hooks/config";
 //import { uploadImageToIPFS } from "../utils";
 
+const Title = styled(Typography)`
+    background: linear-gradient(90deg, #FF8E08 0.14%, #FDFFB3 11.87%, #FFED4C 23.15%, #FBE4A8 54.37%, #F8D185 74.22%, #E66606 79.32%, #FCF3A0 86.96%, #FF7629 100%);
+    background-clip: text;
+    text-fill-color: transparent;
+`
+
 export const BootstrapInput = styled(InputBase)(({ theme }) => ({
     'label + &': {
         marginTop: theme.spacing(3),
@@ -644,11 +650,12 @@ export default function Create() {
     //     }
     //     reader.readAsDataURL(file)
     // }
+    /* LAUNCH YOUR TOKEN */
 
     return (
-        <PageBox>
+        <PageBox mt={6}>
             <Box display='flex' alignItems='flex-start' justifyContent='center' sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography sx={{ fontSize: { sm: 36, xs: 20 } }} color="white" textTransform="uppercase">Launch your token</Typography>
+                <Title fontSize={[24, 28, 36]} fontFamily="Londrina Solid" color="white" textTransform="uppercase">Launch your token</Title>
                 {/* <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', position: 'absolute', right: 0 }}>
                     <ArrowLeftIcon sx={{ color: 'white', height: 24 }} />
                     <Typography sx={{ color: 'white', textDecoration: 'none' }} fontSize="small">Go back</Typography>

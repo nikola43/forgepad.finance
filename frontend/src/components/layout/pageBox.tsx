@@ -2,6 +2,7 @@ import { Box, styled } from "@mui/material"
 
 const PageBox = styled(Box)`
   padding: 16px;
+  // padding-top: 0;
   padding-bottom: 30px;
   position: relative;
   box-sizing: border-box;

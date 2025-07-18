@@ -29,33 +29,37 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
                     pageNumber, pageSize
                 }
             })
-            const tokenChain = chains?.find(chain => chain.network === network)
-            const networks = ChainController.getCaipNetworks()
-            const tokenNetwork = networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
-            if (tokenChain && tokenNetwork) {
-                if (tokenNetwork.chainNamespace === "eip155") {
-                    const provider = new BrowserProvider(evmProvider, chainId)
-                    const tokenContract = new Contract(tokenAddress, erc20Abi, provider)
-                    const contract = new Contract(tokenChain.contractAddress, tokenChain.abi, provider)
-                    data.curveBalance = await tokenContract.balanceOf(tokenChain.contractAddress).catch(() => 0n)
-                    if (address) {
-                        data.balance = await tokenContract.balanceOf(address).catch(() => 0n)
-                        data.allowance = await tokenContract.allowance(address, tokenChain.contractAddress).catch(() => 0n)
+            try {
+                const tokenChain = chains?.find(chain => chain.network === network)
+                const networks = ChainController.getCaipNetworks()
+                const tokenNetwork = networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
+                if (tokenChain && tokenNetwork) {
+                    if (tokenNetwork.chainNamespace === "eip155" && evmProvider) {
+                        const provider = new BrowserProvider(evmProvider, chainId)
+                        const tokenContract = new Contract(tokenAddress, erc20Abi, provider)
+                        const contract = new Contract(tokenChain.contractAddress, tokenChain.abi, provider)
+                        data.curveBalance = await tokenContract.balanceOf(tokenChain.contractAddress).catch(() => 0n)
+                        if (address) {
+                            data.balance = await tokenContract.balanceOf(address).catch(() => 0n)
+                            data.allowance = await tokenContract.allowance(address, tokenChain.contractAddress).catch(() => 0n)
+                        }
+                        data.poolInfo = await contract.tokenPools(tokenAddress).catch(() => undefined)
+                    } else if (tokenNetwork.chainNamespace === "solana" && connection) {
+                        const client = new DynamicBondingCurveClient(connection, 'confirmed')
+                        const mint = new PublicKey(tokenAddress)
+                        const curveAccount = await connection.getTokenAccountsByOwner(new PublicKey(tokenChain.contractAddress), { mint })
+                        data.curveBalance = await connection.getTokenAccountBalance(curveAccount?.value?.[0]?.pubkey)
+                        if (address) {
+                            const owner = new PublicKey(address)
+                            const account = await connection.getTokenAccountsByOwner(owner, { mint })
+                            data.balance = await connection.getTokenAccountBalance(account?.value?.[0]?.pubkey)
+                            data.allowance = MaxUint256
+                        }
+                        data.poolInfo = await client.state.getPoolConfig(tokenChain.contractAddress)
                     }
-                    data.poolInfo = await contract.tokenPools(tokenAddress).catch(() => undefined)
-                } else if (tokenNetwork.chainNamespace === "solana" && connection) {
-                    const client = new DynamicBondingCurveClient(connection, 'confirmed')
-                    const mint = new PublicKey(tokenAddress)
-                    const curveAccount = await connection.getTokenAccountsByOwner(new PublicKey(tokenChain.contractAddress), { mint })
-                    data.curveBalance = await connection.getTokenAccountBalance(curveAccount?.value?.[0]?.pubkey)
-                    if (address) {
-                        const owner = new PublicKey(address)
-                        const account = await connection.getTokenAccountsByOwner(owner, { mint })
-                        data.balance = await connection.getTokenAccountBalance(account?.value?.[0]?.pubkey)
-                        data.allowance = MaxUint256
-                    }
-                    data.poolInfo = await client.state.getPoolConfig(tokenChain.contractAddress)
                 }
+            } catch(ex) {
+                console.log(ex)
             }
             return data
         }, {
@@ -125,7 +129,7 @@ export function useHandlers(network?: CaipNetwork) {
     const chain = chains.find(c => c.chainId === network.id || c.chainId === network.chainNamespace)
     if (!chain)
         return undefined
-    if (network.chainNamespace === "eip155") {
+    if (network.chainNamespace === "eip155" && evmProvider) {
         const provider = new BrowserProvider(evmProvider, network.id)
         return {
             createToken: async (token: { name: string, symbol: string, pool: number, amount?: string }, sig: any) => {
@@ -222,7 +226,7 @@ export function useHandlers(network?: CaipNetwork) {
             }
         }
     }
-    if (!connection)
+    if (!connection || !solProvider)
         return undefined
     const client = new DynamicBondingCurveClient(connection, 'confirmed')
     return {
