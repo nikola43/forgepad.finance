@@ -4,8 +4,6 @@ pragma solidity ^0.8.26;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IEthismLiquidityManager} from "./IEthismLiquidityManager.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -31,9 +29,7 @@ interface IEthism {
     function tokenPools(address) external view returns (PoolInfo memory);
 }
 
-contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
-    using ECDSA for bytes32;
-
+contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;
@@ -130,7 +126,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         address _distributorAddress,
         uint256 _targetMarketCap,
         uint256 _totalSupply
-    ) Ownable(msg.sender) EIP712("Ethism", "1") {
+    ) Ownable(msg.sender) {
         require(
             _dataFeedAddress != address(0),
             "Data feed address cannot be zero"
@@ -166,8 +162,8 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         // initialEthLPAmount = 50 ether;
         // initialTokenLPAmount = 5_000_000_000 ether;
 
-        initialEthLPAmount = 5 ether;
-        initialTokenLPAmount = 900_000_000 ether;
+        initialEthLPAmount = 4 ether;
+        initialTokenLPAmount = 800_000_000 ether;
 
         firstBuyFeeUSD = 0;
         // firstBuyFeeUSD = 3 ether;
@@ -247,110 +243,6 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
 
         return newToken;
     }
-
-    /**
-     * @dev Execute gasless token creation via meta-transaction
-     */
-    function createTokenGasless(
-        CreateTokenMetaTx memory metaTx,
-        bytes memory signature,
-        uint8 poolType,
-        uint32 sig
-    ) external payable whenNotPaused nonReentrant returns (address) {
-        // Verify deadline
-        require(block.timestamp <= metaTx.deadline, "Transaction expired");
-
-        // Verify nonce
-        require(
-            metaTx.nonce == _createTokenNonces[metaTx.creator],
-            "Invalid nonce"
-        );
-
-        // Verify signature
-        bytes32 digest = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    keccak256(
-                        "CreateTokenMetaTx(uint256 nonce,address creator,string name,string symbol,uint256 deadline)"
-                    ),
-                    metaTx.nonce,
-                    metaTx.creator,
-                    keccak256(bytes(metaTx.name)),
-                    keccak256(bytes(metaTx.symbol)),
-                    metaTx.deadline
-                )
-            )
-        );
-
-        address signer = digest.recover(signature);
-        require(signer == metaTx.creator, "Invalid signature");
-
-        // Increment nonce
-        _createTokenNonces[metaTx.creator]++;
-
-        // Execute token creation with relayer as msg.sender but creator as the actual user
-        address newToken = _executeCreateToken(
-            metaTx.creator,
-            metaTx.name,
-            metaTx.symbol,
-            poolType
-        );
-
-        emit TokenCreated(
-            newToken,
-            getVirtualPrice(newToken),
-            getETHPriceByUSD(),
-            sig,
-            block.timestamp
-        );
-
-        return newToken;
-    }
-
-    /**
-     * @dev Internal function to execute token creation
-     */
-    function _executeCreateToken(
-        address creator,
-        string memory name,
-        string memory symbol,
-        uint8 poolType
-    ) internal returns (address) {
-        address newToken = (address)(new Token(name, symbol, TOTAL_SUPPLY));
-
-        IERC20(newToken).approve(address(this), type(uint256).max);
-        tokenPools[newToken] = PoolInfo(
-            0, // ethReserve
-            TOTAL_SUPPLY, // tokenReserve
-            initialEthLPAmount, // virtualEthReserve
-            initialTokenLPAmount, // virtualTokenReserve
-            newToken, // token address
-            creator, // owner
-            poolType, // poolType (1 = V2, 2 = V3, 3 = V4)
-            false // launched
-        );
-        tokenList[tokenCount] = newToken;
-        tokenCount++;
-
-        emit TokenCreated(
-            newToken,
-            getVirtualPrice(newToken),
-            getETHPriceByUSD(),
-            1,
-            block.timestamp
-        );
-
-        return newToken;
-    }
-
-    /**
-     * @dev Get domain separator for EIP-712
-     */
-    function getDomainSeparator() public view returns (bytes32) {
-        return _domainSeparatorV4();
-    }
-
-    // ==================== ORIGINAL CONTRACT FUNCTIONS ====================
 
     function _swapExactETHForTokens(
         address token,
@@ -480,64 +372,6 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         return amountIn;
     }
 
-    // function _swapETHForExactTokens(
-    //     address token,
-    //     uint256 buyAmount,
-    //     uint256 maxAmountIn
-    // ) internal returns (uint256) {
-    //     require(!tokenPools[token].launched, "Pool has been already launched");
-
-    //     uint256 amountOut = buyAmount;
-    //     uint256 amountIn = (amountOut * tokenPools[token].virtualEthReserve) /
-    //         (tokenPools[token].virtualTokenReserve - amountOut) +
-    //         1;
-    //     uint256 buyFee = (amountIn * PLATFORM_BUY_FEE_PERCENT) / 100;
-    //     uint256 tokenOwnerFee = 0;
-    //     if (TOKEN_OWNER_FEE_PERCENT > 0) {
-    //         tokenOwnerFee = (amountIn * TOKEN_OWNER_FEE_PERCENT) / 100;
-    //     }
-    //     amountIn -= buyFee + tokenOwnerFee;
-    //     require(amountIn <= maxAmountIn, "Overflow slippage");
-    //     require(
-    //         amountOut < tokenPools[token].tokenReserve,
-    //         "Not enough tokens in the pool"
-    //     );
-
-    //     IERC20(token).transfer(msg.sender, amountOut);
-    //     tokenPools[token].ethReserve += amountIn;
-    //     tokenPools[token].tokenReserve -= amountOut;
-    //     tokenPools[token].virtualEthReserve += amountIn;
-    //     tokenPools[token].virtualTokenReserve -= amountOut;
-
-    //     uint256 tokenPrice = getVirtualPrice(token);
-    //     uint256 ethPrice = getETHPriceByUSD();
-    //     uint256 marketCap = getTokenVirtualMarketCap(token);
-    //     tokenTrades[token]++;
-
-    //     if (tokenOwnerFee > 0) {
-    //         _transferETH(tokenPools[token].owner, tokenOwnerFee);
-    //     }
-    //     if (buyFee > 0) {
-    //         _transferETH(feeAddress, buyFee / 2);
-    //         _transferETH(distributorAddress, buyFee / 2);
-    //     }
-
-    //     emit BuyTokens(
-    //         msg.sender,
-    //         token,
-    //         amountIn,
-    //         amountOut,
-    //         tokenPrice,
-    //         ethPrice,
-    //         marketCap,
-    //         block.timestamp
-    //     );
-
-    //     _checkAndAddLiquidity(token);
-
-    //     return amountIn;
-    // }
-
     function _swapExactTokensForETH(
         address token,
         uint256 sellAmount,
@@ -593,6 +427,10 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         uint256 buyAmount,
         uint256 minAmountOut
     ) public payable whenNotPaused nonReentrant {
+        uint256 maxBuy = (tokenPools[token].virtualEthReserve *
+            MAX_BUY_PERCENT) / 10000;
+        require(buyAmount <= maxBuy, "Buy amount too large");
+
         uint256 firstBuyFee = getFirstBuyFee(token);
 
         require(msg.value >= buyAmount + firstBuyFee, "Insufficient ETH value");
@@ -610,6 +448,10 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         uint256 buyAmount,
         uint256 maxAmountIn
     ) public payable whenNotPaused nonReentrant {
+        uint256 maxBuy = (tokenPools[token].virtualEthReserve *
+            MAX_BUY_PERCENT) / 10000;
+        require(buyAmount <= maxBuy, "Buy amount too large");
+
         uint256 firstBuyFee = getFirstBuyFee(token);
 
         require(

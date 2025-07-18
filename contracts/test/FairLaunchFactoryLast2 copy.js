@@ -186,6 +186,161 @@ describe("EthismV2", function () {
       expect(evTokenCreated.args.token).to.be.properAddress;
     });
 
+
+    // it("1. Should create token Gasless", async function () {
+    //   await sleep(20000);
+
+    //   console.log("\n1️⃣ Initial State");
+    //   const initialTokenCount = await EthismV2.tokenCount();
+    //   const initialNonce = await EthismV2.getCreateTokenNonce(owner.address);
+    //   console.log(`📊 Token Count: ${initialTokenCount}`);
+    //   console.log(`🔢 Create Token Nonce: ${initialNonce}`);
+
+    //   // Get user balance
+    //   const userBalance = await owner.provider.getBalance(owner.address);
+    //   console.log(`💰 User Balance: ${ethers.utils.formatEther(userBalance)} ETH`);
+    //   console.log("\n2️⃣ Testing Direct Token Creation (User Pays Gas)");
+    //   const directTokenName = `DirectToken${Date.now()}`;
+    //   const directTokenSymbol = `DT${Date.now().toString().slice(-4)}`;
+    //   const poolType = 1; // V2 pool
+    //   console.log(`🏗️ Creating token: ${directTokenName} (${directTokenSymbol})`);
+
+    //   console.log("\n3️⃣ Preparing Gasless Token Creation");
+
+    //   // Setup EIP-712
+    //   const network = await owner.provider.getNetwork();
+    //   const chainId = Number(network.chainId);
+
+    //   const domain = {
+    //     name: "Ethism",
+    //     version: "1",
+    //     chainId: chainId,
+    //     verifyingContract: EthismV2.address
+    //   };
+
+    //   const types = {
+    //     CreateTokenMetaTx: [
+    //       { name: "nonce", type: "uint256" },
+    //       { name: "creator", type: "address" },
+    //       { name: "name", type: "string" },
+    //       { name: "symbol", type: "string" },
+    //       { name: "deadline", type: "uint256" }
+    //     ]
+    //   };
+
+
+
+
+    //   console.log("\n5️⃣ Testing with Relayer");
+
+    //   // Test submission to relayer
+    //   const relayerUrl = process.env.RELAYER_URL || "http://localhost:3002";
+
+    //   try {
+    //     // Check relayer health first
+    //     console.log(`🔗 Connecting to relayer: ${relayerUrl}`);
+    //     const healthResponse = await fetch(`${relayerUrl}/health`);
+    //     const health = await healthResponse.json();
+    //     console.log(`🏥 Relayer health: ${health.status}`);
+    //     console.log(`💰 Relayer balance: ${health.balance} ETH`);
+
+    //     if (health.status === 'healthy') {
+    //       // Prepare new gasless transaction for relayer
+    //       const newNonce = await EthismV2.getCreateTokenNonce(owner.address);
+    //       const newDeadline = Math.floor(Date.now() / 1000) + 300;
+    //       const relayerTokenName = `RelayerToken${Date.now()}`;
+    //       const relayerTokenSymbol = `RT${Date.now().toString().slice(-4)}`;
+
+    //       const newMessage = {
+    //         nonce: newNonce.toString(),
+    //         creator: owner.address,
+    //         name: relayerTokenName,
+    //         symbol: relayerTokenSymbol,
+    //         deadline: newDeadline.toString()
+    //       };
+
+    //       const newSignature = await owner._signTypedData(domain, types, newMessage);
+
+    //       console.log("📤 Submitting to relayer...");
+    //       console.log(`🏗️ Token: ${relayerTokenName} (${relayerTokenSymbol})`);
+
+    //       const relayResponse = await fetch(`${relayerUrl}/relay/create-token`, {
+    //         method: 'POST',
+    //         headers: { 'Content-Type': 'application/json' },
+    //         body: JSON.stringify({
+    //           metaTx: newMessage,
+    //           signature: newSignature,
+    //           poolType: poolType,
+    //           sig: 1
+    //         })
+    //       });
+
+    //       const relayResult = await relayResponse.json();
+
+    //       if (relayResult.success) {
+    //         console.log(`✅ Relayer submission successful!`);
+    //         console.log(`📝 TX Hash: ${relayResult.txHash}`);
+    //         console.log(`🎯 Token Address: ${relayResult.tokenAddress}`);
+    //         console.log(`💰 Gas Cost: ${relayResult.gasCost} ETH`);
+    //         console.log(`⛽ Gas Used: ${relayResult.gasUsed}`);
+
+    //         const tokenPool = await EthismV2.tokenPools(relayResult.tokenAddress);
+    //         console.log(`🏊 Token Pool Info:`);
+    //         console.log(tokenPool)
+
+    //         // Wait a bit and check final state
+    //         console.log("⏳ Waiting for confirmation...");
+    //         await new Promise(resolve => setTimeout(resolve, 5000));
+
+    //         const finalTokenCount = await EthismV2.tokenCount();
+    //         const finalNonce = await EthismV2.getCreateTokenNonce(owner.address);
+
+    //         console.log(`📊 Final token count: ${finalTokenCount}`);
+    //         console.log(`🔢 Final nonce: ${finalNonce}`);
+
+    //         // Check the created token via relayer
+    //         if (relayResult.tokenAddress) {
+    //           const relayerPoolInfo = await EthismV2.tokenPools(relayResult.tokenAddress);
+    //           console.log(`🏊 Relayer Token Pool Info:`);
+    //           console.log(`   ETH Reserve: ${ethers.utils.formatEther(relayerPoolInfo.ethReserve)} ETH`);
+    //           console.log(`   Token Reserve: ${ethers.utils.formatEther(relayerPoolInfo.tokenReserve)} tokens`);
+    //           console.log(`   Owner: ${relayerPoolInfo.owner}`);
+    //           console.log(`   Pool Type: ${relayerPoolInfo.poolType}`);
+    //         }
+
+    //         // Test transaction status endpoint
+    //         console.log("\n🔍 Testing transaction status endpoint...");
+    //         const statusResponse = await fetch(`${relayerUrl}/status/${relayResult.txHash}`);
+    //         const statusResult = await statusResponse.json();
+    //         console.log(`📊 Transaction status: ${statusResult.status}`);
+    //         if (statusResult.blockNumber) {
+    //           console.log(`🏗️ Block number: ${statusResult.blockNumber}`);
+    //         }
+
+    //       } else {
+    //         console.log(`❌ Relayer submission failed: ${relayResult.error}`);
+    //       }
+
+    //     } else {
+    //       console.log("❌ Relayer is not healthy");
+    //     }
+
+    //   } catch (relayerError) {
+    //     console.log("❌ Could not connect to relayer:", relayerError);
+    //     console.log("💡 Make sure relayer is running on the correct port");
+    //     console.log(`💡 Expected URL: ${relayerUrl}`);
+    //   }
+    // });
+
+    // it("2. Should get vitualMarketCap", async function () {
+    //   const marketCap = await EthismV2.getTokenMarketCap(token.address);
+    //   console.log("Market Cap:", parseFloat(ethers.utils.formatEther(marketCap)));
+    //   const virtualMarketCap = await EthismV2.getTokenVirtualMarketCap(token.address);
+    //   console.log("Virtual Market Cap:", parseFloat(ethers.utils.formatEther(virtualMarketCap)));
+    //   expect(virtualMarketCap).to.be.gt(0);
+
+    // });
+
     it("2. Should buy", async function () {
       const firstFee = await EthismV2.getFirstBuyFee(token.address);
       console.log("First buy fee:", ethers.utils.formatEther(firstFee));
