@@ -4,8 +4,6 @@ pragma solidity ^0.8.26;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IEthismLiquidityManager} from "./IEthismLiquidityManager.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -16,8 +14,7 @@ interface ILaunchable {
     function launch() external;
 }
 
-contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 {
-    using ECDSA for bytes32;
+contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable {
 
     // Simplified curve structure
     struct CurveSegment {
@@ -44,15 +41,6 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         uint256 creatorFeeShare;   // Creator's share of migration fee (0-100)
     }
 
-    // Meta-transaction structure for gasless token creation
-    struct CreateTokenMetaTx {
-        uint256 nonce;
-        address creator;
-        string name;
-        string symbol;
-        uint256 deadline;
-    }
-
     // Contract variables
     IEthismLiquidityManager public liquidityManager;
     AggregatorV3Interface internal priceFeed;
@@ -60,7 +48,6 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
     mapping(address => PoolInfo) public tokenPools;
     mapping(address => FeeConfig) public poolFees;
     mapping(address => uint256) private tokenTrades;
-    mapping(address => uint256) private _createTokenNonces;
     
     address public burnAddress;
     address public feeAddress;
@@ -110,7 +97,7 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         address _distributorAddress,
         uint256 _totalSupply,
         uint256 _defaultMigrationMarketCap
-    ) Ownable(msg.sender) EIP712("MeteoraStyleBondingCurve", "1") {
+    ) Ownable(msg.sender) {
         require(_dataFeedAddress != address(0), "Data feed address cannot be zero");
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
 
@@ -256,9 +243,6 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         // We need to find the ETH reserve that corresponds to this market cap
         
         uint256 ethPriceUSD = getETHPriceByUSD();
-        if (ethPriceUSD == 0) {
-            ethPriceUSD = 3500 * 1e18; // Fallback to $3500
-        }
         
         // Target market cap is $69,000
         uint256 targetMarketCapUSD = DEFAULT_MIGRATION_MARKET_CAP * 1e18;
@@ -380,14 +364,10 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         // Calculate the exact price needed for $69k market cap
         // At $69k market cap: token price = $69,000 / 1B tokens = $0.000069 per token
         uint256 ethPriceUSD = getETHPriceByUSD();
-        if (ethPriceUSD == 0) {
-            ethPriceUSD = 3500 * 1e18; // Fallback to $3500
-        }
 
         // Calculate prices that will reach $69k market cap
         // At $69k market cap: token price = $69,000 / 1B tokens = $0.000069 per token
         // With ETH at $3500: token price = $0.000069 / $3500 = 0.0000000197 ETH ≈ 19.7 gwei
-        
         // Use fixed progressive pricing that reaches $69k at around 3.4 ETH
         // With ETH at ~$3560, target is ~19.4 gwei for $69k market cap
         // Start lower to have initial market cap around $4-5k
@@ -837,12 +817,7 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         return tokenPools[token];
     }
 
-    function getCreateTokenNonce(address user) public view returns (uint256) {
-        return _createTokenNonces[user];
-    }
-
     // ==================== DEBUGGING FUNCTIONS ====================
-
     function debugCurveCalculation(address token) external view returns (
         uint256[] memory prices,
         uint256[] memory tokensAvailable,

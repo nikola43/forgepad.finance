@@ -173,12 +173,12 @@ describe("MeteoraStyleBondingCurve - Market Cap Based Launch", function () {
 
       // Strategy: Make strategic purchases to reach $69k with ~3-4 ETH total
       const purchaseAmounts = [
-        ethers.utils.parseEther("1.0"),   // Start with 1 ETH
-        ethers.utils.parseEther("1.5"),   // Add 1.5 ETH  
-        ethers.utils.parseEther("1.0"),   // Add 1.0 ETH - should be close to 3.5 ETH total
-        ethers.utils.parseEther("0.5"),   // Fine-tune with 0.5 ETH
-        ethers.utils.parseEther("0.3"),   // Smaller adjustments
-        ethers.utils.parseEther("0.2"),   // Even smaller
+        ethers.utils.parseEther("0.1"),   // Start with 1 ETH
+        ethers.utils.parseEther("0.2"),   // Add 1.5 ETH  
+        ethers.utils.parseEther("0.3"),   // Add 1.0 ETH - should be close to 3.5 ETH total
+        ethers.utils.parseEther("0.4"),   // Fine-tune with 0.5 ETH
+        ethers.utils.parseEther("0.5"),   // Smaller adjustments
+        ethers.utils.parseEther("0.6"),   // Even smaller
       ];
 
       for (let i = 0; i < purchaseAmounts.length; i++) {
