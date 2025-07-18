@@ -352,7 +352,7 @@ export default function Header() {
         return Math.floor((width - 280 - 130) / 350)
     }, [width])
 
-    useLayoutEffect(() => {
+    useEffect(() => {
         const updateWidth = () => {
             if (slider.current) {
                 setWidth(slider.current.offsetWidth);
