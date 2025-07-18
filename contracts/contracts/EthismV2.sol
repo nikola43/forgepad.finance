@@ -416,23 +416,27 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         require(!tokenPools[token].launched, "Pool has been already launched");
 
         uint256 amountOut = buyAmount;
-        uint256 amountIn = (amountOut * tokenPools[token].virtualEthReserve) /
+
+        // Calculate the amountIn (ETH) required for the exact token swap, BEFORE fees.
+        // This is the net amount that goes into the liquidity pool for the token exchange.
+        uint256 netAmountIn = (amountOut *
+            tokenPools[token].virtualEthReserve) /
             (tokenPools[token].virtualTokenReserve - amountOut) +
             1;
 
-        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
-            TOKEN_OWNER_FEE_PERCENT;
-        uint256 totalAmountIn = (amountIn * 100) / (100 - totalFeePercent);
-
-        uint256 buyFee = (totalAmountIn * PLATFORM_BUY_FEE_PERCENT) / 100;
+        // Calculate fees based on the netAmountIn. These fees will be added on top.
+        uint256 buyFee = (netAmountIn * PLATFORM_BUY_FEE_PERCENT) /
+            (100 - PLATFORM_BUY_FEE_PERCENT - TOKEN_OWNER_FEE_PERCENT); // Fees are a percentage of the *gross* input, so we need to adjust
         uint256 tokenOwnerFee = 0;
         if (TOKEN_OWNER_FEE_PERCENT > 0) {
-            tokenOwnerFee = (totalAmountIn * TOKEN_OWNER_FEE_PERCENT) / 100;
+            tokenOwnerFee =
+                (netAmountIn * TOKEN_OWNER_FEE_PERCENT) /
+                (100 - PLATFORM_BUY_FEE_PERCENT - TOKEN_OWNER_FEE_PERCENT); // Fees are a percentage of the *gross* input, so we need to adjust
         }
 
-        uint256 amountInForSwap = totalAmountIn - buyFee - tokenOwnerFee;
+        // The total amountIn is the netAmountIn plus the calculated fees.
+        uint256 amountIn = netAmountIn + buyFee + tokenOwnerFee;
 
-        amountIn -= buyFee + tokenOwnerFee;
         require(amountIn <= maxAmountIn, "Overflow slippage");
         require(
             amountOut < tokenPools[token].tokenReserve,
@@ -440,9 +444,11 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         );
 
         IERC20(token).transfer(msg.sender, amountOut);
-        tokenPools[token].ethReserve += amountInForSwap;
+
+        // Update reserves with the net amount (excluding fees)
+        tokenPools[token].ethReserve += netAmountIn; // Only the net amount goes to the pool for the swap
         tokenPools[token].tokenReserve -= amountOut;
-        tokenPools[token].virtualEthReserve += amountInForSwap;
+        tokenPools[token].virtualEthReserve += netAmountIn; // Only the net amount goes to the pool for the swap
         tokenPools[token].virtualTokenReserve -= amountOut;
 
         uint256 tokenPrice = getVirtualPrice(token);
@@ -461,7 +467,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
         emit BuyTokens(
             msg.sender,
             token,
-            amountInForSwap,
+            amountIn, // amountIn should reflect the total ETH paid by the user
             amountOut,
             tokenPrice,
             ethPrice,
@@ -473,6 +479,64 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable, EIP712 {
 
         return amountIn;
     }
+
+    // function _swapETHForExactTokens(
+    //     address token,
+    //     uint256 buyAmount,
+    //     uint256 maxAmountIn
+    // ) internal returns (uint256) {
+    //     require(!tokenPools[token].launched, "Pool has been already launched");
+
+    //     uint256 amountOut = buyAmount;
+    //     uint256 amountIn = (amountOut * tokenPools[token].virtualEthReserve) /
+    //         (tokenPools[token].virtualTokenReserve - amountOut) +
+    //         1;
+    //     uint256 buyFee = (amountIn * PLATFORM_BUY_FEE_PERCENT) / 100;
+    //     uint256 tokenOwnerFee = 0;
+    //     if (TOKEN_OWNER_FEE_PERCENT > 0) {
+    //         tokenOwnerFee = (amountIn * TOKEN_OWNER_FEE_PERCENT) / 100;
+    //     }
+    //     amountIn -= buyFee + tokenOwnerFee;
+    //     require(amountIn <= maxAmountIn, "Overflow slippage");
+    //     require(
+    //         amountOut < tokenPools[token].tokenReserve,
+    //         "Not enough tokens in the pool"
+    //     );
+
+    //     IERC20(token).transfer(msg.sender, amountOut);
+    //     tokenPools[token].ethReserve += amountIn;
+    //     tokenPools[token].tokenReserve -= amountOut;
+    //     tokenPools[token].virtualEthReserve += amountIn;
+    //     tokenPools[token].virtualTokenReserve -= amountOut;
+
+    //     uint256 tokenPrice = getVirtualPrice(token);
+    //     uint256 ethPrice = getETHPriceByUSD();
+    //     uint256 marketCap = getTokenVirtualMarketCap(token);
+    //     tokenTrades[token]++;
+
+    //     if (tokenOwnerFee > 0) {
+    //         _transferETH(tokenPools[token].owner, tokenOwnerFee);
+    //     }
+    //     if (buyFee > 0) {
+    //         _transferETH(feeAddress, buyFee / 2);
+    //         _transferETH(distributorAddress, buyFee / 2);
+    //     }
+
+    //     emit BuyTokens(
+    //         msg.sender,
+    //         token,
+    //         amountIn,
+    //         amountOut,
+    //         tokenPrice,
+    //         ethPrice,
+    //         marketCap,
+    //         block.timestamp
+    //     );
+
+    //     _checkAndAddLiquidity(token);
+
+    //     return amountIn;
+    // }
 
     function _swapExactTokensForETH(
         address token,
