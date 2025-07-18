@@ -13,6 +13,6 @@ export const FILE_ENDPOINT = `${API_ENDPOINT}/uploads` // `https://files.ethism.
 // export const IPFS_UPLOAD_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS"
 //export const IPFS_GATEWAY_URL = "https://coffee-magnetic-rattlesnake-502.mypinata.cloud/ipfs"
 
-export const ETHISM_TELEGRAM_URL = "https://t.me/Ethismdotfun"
-export const ETHISM_TWITTER_URL = "https://x.com/ethismfun"
-export const ETHISM_WEBSITE_URL = "https://ethism.fun"
+export const FORGE_TELEGRAM_URL = "https://t.me/forgepad"
+export const FORGE_TWITTER_URL = "https://x.com/forgepad"
+export const FORGE_WEBSITE_URL = "https://forgepad.finance"

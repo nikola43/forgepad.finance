@@ -20,7 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import TelegramIcon from '@/assets/images/telegram.svg';
 import TwitterIcon from '@/assets/images/x.svg';
-import { ETHISM_TELEGRAM_URL, ETHISM_TWITTER_URL } from "@/config";
+import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
 import TokenLogo from "../tokenLogo";
 import { useNewTrades, useTokens } from "@/hooks/token";
 
@@ -498,8 +498,8 @@ export default function Header() {
             </Box>
             <Box flex={1} display="flex" gap="18px" alignItems="center" justifyContent="flex-end">
                 <SocialLinks>
-                    <Link href={ETHISM_TELEGRAM_URL} target="_blank"><Image src={TelegramIcon} width={50} height={35} alt="telegramCommunity" /></Link>
-                    <Link href={ETHISM_TWITTER_URL} target="_blank"><Image src={TwitterIcon} width={50} height={35} alt="twitter" /></Link>
+                    <Link href={FORGE_TELEGRAM_URL} target="_blank"><Image src={TelegramIcon} width={50} height={35} alt="telegramCommunity" /></Link>
+                    <Link href={FORGE_TWITTER_URL} target="_blank"><Image src={TwitterIcon} width={50} height={35} alt="twitter" /></Link>
                 </SocialLinks>
                 <Link href="/forge" style={{ textDecoration: "none" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')}>

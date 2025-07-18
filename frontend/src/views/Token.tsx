@@ -229,7 +229,7 @@ const HolderBox = styled(Box)`
     & > :first-of-type {
       flex: 0 0 1.5em;
     }
-    & > :nth-child(2) {
+    & > :nth-of-type(2) {
       flex: 1;
       min-width: 0;
       overflow: hidden;
@@ -485,7 +485,6 @@ export default function Token() {
 
     const { chains } = useMainContext()
     const { userInfo } = useUserInfo()
-    // const { ethismContract } = useContractInfo()
     const { tokenInfo, reload: reloadTokenInfo } = useTokenInfo(id as string, network as string, pageOfTrades, pageSize)
     const ethBalance = useMemo(() => userInfo?.balance ?? 0, [userInfo])
     const { balance: tokenBalance, allowance: tokenAllowance, curveBalance: lpBalance } = useMemo(() => tokenInfo ?? { balance: 0n, allowance: 0n, curveBalance: 0n }, [tokenInfo])

@@ -3,7 +3,7 @@ import TelegramIcon from '../../assets/images/telegram.svg';
 import TwitterIcon from '../../assets/images/x.svg';
 import LogoutIcon from '@mui/icons-material/Logout';
 import styled, { useTheme } from "styled-components";
-import { ETHISM_TELEGRAM_URL, ETHISM_TWITTER_URL } from "@/config";
+import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
 import { Box, Dialog, DialogContent, DialogTitle, Typography, useMediaQuery } from "@mui/material";
 import { useState } from "react";
 import Link from 'next/link';
@@ -291,10 +291,10 @@ function Sidebar({ minimized, setMinimize }: Props) {
       </Buttons>
 
       <SocialLinks vertical>
-        <Link href={ETHISM_TELEGRAM_URL} target="_blank">
+        <Link href={FORGE_TELEGRAM_URL} target="_blank">
           <Image src={TelegramIcon} width={24} height={24} alt="telegramCommunity" />
         </Link>
-        <Link href={ETHISM_TWITTER_URL} target="_blank">
+        <Link href={FORGE_TWITTER_URL} target="_blank">
           <Image src={TwitterIcon} width={20} height={20} alt="twitter" />
         </Link>
       </SocialLinks>
@@ -304,11 +304,11 @@ function Sidebar({ minimized, setMinimize }: Props) {
 
   return (
     <div className="sidebar">
-      <Title>ETHISM</Title>
+      <Title>Forge</Title>
 
       <Logo as={Link} href="/">
         <Image src={imgLogo} height={90} alt="logo" />
-        <span>Ethism</span>
+        <span>Forge</span>
       </Logo>
 
       <Buttons>
@@ -353,10 +353,10 @@ function Sidebar({ minimized, setMinimize }: Props) {
       </LogoWrapper>
 
       <SocialLinks>
-        <Link href={ETHISM_TELEGRAM_URL} target="_blank">
+        <Link href={FORGE_TELEGRAM_URL} target="_blank">
           <Image src={TelegramIcon} width={24} height={24} alt="telegramCommunity" />
         </Link>
-        <Link href={ETHISM_TWITTER_URL} target="_blank">
+        <Link href={FORGE_TWITTER_URL} target="_blank">
           <Image src={TwitterIcon} width={20} height={20} alt="twitter" />
         </Link>
       </SocialLinks>
