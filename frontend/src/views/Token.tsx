@@ -1010,20 +1010,7 @@ export default function Token() {
                                 <HolderBox as="ol" mb="1.5em">
                                     <Box component="h3">Top Holders</Box>
                                     <Box component="li">
-                                        <Typography>1.</Typography>
-                                        {/* {
-                                    isMobile
-                                        ? <UserAvatar address={PULSECHAIN_CONTRACT_ADDRESS} color="#9E9E9E" user={{
-                                            username: "Remaining supply", avatar: "bondingCurv"
-                                        }} />
-                                        : <Box display="flex" alignItems="center">
-                                            <User address={PULSECHAIN_CONTRACT_ADDRESS} color="#9E9E9E" user={{
-                                                username: "Remaining supply", avatar: "bondingCurv"
-                                            }} />
-                                        </Box>
-                                } */}
-
-
+                                        <div>1.</div>
                                         <Box display="flex" alignItems="center" flexGrow={1} minWidth={0}>
                                             <UserName
                                                 address={tokenChain?.contractAddress}
@@ -1034,7 +1021,6 @@ export default function Token() {
                                                 }}
                                             />
                                         </Box>
-
                                         <Box display="flex" alignItems="center" ml={1}>
                                             <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', marginRight: '8px' }}>
                                                 <LinkIcon sx={{ color: "white", height: 16 }} />
@@ -1099,20 +1085,7 @@ export default function Token() {
                             <HolderBox as="ol" mb="1.5em">
                                 <Box component="h3">Top Holders</Box>
                                 <Box component="li">
-                                    <Typography>1.</Typography>
-                                    {/* {
-                                            isMobile
-                                                ? <UserAvatar address={PULSECHAIN_CONTRACT_ADDRESS} color="#9E9E9E" user={{
-                                                    username: "Remaining supply", avatar: "bondingCurv"
-                                                }} />
-                                                : <Box display="flex" alignItems="center">
-                                                    <User address={PULSECHAIN_CONTRACT_ADDRESS} color="#9E9E9E" user={{
-                                                        username: "Remaining supply", avatar: "bondingCurv"
-                                                    }} />
-                                                </Box>
-                                        } */}
-
-
+                                    <div>1.</div>
                                     <Box display="flex" alignItems="center" flexGrow={1} minWidth={0}>
                                         <User
                                             address={tokenChain?.contractAddress}
