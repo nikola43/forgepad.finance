@@ -40,7 +40,7 @@ import { AssetUtil, ChainController } from "@reown/appkit-controllers"
 import { AppKitNetwork } from "@reown/appkit/networks";
 import { useUserInfo } from "@/hooks/user";
 
-const SlippageInput = styled("input")<{ slippage: number }>`
+const SlippageInput = styled("input") <{ slippage: number }>`
   width: 48px;
   height: 24px;
   padding: 12px;
@@ -70,7 +70,7 @@ const Divider = styled('hr')`
     border-bottom: 1px solid #27272A;
 `
 
-const Progress = styled('div')<{ value: number }>`
+const Progress = styled('div') <{ value: number }>`
     max-width: 400px;
     width: 100%;
     height: 10px;
@@ -483,6 +483,10 @@ export default function Token() {
     const [showSlipaggeDialog, setShowSlipaggeDialog] = React.useState(false);
     const [slippage, setSlippage] = React.useState(0.1);
 
+    // Check if this is a Solana token
+    const isSolanaToken = network === 'solana';
+    console.log(isSolanaToken)
+
     const { chains } = useMainContext()
     const { userInfo } = useUserInfo()
     const { tokenInfo, reload: reloadTokenInfo } = useTokenInfo(id as string, network as string, pageOfTrades, pageSize)
@@ -503,6 +507,8 @@ export default function Token() {
         return networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
     }, [networks, tokenChain])
     const handlers = useHandlers(tokenNetwork)
+
+
 
     const marketCap = useMemo(() => Number(detailData?.marketcap ?? 0), [detailData])
 
@@ -709,10 +715,17 @@ export default function Token() {
 
     const pool = useMemo(() => {
         if (!tokenChain || !detailData)
-          return undefined
+            return undefined
+
+        if (isSolanaToken) {
+            return {
+                name: "meteora"
+            }
+        }
+
         const poolFields = tokenChain.pools[detailData.poolType - 1].split(':')
         return {
-          name: poolFields[0], version: poolFields[1]
+            name: poolFields[0], version: poolFields[1]
         }
     }, [detailData, tokenChain])
 
@@ -756,11 +769,11 @@ export default function Token() {
                                 <Box display="flex" gap="8px" alignItems="baseline" position="relative" width="fit-content">
                                     <Typography fontSize={48} fontFamily="Arial" fontWeight="bold" color="white">${priceFormatter(marketCap, 2)}</Typography>
                                     <Typography fontSize={12} color="white">Market cap</Typography>
-                                    <Box 
-                                        position="absolute" 
-                                        right={0} top={12} 
+                                    <Box
+                                        position="absolute"
+                                        right={0} top={12}
                                         display="flex" justifyContent="center" alignItems="center" gap="4px"
-                                        // title={`When marcket cap reaches at $${priceFormatter(tokenChain?.targetMarketCap, 2)}, all the liquidity will be listed on Uniswap`}
+                                    // title={`When marcket cap reaches at $${priceFormatter(tokenChain?.targetMarketCap, 2)}, all the liquidity will be listed on Uniswap`}
                                     >
                                         <Avatar src={`/pools/${pool?.name}.png`} sx={{ width: 20, height: 20 }} alt="unitswap" />
                                         {
@@ -942,9 +955,9 @@ export default function Token() {
                                                             }
                                                         </Typography>
                                                         <Typography color="inherit" fontSize="small">{trade.type}</Typography>
-                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.ethAmount, 2, true, true)}</Typography>
+                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.ethAmount, 4, true, true)}</Typography>
                                                         {/* <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount * trade.tokenPrice, 2, true, true)}</Typography> */}
-                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount, 2, true, true)}</Typography>
+                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount, 4, true, true)}</Typography>
                                                         <Box display={{ sm: 'flex', xs: 'none' }} alignItems="center">
                                                             <UserName user={trade.user} address={trade.swapperAddress} color={trade.type === "BUY" ? "lightgreen" : "#ef5350"} size={18} />
                                                         </Box>
@@ -1025,7 +1038,7 @@ export default function Token() {
                                             <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', marginRight: '8px' }}>
                                                 <LinkIcon sx={{ color: "white", height: 16 }} />
                                             </Link>
-                                            <Typography noWrap>{ tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                            <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                         </Box>
                                     </Box>
                                     {
@@ -1048,7 +1061,7 @@ export default function Token() {
                                                 <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
                                                     <LinkIcon sx={{ color: "white", height: 16 }} />
                                                 </Link>
-                                                <Typography>{ tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                                <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                             </Box>
                                         ))}
                                 </HolderBox>
@@ -1059,7 +1072,7 @@ export default function Token() {
                     {
                         !isMobile &&
                         <Box width="370px">
-                            <SwapBox className={isLoading || launched ? "disabled" : ""}>
+                            <SwapBox className={isLoading || (!isSolanaToken && launched) ? "disabled" : ""}>
                                 <Toggle style={{ width: "inherit" }}>
                                     <div className={tradeType === "buy" ? "active" : ""} onClick={() => setTradeType("buy")}>Buy</div>
                                     <div className={tradeType === "sell" ? "active" : ""} onClick={() => setTradeType("sell")}>Sell</div>
@@ -1101,7 +1114,7 @@ export default function Token() {
                                         <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', marginRight: '8px' }}>
                                             <LinkIcon sx={{ color: "white", height: 16 }} />
                                         </Link>
-                                        <Typography noWrap>{ tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0 } %</Typography>
+                                        <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                     </Box>
                                 </Box>
                                 {
@@ -1124,7 +1137,7 @@ export default function Token() {
                                             <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
                                                 <LinkIcon sx={{ color: "white", height: 16 }} />
                                             </Link>
-                                            <Typography>{ tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0 } %</Typography>
+                                            <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                         </Box>
                                     ))}
                             </HolderBox>
