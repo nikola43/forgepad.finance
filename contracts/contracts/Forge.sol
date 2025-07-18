@@ -191,26 +191,40 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         uint256 totalEth = 0;
         uint256 currentIndex = pool.currentSegmentIndex;
 
-        // Work backwards through segments
+        // For sells, we need to work backwards from the current price
+        // Start from current segment and work down through lower price tiers
         while (remainingTokens > 0 && currentIndex > 0) {
-            currentIndex--;
-            CurveSegment memory segment = pool.curve[currentIndex];
+            CurveSegment memory segment = pool.curve[currentIndex - 1];
             
-            uint256 availableTokens = segment.tokensAvailable;
             uint256 tokenPrice = segment.targetPrice;
+            if (tokenPrice == 0) {
+                currentIndex--;
+                continue;
+            }
             
-            if (tokenPrice == 0) continue;
+            // Calculate how many tokens were originally available at this tier
+            uint256 originalTokensAtTier = (TOTAL_SUPPLY * 80) / 100 / 5; // 80% supply / 5 tiers
             
-            if (remainingTokens >= availableTokens) {
-                // Sell all tokens at this level
-                uint256 ethAtThisLevel = (availableTokens * tokenPrice) / 1e18;
+            // Calculate how many tokens have been sold from this tier
+            uint256 tokensSoldFromTier = originalTokensAtTier - segment.tokensAvailable;
+            
+            // We can sell back tokens that were sold from this tier
+            uint256 maxSellableAtTier = tokensSoldFromTier;
+            
+            if (remainingTokens >= maxSellableAtTier && maxSellableAtTier > 0) {
+                // Sell all available tokens at this tier
+                uint256 ethAtThisLevel = (maxSellableAtTier * tokenPrice) / 1e18;
                 totalEth += ethAtThisLevel;
-                remainingTokens -= availableTokens;
-            } else {
-                // Sell partial tokens at this level
+                remainingTokens -= maxSellableAtTier;
+                currentIndex--;
+            } else if (maxSellableAtTier > 0) {
+                // Sell partial tokens at this tier
                 uint256 ethAtThisLevel = (remainingTokens * tokenPrice) / 1e18;
                 totalEth += ethAtThisLevel;
                 remainingTokens = 0;
+            } else {
+                // No tokens sold at this tier yet, move to next
+                currentIndex--;
             }
         }
 
@@ -223,6 +237,10 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
     function getCurrentPrice(address token) public view returns (uint256) {
         PoolInfo storage pool = tokenPools[token];
         if (pool.currentSegmentIndex >= pool.curve.length) {
+            // If we've exhausted all segments, return the last segment's price
+            if (pool.curve.length > 0) {
+                return pool.curve[pool.curve.length - 1].targetPrice;
+            }
             return 0;
         }
 
@@ -230,21 +248,68 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
     }
 
     /**
-     * @dev Calculate migration quote threshold
+     * @dev Calculate migration quote threshold based on target market cap
      */
     function calculateMigrationThreshold(address token) public view returns (uint256) {
-        PoolInfo storage pool = tokenPools[token];
-        uint256 threshold = 0;
+        // We launch when market cap reaches $69,000
+        // Market cap = token price * total supply
+        // We need to find the ETH reserve that corresponds to this market cap
         
-        // Sum up ETH needed to exhaust all curve segments
-        for (uint256 i = 0; i < pool.curve.length; i++) {
-            CurveSegment memory segment = pool.curve[i];
-            if (segment.targetPrice > 0) {
-                threshold += (segment.tokensAvailable * segment.targetPrice) / 1e18;
-            }
+        uint256 ethPriceUSD = getETHPriceByUSD();
+        if (ethPriceUSD == 0) {
+            ethPriceUSD = 3500 * 1e18; // Fallback to $3500
         }
         
-        return threshold;
+        // Target market cap is $69,000
+        uint256 targetMarketCapUSD = DEFAULT_MIGRATION_MARKET_CAP * 1e18;
+        
+        // Calculate required token price for target market cap
+        // Required token price = Target Market Cap / Total Supply
+        uint256 requiredTokenPriceUSD = (targetMarketCapUSD * 1e18) / TOTAL_SUPPLY;
+        
+        // Convert to ETH price: USD price / ETH price in USD
+        uint256 requiredTokenPriceETH = (requiredTokenPriceUSD * 1e18) / ethPriceUSD;
+        
+        // Now calculate how much ETH we need to reach this token price
+        // This requires simulating purchases through the curve
+        return _calculateETHNeededForTokenPrice(token, requiredTokenPriceETH);
+    }
+
+    function _calculateETHNeededForTokenPrice(address token, uint256 targetPrice) internal view returns (uint256) {
+        PoolInfo storage pool = tokenPools[token];
+        uint256 totalETHNeeded = 0;
+        uint256 segmentIndex = 0;
+        
+        // Calculate ETH needed to reach each price tier until we exceed target price
+        while (segmentIndex < pool.curve.length) {
+            CurveSegment memory segment = pool.curve[segmentIndex];
+            
+            if (segment.targetPrice >= targetPrice) {
+                // We've reached or exceeded our target price
+                break;
+            }
+            
+            // Add ETH needed for this entire segment
+            uint256 ethForSegment = (segment.tokensAvailable * segment.targetPrice) / 1e18;
+            totalETHNeeded += ethForSegment;
+            segmentIndex++;
+        }
+        
+        return totalETHNeeded;
+    }
+
+    /**
+     * @dev Check if token should migrate based on current market cap
+     */
+    function shouldMigrate(address token) public view returns (bool) {
+        if (tokenPools[token].launched) {
+            return false;
+        }
+        
+        uint256 currentMarketCapUSD = getTokenMarketCapUSD(token);
+        uint256 targetMarketCapUSD = DEFAULT_MIGRATION_MARKET_CAP * 1e18;
+        
+        return currentMarketCapUSD >= targetMarketCapUSD;
     }
 
     // ==================== CORE TRADING FUNCTIONS ====================
@@ -303,26 +368,57 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         tokenPools[token].tokenReserve = TOTAL_SUPPLY;
         tokenPools[token].ethReserve = 0;
 
-        // Create simple price tiers with reasonable token amounts
-        uint256 tokensPerSegment = TOTAL_SUPPLY / 6; // Divide into 6 segments, use 3 for bonding curve
+        // Create price tiers that progress toward $69k market cap
+        // Total bonding curve tokens = 80% of supply (leave 20% for liquidity)
+        uint256 bondingCurveTokens = (TOTAL_SUPPLY * 80) / 100;
+        uint256 tokensPerTier = bondingCurveTokens / 5; // 5 tiers for more precision
 
-        // Price progression: 0.000001 ETH -> 0.000004 ETH -> 0.000016 ETH per token
+        // Calculate prices that will reach $69k market cap
+        // At $69k market cap: token price = $69,000 / 1B tokens = $0.000069 per token
+        // With ETH at $3500: token price = $0.000069 / $3500 = 0.0000000197 ETH ≈ 19.7 gwei
+        
+        // Calculate the exact price needed for $69k market cap
+        // At $69k market cap: token price = $69,000 / 1B tokens = $0.000069 per token
+        uint256 ethPriceUSD = getETHPriceByUSD();
+        if (ethPriceUSD == 0) {
+            ethPriceUSD = 3500 * 1e18; // Fallback to $3500
+        }
+
+        // Calculate prices that will reach $69k market cap
+        // At $69k market cap: token price = $69,000 / 1B tokens = $0.000069 per token
+        // With ETH at $3500: token price = $0.000069 / $3500 = 0.0000000197 ETH ≈ 19.7 gwei
+        
+        // Use fixed progressive pricing that reaches $69k at around 3.4 ETH
+        // With ETH at ~$3560, target is ~19.4 gwei for $69k market cap
+        // Start lower to have initial market cap around $4-5k
+        // Progressive tiers: 1.5, 4, 8, 12, 19.5 gwei
+        
         tokenPools[token].curve.push(CurveSegment({
-            targetPrice: 1000000000000,    // 0.000001 ETH per token (1e12 wei)
-            tokensAvailable: tokensPerSegment
+            targetPrice: 1500000000,    // 1.5 gwei per token (~$5.3k market cap) - good starting point
+            tokensAvailable: tokensPerTier
         }));
         
         tokenPools[token].curve.push(CurveSegment({
-            targetPrice: 4000000000000,    // 0.000004 ETH per token (4e12 wei)
-            tokensAvailable: tokensPerSegment
+            targetPrice: 4000000000,    // 4 gwei per token (~$14.2k market cap)
+            tokensAvailable: tokensPerTier
         }));
         
         tokenPools[token].curve.push(CurveSegment({
-            targetPrice: 16000000000000,   // 0.000016 ETH per token (16e12 wei)
-            tokensAvailable: tokensPerSegment
+            targetPrice: 8000000000,    // 8 gwei per token (~$28.5k market cap)
+            tokensAvailable: tokensPerTier
+        }));
+        
+        tokenPools[token].curve.push(CurveSegment({
+            targetPrice: 12000000000,   // 12 gwei per token (~$42.7k market cap)
+            tokensAvailable: tokensPerTier
+        }));
+        
+        tokenPools[token].curve.push(CurveSegment({
+            targetPrice: 19500000000,   // 19.5 gwei per token (~$69.4k market cap) - hits target!
+            tokensAvailable: tokensPerTier
         }));
 
-        // Calculate thresholds
+        // Calculate thresholds based on target market cap
         tokenPools[token].migrationQuoteThreshold = calculateMigrationThreshold(token);
         tokenPools[token].bondingCurveAmount = calculateBondingCurveAmount(token);
 
@@ -390,10 +486,11 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
             tokenAmount,
             getCurrentPrice(token),
             getETHPriceByUSD(),
-            getTokenMarketCap(token),
+            getTokenMarketCapUSD(token),
             block.timestamp
         );
 
+        // Check if we should launch after this purchase
         _checkAndAddLiquidity(token);
     }
 
@@ -421,9 +518,9 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
     }
 
     function _checkAndAddLiquidity(address token) internal {
-        PoolInfo storage pool = tokenPools[token];
-        
-        if (pool.ethReserve >= pool.migrationQuoteThreshold) {
+        // Check if we should migrate based on market cap
+        if (shouldMigrate(token)) {
+            PoolInfo storage pool = tokenPools[token];
             FeeConfig memory fees = poolFees[token];
             
             uint256 migrationFeeAmount = (pool.ethReserve * fees.migrationFee) / 100;
@@ -519,7 +616,7 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
             tokenAmount,
             getCurrentPrice(token),
             getETHPriceByUSD(),
-            getTokenMarketCap(token),
+            getTokenMarketCapUSD(token),
             block.timestamp
         );
     }
@@ -533,21 +630,24 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
         uint256 remainingTokens = tokenAmount;
         uint256 currentIndex = pool.currentSegmentIndex;
 
-        // Add tokens back to curve segments (in reverse order)
+        // Add tokens back to curve segments (working backwards from current segment)
         while (remainingTokens > 0 && currentIndex > 0) {
-            currentIndex--;
-            CurveSegment storage segment = pool.curve[currentIndex];
+            CurveSegment storage segment = pool.curve[currentIndex - 1];
             
-            // Calculate original tokens available for this segment
-            uint256 originalTokens = TOTAL_SUPPLY / 6; // Original tokens per segment
-            uint256 maxCanAdd = originalTokens - segment.tokensAvailable;
+            // Calculate how many tokens can be added back to this tier
+            uint256 originalTokens = (TOTAL_SUPPLY * 80) / 100 / 5; // Original tokens per tier (5 tiers)
+            uint256 maxTokensAtTier = originalTokens;
+            uint256 maxCanAdd = maxTokensAtTier - segment.tokensAvailable;
             
-            if (remainingTokens >= maxCanAdd) {
+            if (remainingTokens >= maxCanAdd && maxCanAdd > 0) {
                 segment.tokensAvailable += maxCanAdd;
                 remainingTokens -= maxCanAdd;
-            } else {
+                currentIndex--;
+            } else if (maxCanAdd > 0) {
                 segment.tokensAvailable += remainingTokens;
                 remainingTokens = 0;
+            } else {
+                currentIndex--;
             }
         }
     }
@@ -609,19 +709,25 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
             return uint256(price) * 1e10;
         } catch {
             // Return a default value if price feed fails
-            return 2000 * 1e18; // $2000 default
+            return 3500 * 1e18; // $3500 default
         }
     }
 
-    function getTokenMarketCap(address token) public view returns (uint256) {
+    function getTokenMarketCapUSD(address token) public view returns (uint256) {
         uint256 currentPrice = getCurrentPrice(token);
         uint256 totalSupply = IERC20(token).totalSupply();
         uint256 ethPriceUSD = getETHPriceByUSD();
         
         if (currentPrice == 0 || totalSupply == 0 || ethPriceUSD == 0) return 0;
         
+        // Market cap in ETH
         uint256 marketCapETH = (currentPrice * totalSupply) / 1e18;
+        // Convert to USD
         return (marketCapETH * ethPriceUSD) / 1e18;
+    }
+
+    function getTokenMarketCap(address token) public view returns (uint256) {
+        return getTokenMarketCapUSD(token);
     }
 
     function _addLiquidity(
@@ -665,8 +771,6 @@ contract MeteoraStyleBondingCurve is ReentrancyGuard, Ownable, Pausable, EIP712 
             require(success, "ETH transfer failed");
         }
     }
-
-    // ==================== ADMIN FUNCTIONS ====================
 
     function setCurveSegments(
         address token,
