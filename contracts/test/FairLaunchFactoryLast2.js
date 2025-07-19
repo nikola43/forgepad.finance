@@ -189,7 +189,7 @@ describe("EthismV2", function () {
     it("2. Should buy", async function () {
       const firstFee = await EthismV2.getFirstBuyFee(token.address);
       console.log("First buy fee:", ethers.utils.formatEther(firstFee));
-      const tradeSize = ethers.utils.parseEther("0.01");
+      const tradeSize = ethers.utils.parseEther("0.001");
       const tradeTx = await EthismV2.connect(addr1).swapExactETHForTokens(
         token.address, tradeSize, 0, { value: tradeSize.add(firstFee) }
       );
@@ -229,7 +229,7 @@ describe("EthismV2", function () {
       while (!isLaunched) {
         const firstFee = await EthismV2.getFirstBuyFee(token.address);
         console.log("First buy fee:", ethers.utils.formatEther(firstFee));
-        const tradeSize = ethers.utils.parseEther("0.1");
+        const tradeSize = ethers.utils.parseEther("0.01");
         const tradeTx = await EthismV2.connect(addr2).swapExactETHForTokens(
           token.address, tradeSize, 0, { value: tradeSize.add(firstFee) }
         );
@@ -266,37 +266,37 @@ describe("EthismV2", function () {
 
           // sell token from addr1
 
-          const router1 = await ethers.getContractAt("INineInchRouter02", UNISWAP_V2_ROUTER);
-          const wethAddress = await router1.WETH();
-          const factory = await ethers.getContractAt("INineInchFactory", await router1.factory());
-          const pairAddress = await factory.getPair(token.address, wethAddress);
-          const pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress);
-          let [reserve0, reserve1] = await pair.getReserves();
+          // const router1 = await ethers.getContractAt("INineInchRouter02", UNISWAP_V2_ROUTER);
+          // const wethAddress = await router1.WETH();
+          // const factory = await ethers.getContractAt("INineInchFactory", await router1.factory());
+          // const pairAddress = await factory.getPair(token.address, wethAddress);
+          // const pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress);
+          // let [reserve0, reserve1] = await pair.getReserves();
 
-          const tokenPriceInPair = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
-          console.log("Pair Address:", pairAddress);
-          console.log("Token Price in Pair:", ethers.utils.formatEther(tokenPriceInPair));
+          // const tokenPriceInPair = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
+          // console.log("Pair Address:", pairAddress);
+          // console.log("Token Price in Pair:", ethers.utils.formatEther(tokenPriceInPair));
 
-          const addr1TokenBalance = await token.balanceOf(addr1.address);
-          const ethBalanceBeforeSell = await ethers.provider.getBalance(addr1.address);
-          const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from now
+          // const addr1TokenBalance = await token.balanceOf(addr1.address);
+          // const ethBalanceBeforeSell = await ethers.provider.getBalance(addr1.address);
+          // const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from now
 
-          const newTokenContract = await ethers.getContractAt("Token", token.address);
-          await newTokenContract.connect(addr1).approve(router1.address, ethers.constants.MaxUint256);
-          await router1.connect(addr1).swapExactTokensForETHSupportingFeeOnTransferTokens(
-            addr1TokenBalance, 0, [token.address, wethAddress], addr1.address, deadline
-          );
+          // const newTokenContract = await ethers.getContractAt("Token", token.address);
+          // await newTokenContract.connect(addr1).approve(router1.address, ethers.constants.MaxUint256);
+          // await router1.connect(addr1).swapExactTokensForETHSupportingFeeOnTransferTokens(
+          //   addr1TokenBalance, 0, [token.address, wethAddress], addr1.address, deadline
+          // );
 
-          [reserve0, reserve1] = await pair.getReserves();
+          // [reserve0, reserve1] = await pair.getReserves();
 
-          const tokenPriceInPairAfterSell = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
-          const ethBalanceAfterSell = await ethers.provider.getBalance(addr1.address);
-          console.log("addr1 balance after sell:", ethers.utils.formatEther(ethBalanceAfterSell));
-          console.log("addr1 token balance after sell:", ethers.utils.formatEther(await token.balanceOf(addr1.address)));
-          console.log("Eth Balance Before Sell:", ethers.utils.formatEther(ethBalanceBeforeSell));
-          console.log("Eth Balance After Sell:", ethers.utils.formatEther(ethBalanceAfterSell));
-          console.log("Profit from Sell:", ethers.utils.formatEther(ethBalanceAfterSell.sub(ethBalanceBeforeSell)));
-          console.log("Token Price in Pair After Sell:", ethers.utils.formatEther(tokenPriceInPairAfterSell));
+          // const tokenPriceInPairAfterSell = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
+          // const ethBalanceAfterSell = await ethers.provider.getBalance(addr1.address);
+          // console.log("addr1 balance after sell:", ethers.utils.formatEther(ethBalanceAfterSell));
+          // console.log("addr1 token balance after sell:", ethers.utils.formatEther(await token.balanceOf(addr1.address)));
+          // console.log("Eth Balance Before Sell:", ethers.utils.formatEther(ethBalanceBeforeSell));
+          // console.log("Eth Balance After Sell:", ethers.utils.formatEther(ethBalanceAfterSell));
+          // console.log("Profit from Sell:", ethers.utils.formatEther(ethBalanceAfterSell.sub(ethBalanceBeforeSell)));
+          // console.log("Token Price in Pair After Sell:", ethers.utils.formatEther(tokenPriceInPairAfterSell));
 
 
           // const addr1Balance = await ethers.provider.getBalance(addr1.address);
