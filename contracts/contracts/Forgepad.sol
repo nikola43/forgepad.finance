@@ -155,18 +155,18 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         require(_feeAddress != address(0), "Fee address cannot be zero");
         feeAddress = _feeAddress;
-        MAX_BUY_PERCENT = 500; // 5%
+        MAX_BUY_PERCENT = 1000; // 5%
         CREATE_TOKEN_FEE_AMOUNT = 0;
         TOKEN_OWNER_FEE_PERCENT = 0;
         TARGET_MARKET_CAP = _targetMarketCap;
         TOTAL_SUPPLY = _totalSupply * 1e18;
         burnAddress = 0x000000000000000000000000000000000000dEaD;
 
-        initialEthLPAmount = 4.5 ether;
-        initialTokenLPAmount = 900_000_000 ether;
+        initialEthLPAmount = 1.2 ether;
+        initialTokenLPAmount = 800_000_000 ether;
 
         firstBuyFeeUSD = 0;
-        MAX_SELL_PERCENT = 500; // 5%
+        MAX_SELL_PERCENT = 1000; // 5%
         PLATFORM_BUY_FEE_PERCENT = 1; // 1%
         PLATFORM_SELL_FEE_PERCENT = 1; // 1%
         platformLPFee = 0.1 ether; // 0.1 ETH
@@ -733,8 +733,12 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     function getTokenMarketCap(address token) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
-        uint256 tokenPrice = getVirtualPrice(token);
-        return safeDiv(safeMul(circulatingSupply, tokenPrice), 1e18);
+        return
+            (getETHPriceByUSD() *
+                circulatingSupply *
+                tokenPools[token].ethReserve) /
+            tokenPools[token].tokenReserve /
+            1e18;
     }
 
     function getTokenVirtualMarketCap(
