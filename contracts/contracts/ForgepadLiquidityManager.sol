@@ -24,13 +24,13 @@ import "./v4-periphery/interfaces/IPositionManager.sol";
 import "./permit2/interfaces/IPermit2.sol";
 
 /**
- * @title EthismLiquidityManager
- * @author Ethism Protocol
+ * @title ForgepadLiquidityManager
+ * @author Forgepad Protocol
  * @notice A comprehensive liquidity management contract supporting Uniswap V2, V3, and V4
  * @dev This contract allows users to add liquidity to different versions of Uniswap protocols
  *      while maintaining security through reentrancy protection
  */
-contract EthismLiquidityManager is
+contract ForgepadLiquidityManager is
     ReentrancyGuard,
     Ownable,
     Pausable,

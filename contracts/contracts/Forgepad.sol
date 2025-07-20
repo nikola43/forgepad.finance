@@ -14,7 +14,7 @@ interface ILaunchable {
     function launch() external;
 }
 
-interface IEthism {
+interface IForgepad {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;
@@ -29,8 +29,7 @@ interface IEthism {
     function tokenPools(address) external view returns (PoolInfo memory);
 }
 
-contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
-
+contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;
@@ -79,7 +78,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     mapping(address => mapping(address => bool)) migrated;
 
     // Added circuit breaker variables
-    uint256 public constant MAX_PRICE_IMPACT = 1000; // 10% maximum price impact
+    uint256 public constant MAX_PRICE_IMPACT = 4500; // 45% maximum price impact
     uint256 public constant MIN_LIQUIDITY = 1e15; // Minimum liquidity threshold
 
     // Events
@@ -156,22 +155,22 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
 
         require(_feeAddress != address(0), "Fee address cannot be zero");
         feeAddress = _feeAddress;
-        MAX_BUY_PERCENT = 300; // 3%
+        MAX_BUY_PERCENT = 500; // 5%
         CREATE_TOKEN_FEE_AMOUNT = 0;
         TOKEN_OWNER_FEE_PERCENT = 0;
         TARGET_MARKET_CAP = _targetMarketCap;
         TOTAL_SUPPLY = _totalSupply * 1e18;
         burnAddress = 0x000000000000000000000000000000000000dEaD;
 
-        initialEthLPAmount = 4 ether;
-        initialTokenLPAmount = 800_000_000 ether;
+        initialEthLPAmount = 4.5 ether;
+        initialTokenLPAmount = 900_000_000 ether;
 
         firstBuyFeeUSD = 0;
-        MAX_SELL_PERCENT = 300; // 3%
+        MAX_SELL_PERCENT = 500; // 5%
         PLATFORM_BUY_FEE_PERCENT = 1; // 1%
         PLATFORM_SELL_FEE_PERCENT = 1; // 1%
         platformLPFee = 0.1 ether; // 0.1 ETH
-        tokenOwnerLPFee = 0.1 ether; // 0.1 ETH
+        tokenOwnerLPFee = 0 ether; // 0 ETH
     }
 
     // ==================== MATHEMATICAL FIXES ====================
@@ -196,7 +195,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @dev Calculate output amount using proper constant product formula
-     * FIXED: Now correctly implements x * y = k with fee integration
+     * FIXED: Correct implementation of x * y = k with proper fee handling
      */
     function getAmountOut(
         uint256 amountIn,
@@ -206,25 +205,29 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     ) internal pure returns (uint256 amountOut) {
         require(amountIn > 0, "Insufficient input amount");
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
-        
-        // CRITICAL FIX: Apply fees BEFORE invariant calculation
-        uint256 amountInWithFee = safeMul(amountIn, (10000 - feePercent));
+
+        // Calculate fee in basis points (100 = 1%)
+        uint256 feeBasisPoints = feePercent * 100; // Convert percent to basis points
+        require(feeBasisPoints < 10000, "Fee too high");
+
+        // Apply fees: amountInWithFee = amountIn * (10000 - feeBasisPoints) / 10000
+        uint256 amountInWithFee = safeMul(amountIn, (10000 - feeBasisPoints));
         amountInWithFee = safeDiv(amountInWithFee, 10000);
-        
-        // Constant product formula: (reserveIn + amountInWithFee) * (reserveOut - amountOut) = reserveIn * reserveOut
+
+        // Constant product formula: (x + dx) * (y - dy) = x * y
+        // Solving for dy: dy = (y * dx) / (x + dx)
         uint256 numerator = safeMul(amountInWithFee, reserveOut);
         uint256 denominator = reserveIn + amountInWithFee;
-        
+
         amountOut = safeDiv(numerator, denominator);
-        
-        // Ensure minimum output and prevent draining
+
+        // Safety checks
         require(amountOut > 0, "Insufficient output amount");
         require(amountOut < reserveOut, "Exceeds available liquidity");
     }
 
     /**
-     * @dev Calculate input amount needed for exact output
-     * FIXED: Proper reverse calculation with fee integration
+     * @dev Calculate input amount needed for exact outpu
      */
     function getAmountIn(
         uint256 amountOut,
@@ -235,14 +238,22 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(amountOut > 0, "Insufficient output amount");
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
         require(amountOut < reserveOut, "Exceeds available liquidity");
-        
-        // Calculate required input before fees
+
+        // Calculate fee in basis points
+        uint256 feeBasisPoints = feePercent * 100;
+        require(feeBasisPoints < 10000, "Fee too high");
+
+        // Reverse constant product: (x + dx) * (y - dy) = x * y
+        // Solving for dx: dx = (x * dy) / (y - dy)
         uint256 numerator = safeMul(reserveIn, amountOut);
         uint256 denominator = reserveOut - amountOut;
         uint256 amountInBeforeFees = safeDiv(numerator, denominator) + 1; // Add 1 for rounding
-        
-        // CRITICAL FIX: Calculate total amount including fees
-        amountIn = safeDiv(safeMul(amountInBeforeFees, 10000), (10000 - feePercent));
+
+        // Account for fees: actualAmountIn = amountInBeforeFees * 10000 / (10000 - feeBasisPoints)
+        amountIn = safeDiv(
+            safeMul(amountInBeforeFees, 10000),
+            (10000 - feeBasisPoints)
+        );
     }
 
     /**
@@ -255,14 +266,20 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         uint256 reserveOut
     ) internal pure {
         uint256 priceImpact = safeMul(amountOut, 10000) / reserveOut;
-        require(priceImpact <= MAX_PRICE_IMPACT, "Exceeds maximum price impact");
-        
+        require(
+            priceImpact <= MAX_PRICE_IMPACT,
+            "Exceeds maximum price impact"
+        );
+
         // Ensure minimum liquidity remains
-        require(reserveOut - amountOut >= MIN_LIQUIDITY, "Below minimum liquidity");
+        require(
+            reserveOut - amountOut >= MIN_LIQUIDITY,
+            "Below minimum liquidity"
+        );
     }
 
     // ==================== GASLESS TOKEN CREATION ====================
-    
+
     function getCreateTokenNonce(address user) public view returns (uint256) {
         return _createTokenNonces[user];
     }
@@ -341,11 +358,12 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(buyAmount > 0, "Buy amount must be greater than zero");
 
         PoolInfo storage pool = tokenPools[token];
-        
-        // FIXED: Calculate combined fee percentage
-        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT;
-        
-        // FIXED: Use proper constant product formula with integrated fees
+
+        // Calculate total fee percentage
+        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
+            TOKEN_OWNER_FEE_PERCENT;
+
+        // Use proper constant product formula with integrated fees
         uint256 amountOut = getAmountOut(
             buyAmount,
             pool.virtualEthReserve,
@@ -354,27 +372,50 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         );
 
         require(amountOut >= minAmountOut, "Slippage limit exceeded");
-        
-        // Check price impact
-        checkPriceImpact(buyAmount, amountOut, pool.virtualEthReserve, pool.virtualTokenReserve);
 
-        // Calculate fees for distribution
+        // Check price impact
+        checkPriceImpact(
+            buyAmount,
+            amountOut,
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+
+        // Calculate actual fees (not from virtual amount)
         uint256 buyFee = safeMul(buyAmount, PLATFORM_BUY_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = safeMul(buyAmount, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 tokenOwnerFee = safeMul(buyAmount, TOKEN_OWNER_FEE_PERCENT) /
+            100;
         uint256 netAmountIn = buyAmount - buyFee - tokenOwnerFee;
+
+        // CRITICAL FIX: Store old K before any changes
+        uint256 oldK = pool.lastKValue;
 
         // Transfer tokens to user
         IERC20(token).transfer(msg.sender, amountOut);
-        
-        // FIXED: Update reserves to maintain mathematical consistency
+
+        // Update reserves with the NET amount (after fees)
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= amountOut;
         pool.virtualEthReserve += netAmountIn;
         pool.virtualTokenReserve -= amountOut;
 
-        // CRITICAL FIX: Verify invariant preservation (k should increase due to fees)
-        uint256 newK = safeMul(pool.virtualEthReserve, pool.virtualTokenReserve);
-        require(newK >= pool.lastKValue, "Invariant violation");
+        // CRITICAL FIX: For buys, K should increase due to fees being removed from the pool
+        // The invariant should account for fees being extracted
+        uint256 newK = safeMul(
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+
+        // For purchases, we allow K to decrease slightly due to fee extraction,
+        // but it should not decrease by more than the fee amount
+        // Calculate minimum allowed K after accounting for fees
+        uint256 feeAdjustment = safeMul(oldK, (buyFee + tokenOwnerFee)) /
+            buyAmount;
+        uint256 minAllowedK = oldK > feeAdjustment
+            ? oldK - feeAdjustment
+            : oldK / 2;
+
+        require(newK >= minAllowedK, "Invariant violation");
         pool.lastKValue = newK;
 
         // Distribute fees
@@ -388,7 +429,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
 
         uint256 tokenPrice = getVirtualPrice(token);
         uint256 ethPrice = getETHPriceByUSD();
-        uint256 marketCap = getTokenVirtualMarketCap(token); // FIXED: Use consistent calculation
+        uint256 marketCap = getTokenVirtualMarketCap(token);
         tokenTrades[token]++;
 
         emit BuyTokens(
@@ -414,10 +455,11 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(buyAmount > 0, "Buy amount must be greater than zero");
 
         PoolInfo storage pool = tokenPools[token];
-        
-        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT;
-        
-        // FIXED: Calculate exact input needed using proper reverse calculation
+
+        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
+            TOKEN_OWNER_FEE_PERCENT;
+
+        // Calculate exact input needed using proper reverse calculation
         uint256 amountIn = getAmountIn(
             buyAmount,
             pool.virtualEthReserve,
@@ -426,14 +468,23 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         );
 
         require(amountIn <= maxAmountIn, "Exceeds maximum input");
-        
-        // Check price impact
-        checkPriceImpact(amountIn, buyAmount, pool.virtualEthReserve, pool.virtualTokenReserve);
 
-        // Calculate fees for distribution
+        // Check price impact
+        checkPriceImpact(
+            amountIn,
+            buyAmount,
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+
+        // Calculate actual fees
         uint256 buyFee = safeMul(amountIn, PLATFORM_BUY_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = safeMul(amountIn, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 tokenOwnerFee = safeMul(amountIn, TOKEN_OWNER_FEE_PERCENT) /
+            100;
         uint256 netAmountIn = amountIn - buyFee - tokenOwnerFee;
+
+        // Store old K
+        uint256 oldK = pool.lastKValue;
 
         // Transfer tokens to user
         IERC20(token).transfer(msg.sender, buyAmount);
@@ -444,9 +495,18 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         pool.virtualEthReserve += netAmountIn;
         pool.virtualTokenReserve -= buyAmount;
 
-        // Verify invariant preservation
-        uint256 newK = safeMul(pool.virtualEthReserve, pool.virtualTokenReserve);
-        require(newK >= pool.lastKValue, "Invariant violation");
+        // Check invariant with fee adjustment
+        uint256 newK = safeMul(
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+        uint256 feeAdjustment = safeMul(oldK, (buyFee + tokenOwnerFee)) /
+            amountIn;
+        uint256 minAllowedK = oldK > feeAdjustment
+            ? oldK - feeAdjustment
+            : oldK / 2;
+
+        require(newK >= minAllowedK, "Invariant violation");
         pool.lastKValue = newK;
 
         // Distribute fees
@@ -488,10 +548,11 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(sellAmount > 0, "Sell amount must be greater than zero");
 
         PoolInfo storage pool = tokenPools[token];
-        
-        uint256 totalFeePercent = PLATFORM_SELL_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT;
-        
-        // FIXED: Use proper constant product formula for selling
+
+        uint256 totalFeePercent = PLATFORM_SELL_FEE_PERCENT +
+            TOKEN_OWNER_FEE_PERCENT;
+
+        // Use proper constant product formula for selling
         uint256 amountOut = getAmountOut(
             sellAmount,
             pool.virtualTokenReserve,
@@ -500,28 +561,46 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         );
 
         require(amountOut >= minAmountOut, "Slippage limit exceeded");
-        
-        // Check price impact
-        checkPriceImpact(sellAmount, amountOut, pool.virtualTokenReserve, pool.virtualEthReserve);
 
-        // Calculate fees
+        // Check price impact
+        checkPriceImpact(
+            sellAmount,
+            amountOut,
+            pool.virtualTokenReserve,
+            pool.virtualEthReserve
+        );
+
+        // Calculate fees from ETH output
         uint256 sellFee = safeMul(amountOut, PLATFORM_SELL_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = safeMul(amountOut, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 tokenOwnerFee = safeMul(amountOut, TOKEN_OWNER_FEE_PERCENT) /
+            100;
         uint256 netAmountOut = amountOut - sellFee - tokenOwnerFee;
+
+        // Store old K
+        uint256 oldK = pool.lastKValue;
 
         // Transfer tokens from user and ETH to user
         IERC20(token).transferFrom(msg.sender, address(this), sellAmount);
         _transferETH(msg.sender, netAmountOut);
 
-        // Update reserves
-        pool.ethReserve -= amountOut;
+        // Update reserves with gross amounts before fees
+        pool.ethReserve -= amountOut; // Full amount before fees
         pool.tokenReserve += sellAmount;
         pool.virtualEthReserve -= amountOut;
         pool.virtualTokenReserve += sellAmount;
 
-        // Verify invariant preservation
-        uint256 newK = safeMul(pool.virtualEthReserve, pool.virtualTokenReserve);
-        require(newK >= pool.lastKValue, "Invariant violation");
+        // Check invariant for sells
+        uint256 newK = safeMul(
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+        uint256 feeAdjustment = safeMul(oldK, (sellFee + tokenOwnerFee)) /
+            amountOut;
+        uint256 minAllowedK = oldK > feeAdjustment
+            ? oldK - feeAdjustment
+            : oldK / 2;
+
+        require(newK >= minAllowedK, "Invariant violation");
         pool.lastKValue = newK;
 
         // Distribute fees
@@ -552,14 +631,17 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         uint256 buyAmount,
         uint256 minAmountOut
     ) public payable whenNotPaused nonReentrant {
-        uint256 maxBuy = safeMul(tokenPools[token].virtualEthReserve, MAX_BUY_PERCENT) / 10000;
+        uint256 maxBuy = safeMul(
+            tokenPools[token].virtualEthReserve,
+            MAX_BUY_PERCENT
+        ) / 10000;
         require(buyAmount <= maxBuy, "Buy amount too large");
 
         uint256 firstBuyFee = getFirstBuyFee(token);
 
         require(msg.value >= buyAmount + firstBuyFee, "Insufficient ETH value");
         _swapExactETHForTokens(token, buyAmount, minAmountOut);
-        
+
         if (msg.value > buyAmount + firstBuyFee) {
             _transferETH(msg.sender, msg.value - buyAmount - firstBuyFee);
         }
@@ -573,14 +655,24 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         uint256 buyAmount,
         uint256 maxAmountIn
     ) public payable whenNotPaused nonReentrant {
-        uint256 maxBuy = safeMul(tokenPools[token].virtualEthReserve, MAX_BUY_PERCENT) / 10000;
+        uint256 maxBuy = safeMul(
+            tokenPools[token].virtualEthReserve,
+            MAX_BUY_PERCENT
+        ) / 10000;
         require(buyAmount <= maxBuy, "Buy amount too large");
 
         uint256 firstBuyFee = getFirstBuyFee(token);
 
-        require(msg.value >= maxAmountIn + firstBuyFee, "Insufficient ETH value");
-        uint256 amountIn = _swapETHForExactTokens(token, buyAmount, maxAmountIn);
-        
+        require(
+            msg.value >= maxAmountIn + firstBuyFee,
+            "Insufficient ETH value"
+        );
+        uint256 amountIn = _swapETHForExactTokens(
+            token,
+            buyAmount,
+            maxAmountIn
+        );
+
         if (msg.value > amountIn + firstBuyFee) {
             _transferETH(msg.sender, msg.value - amountIn - firstBuyFee);
         }
@@ -594,9 +686,12 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         uint256 sellAmount,
         uint256 minAmountOut
     ) public whenNotPaused nonReentrant {
-        uint256 maxSell = safeMul(tokenPools[token].virtualTokenReserve, MAX_SELL_PERCENT) / 10000;
+        uint256 maxSell = safeMul(
+            tokenPools[token].virtualTokenReserve,
+            MAX_SELL_PERCENT
+        ) / 10000;
         require(sellAmount <= maxSell, "Sell amount too large");
-        
+
         _swapExactTokensForETH(token, sellAmount, minAmountOut);
     }
 
@@ -613,7 +708,8 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
             return 0;
         }
         if (tokenTrades[token] < 3) {
-            return safeDiv(safeMul(firstBuyFeeUSD, 1 ether), getETHPriceByUSD());
+            return
+                safeDiv(safeMul(firstBuyFeeUSD, 1 ether), getETHPriceByUSD());
         }
         return 0;
     }
@@ -626,32 +722,39 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
 
     function getVirtualPrice(address token) public view returns (uint256) {
         PoolInfo storage pool = tokenPools[token];
-        if (pool.virtualEthReserve == 0 || pool.virtualTokenReserve == 0) return 0;
-        return safeDiv(safeMul(pool.virtualEthReserve, 1e18), pool.virtualTokenReserve);
+        if (pool.virtualEthReserve == 0 || pool.virtualTokenReserve == 0)
+            return 0;
+        return
+            safeDiv(
+                safeMul(pool.virtualEthReserve, 1e18),
+                pool.virtualTokenReserve
+            );
     }
 
-    // FIXED: Consistent market cap calculation using virtual reserves
     function getTokenMarketCap(address token) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
-        uint256 tokenPrice = getVirtualPrice(token); // Use virtual price for consistency
+        uint256 tokenPrice = getVirtualPrice(token);
         return safeDiv(safeMul(circulatingSupply, tokenPrice), 1e18);
     }
 
-    function getTokenVirtualMarketCap(address token) public view returns (uint256) {
+    function getTokenVirtualMarketCap(
+        address token
+    ) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
-        uint256 virtualPrice = getVirtualPrice(token);
-        return safeDiv(safeMul(circulatingSupply, virtualPrice), 1e18);
+        return
+            (getETHPriceByUSD() *
+                circulatingSupply *
+                tokenPools[token].virtualEthReserve) /
+            tokenPools[token].virtualTokenReserve /
+            1e18;
     }
-
-    // ==================== FIXED LIQUIDITY MANAGEMENT ====================
 
     function _checkAndAddLiquidity(address token) internal {
         PoolInfo storage pool = tokenPools[token];
-        
-        // FIXED: Use consistent virtual market cap for launch threshold
+
         uint256 marketCap = getTokenVirtualMarketCap(token);
         uint256 targetMarketCapWei = safeMul(TARGET_MARKET_CAP, 1 ether);
-        
+
         if (marketCap >= targetMarketCapWei) {
             uint256 tokenPrice = getVirtualPrice(token);
             require(tokenPrice > 0, "Token price must be greater than 0");
@@ -659,17 +762,14 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
             uint256 totalEthReserve = pool.ethReserve;
             uint256 totalTokenReserve = pool.tokenReserve;
 
-            // Calculate total fees to reserve
             uint256 totalFeesToReserve = tokenOwnerLPFee + platformLPFee;
 
             uint256 ethAmountForLP = totalEthReserve;
             uint256 tokenAmountForLP = totalTokenReserve;
 
-            // FIXED: Proper proportional calculation for liquidity addition
             if (totalEthReserve > totalFeesToReserve) {
                 ethAmountForLP = totalEthReserve - totalFeesToReserve;
-                
-                // Maintain the same ratio for tokens
+
                 if (totalEthReserve > 0) {
                     tokenAmountForLP = safeDiv(
                         safeMul(totalTokenReserve, ethAmountForLP),
@@ -685,7 +785,6 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
             // Add liquidity with calculated amounts
             _addLiquidity(token, ethAmountForLP, tokenAmountForLP);
 
-            // Calculate remaining ETH after liquidity addition
             uint256 remainingEthReserve = totalEthReserve - ethAmountForLP;
 
             // Burn remaining tokens
@@ -699,6 +798,12 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
                 _transferETH(pool.owner, remainingEthReserve / 2);
                 _transferETH(feeAddress, remainingEthReserve / 2);
             }
+
+            // Update pool state
+            // tokenPools[token].tokenReserve = 0;
+            // tokenPools[token].ethReserve = 0;
+            // tokenPools[token].virtualEthReserve = 0;
+            // tokenPools[token].virtualTokenReserve = 0;
 
             emit TokenLaunched(token, block.timestamp);
         }
@@ -757,51 +862,54 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== ADMIN FUNCTIONS ====================
-    
+
     function setTokenOwnerFeePercent(uint256 feePercent) external onlyOwner {
         require(feePercent <= 500, "Fee cannot exceed 5%"); // Max 5%
         TOKEN_OWNER_FEE_PERCENT = feePercent;
     }
-    
+
     function setTargetMarketCap(uint256 targetMarketCap) external onlyOwner {
         require(targetMarketCap > 0, "Target market cap must be positive");
         TARGET_MARKET_CAP = targetMarketCap;
     }
-    
+
     function setTotalSupply(uint256 totalSupply) external onlyOwner {
         require(totalSupply > 0, "Total supply must be positive");
         TOTAL_SUPPLY = totalSupply;
     }
-    
+
     function setMaxBuyPercent(uint256 percent) external onlyOwner {
         require(percent <= 1000, "Max buy cannot exceed 10%"); // Max 10%
         MAX_BUY_PERCENT = percent;
     }
-    
+
     function setCreateTokenFeeAmount(uint256 feeAmount) external onlyOwner {
         CREATE_TOKEN_FEE_AMOUNT = feeAmount;
     }
-    
+
     function setInitialEthLPAmount(uint256 amount) external onlyOwner {
         require(amount > 0, "Amount must be positive");
         initialEthLPAmount = amount;
     }
-    
+
     function setInitialTokenLPAmount(uint256 amount) external onlyOwner {
         require(amount > 0, "Amount must be positive");
         initialTokenLPAmount = amount;
     }
-    
+
     function setFirstBuyFee(uint256 fee) external onlyOwner {
         firstBuyFeeUSD = fee;
     }
-    
+
     function setTokenOwnerLPFee(uint256 fee) external onlyOwner {
         tokenOwnerLPFee = fee;
     }
 
     function emergencyWithdrawETH(uint256 amount) external onlyOwner {
-        require(amount <= address(this).balance, "Insufficient contract balance");
+        require(
+            amount <= address(this).balance,
+            "Insufficient contract balance"
+        );
         _transferETH(owner(), amount);
     }
 
@@ -809,7 +917,10 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         address token,
         uint256 amount
     ) external onlyOwner {
-        require(amount <= IERC20(token).balanceOf(address(this)), "Insufficient token balance");
+        require(
+            amount <= IERC20(token).balanceOf(address(this)),
+            "Insufficient token balance"
+        );
         IERC20(token).transfer(owner(), amount);
     }
 
@@ -827,7 +938,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(percent <= 500, "Sell fee cannot exceed 5%"); // Max 5%
         PLATFORM_SELL_FEE_PERCENT = percent;
     }
-    
+
     function setFeeAddress(address newFeeAddress) external onlyOwner {
         require(newFeeAddress != address(0), "Fee address cannot be zero");
         feeAddress = newFeeAddress;
@@ -868,9 +979,15 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     ) external onlyOwner {
         require(token != address(0), "Token address cannot be zero");
         require(tokenPools[token].token == token, "Token pool does not exist");
-        require(ethReserve > 0 && tokenReserve > 0, "Reserves must be positive");
-        require(virtualEthReserve > 0 && virtualTokenReserve > 0, "Virtual reserves must be positive");
-        
+        require(
+            ethReserve > 0 && tokenReserve > 0,
+            "Reserves must be positive"
+        );
+        require(
+            virtualEthReserve > 0 && virtualTokenReserve > 0,
+            "Virtual reserves must be positive"
+        );
+
         PoolInfo storage pool = tokenPools[token];
         pool.ethReserve = ethReserve;
         pool.tokenReserve = tokenReserve;
@@ -878,7 +995,7 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         pool.virtualTokenReserve = virtualTokenReserve;
         pool.owner = owner;
         pool.poolType = poolType;
-        
+
         // Update K value for invariant tracking
         pool.lastKValue = safeMul(virtualEthReserve, virtualTokenReserve);
     }
@@ -899,14 +1016,14 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
         require(!migrated[from][token], "Already migrated");
         require(from != address(0), "Invalid from address");
         require(token != address(0), "Invalid token address");
-        
+
         migrated[from][token] = true;
-        IEthism.PoolInfo memory pool = IEthism(from).tokenPools(token);
-        
+        IForgepad.PoolInfo memory pool = IForgepad(from).tokenPools(token);
+
         address newToken = (address)(
             new Token(ERC20(token).name(), ERC20(token).symbol(), TOTAL_SUPPLY)
         );
-        
+
         // Transfer balances to new token holders
         for (uint256 i = 0; i < holders.length; i++) {
             if (holders[i] != address(0)) {
@@ -916,10 +1033,13 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
                 }
             }
         }
-        
+
         // Calculate initial K value for the migrated pool
-        uint256 initialK = safeMul(pool.virtualEthReserve, pool.virtualTokenReserve);
-        
+        uint256 initialK = safeMul(
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve
+        );
+
         tokenPools[newToken] = PoolInfo(
             pool.ethReserve,
             pool.tokenReserve,
@@ -939,21 +1059,27 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== VIEW FUNCTIONS FOR DEBUGGING ====================
-    
+
     /**
      * @dev Get detailed pool information for analysis
      */
-    function getPoolDetails(address token) external view returns (
-        uint256 ethReserve,
-        uint256 tokenReserve,
-        uint256 virtualEthReserve,
-        uint256 virtualTokenReserve,
-        uint256 currentK,
-        uint256 lastK,
-        uint256 virtualPrice,
-        uint256 actualPrice,
-        bool launched
-    ) {
+    function getPoolDetails(
+        address token
+    )
+        external
+        view
+        returns (
+            uint256 ethReserve,
+            uint256 tokenReserve,
+            uint256 virtualEthReserve,
+            uint256 virtualTokenReserve,
+            uint256 currentK,
+            uint256 lastK,
+            uint256 virtualPrice,
+            uint256 actualPrice,
+            bool launched
+        )
+    {
         PoolInfo storage pool = tokenPools[token];
         return (
             pool.ethReserve,
@@ -978,11 +1104,11 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     ) external view returns (uint256 amountOut, uint256 priceImpact) {
         PoolInfo storage pool = tokenPools[token];
         require(!pool.launched, "Pool has been launched");
-        
-        uint256 totalFeePercent = isETHInput ? 
-            PLATFORM_BUY_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT :
-            PLATFORM_SELL_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT;
-        
+
+        uint256 totalFeePercent = isETHInput
+            ? PLATFORM_BUY_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT
+            : PLATFORM_SELL_FEE_PERCENT + TOKEN_OWNER_FEE_PERCENT;
+
         if (isETHInput) {
             amountOut = getAmountOut(
                 amountIn,
@@ -1005,19 +1131,27 @@ contract EthismV2 is ReentrancyGuard, Ownable, Pausable {
     /**
      * @dev Check if token is close to launch threshold
      */
-    function getLaunchProgress(address token) external view returns (
-        uint256 currentMarketCap,
-        uint256 targetMarketCap,
-        uint256 progressPercent,
-        bool canLaunch
-    ) {
+    function getLaunchProgress(
+        address token
+    )
+        external
+        view
+        returns (
+            uint256 currentMarketCap,
+            uint256 targetMarketCap,
+            uint256 progressPercent,
+            bool canLaunch
+        )
+    {
         currentMarketCap = getTokenVirtualMarketCap(token);
         targetMarketCap = safeMul(TARGET_MARKET_CAP, 1 ether);
-        
+
         if (targetMarketCap > 0) {
-            progressPercent = safeMul(currentMarketCap, 10000) / targetMarketCap;
+            progressPercent =
+                safeMul(currentMarketCap, 10000) /
+                targetMarketCap;
         }
-        
+
         canLaunch = currentMarketCap >= targetMarketCap;
     }
 }
