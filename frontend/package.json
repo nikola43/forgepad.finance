@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && rm -rf .next/cache",
+    "build": "next build",
     "build:cf": "next build && find .next -name '*.pack' -delete && find .next -size +25M -delete",
     "start": "next start",
     "lint": "next lint"
