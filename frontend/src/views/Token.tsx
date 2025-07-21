@@ -1033,34 +1033,22 @@ export default function Token() {
                                                     avatar: "bondingCurv"
                                                 }}
                                             />
-                                        </Box>
-                                        <Box display="flex" alignItems="center" ml={1}>
-                                            <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', marginRight: '8px' }}>
+                                            <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
                                                 <LinkIcon sx={{ color: "white", height: 16 }} />
                                             </Link>
-                                            <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                         </Box>
+                                        <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                     </Box>
                                     {
                                         holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
                                             <Box component="li" key={index}>
-                                                <Typography>{index + 2}.</Typography>
-                                                {/* {
-                                        isMobile
-                                        ? <UserAvatar user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                        : <Box display="flex" alignItems="center">
-                                            <User user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                        </Box>
-                                    } */}
-
-                                                {
-                                                    <Box display="flex" alignItems="center">
-                                                        <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                                    </Box>
-                                                }
-                                                <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
-                                                    <LinkIcon sx={{ color: "white", height: 16 }} />
-                                                </Link>
+                                                <div>{index + 2}.</div>
+                                                <Box display="flex" alignItems="center">
+                                                    <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
+                                                    <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
+                                                        <LinkIcon sx={{ color: "white", height: 16 }} />
+                                                    </Link>
+                                                </Box>
                                                 <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                             </Box>
                                         ))}
@@ -1108,35 +1096,22 @@ export default function Token() {
                                                 avatar: "bondingCurv"
                                             }}
                                         />
-                                    </Box>
-
-                                    <Box display="flex" alignItems="center" ml={1}>
-                                        <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', marginRight: '8px' }}>
+                                        <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
                                             <LinkIcon sx={{ color: "white", height: 16 }} />
                                         </Link>
-                                        <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                     </Box>
+                                    <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                 </Box>
                                 {
                                     holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
                                         <Box component="li" key={index}>
-                                            <Typography>{index + 2}.</Typography>
-                                            {/* {
-                                                isMobile
-                                                ? <UserAvatar user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                                : <Box display="flex" alignItems="center">
-                                                    <User user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                                </Box>
-                                            } */}
-
-                                            {
-                                                <Box display="flex" alignItems="center">
-                                                    <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
-                                                </Box>
-                                            }
-                                            <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
-                                                <LinkIcon sx={{ color: "white", height: 16 }} />
-                                            </Link>
+                                            <div>{index + 2}.</div>
+                                            <Box display="flex" alignItems="center">
+                                                <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
+                                                <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
+                                                    <LinkIcon sx={{ color: "white", height: 16 }} />
+                                                </Link>
+                                            </Box>
                                             <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                         </Box>
                                     ))}
