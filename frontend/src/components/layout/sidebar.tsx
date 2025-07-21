@@ -1,6 +1,6 @@
-import imgLogo from '../../assets/images/logo.png';
-import TelegramIcon from '../../assets/images/telegram.svg';
-import TwitterIcon from '../../assets/images/x.svg';
+// import imgLogo from '@/assets/images/logo.png';
+import TelegramIcon from '@/assets/images/telegram.svg';
+import TwitterIcon from '@/assets/images/x.svg';
 import LogoutIcon from '@mui/icons-material/Logout';
 import styled, { useTheme } from "styled-components";
 import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
@@ -9,8 +9,8 @@ import { useState } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
-import imgForge3 from '@/assets/images/forge3.png'
-import imgForge4 from '@/assets/images/forge4.png'
+// import imgForge3 from '@/assets/images/forge3.png'
+// import imgForge4 from '@/assets/images/forge4.png'
 import CloseIcon from "@mui/icons-material/Close";
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -215,16 +215,16 @@ export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: ()
     <DialogContent>
       {
         isMobile
-        ? <Image src={imgForge3} width={431} height={22} style={{ maxWidth: "100%" }} alt="" />
+        ? <img src="/images/forge3.png" width={431} height={22} style={{ maxWidth: "100%" }} alt="" />
         : <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Image src={imgForge3} width={431} height={22} alt="" />
+          <img src="/images/forge3.png" width={431} height={22} alt="" />
           <CloseButton onClick={onClose}>
               <CloseIcon style={{ color: "#FF9D00" }} />
           </CloseButton>
         </Box>
       }
       <Box display="flex" flexDirection="column" gap="16px" alignItems="center" pt="16px" fontFamily="Arial">
-        <Image src={imgForge4} width={isMobile ? 300 : 351} height={isMobile ? 160 : 198} alt="logo" />
+        <img src="/images/forge4.png" width={isMobile ? 300 : 351} height={isMobile ? 160 : 198} alt="logo" />
         <Box display="flex" flexDirection={["column", "column", "row"]} gap="8px" alignItems="center">
           <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>💡 idea</Typography>
           { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
@@ -251,7 +251,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
   if (minimized)
     return <div className="sidebar minimized">
       <Logo as={Link} href="/">
-        <Image src={imgLogo} height={90} alt="logo" />
+        <img src="/images/logo.png" height={90} alt="logo" />
       </Logo>
       <Maximize onClick={() => setMinimize(false)}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -307,7 +307,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
       <Title>Forge</Title>
 
       <Logo as={Link} href="/">
-        <Image src={imgLogo} height={90} alt="logo" />
+        <img src="/images/logo.png" height={90} alt="logo" />
         <span>Forge</span>
       </Logo>
 
@@ -349,7 +349,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
       </Buttons>
 
       <LogoWrapper>
-        <Image src={imgLogo} style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={388} alt="logo" />
+        <img src="/images/logo.png" style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={388} alt="logo" />
       </LogoWrapper>
 
       <SocialLinks>

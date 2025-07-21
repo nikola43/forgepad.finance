@@ -1,9 +1,8 @@
 import styled from "styled-components"
 import CloseIcon from "@mui/icons-material/Close";
 import LogoutIcon from '@mui/icons-material/Logout';
-import imgLogo from '../../assets/images/logo.png';
-import TelegramIcon from '../../assets/images/telegram.svg';
-import TwitterIcon from '../../assets/images/x.svg';
+import TelegramIcon from '@/assets/images/telegram.svg';
+import TwitterIcon from '@/assets/images/x.svg';
 import { CubeIcon, DialogHowItWorks, HomeIcon, TokenIcon, WalletIcon } from "./sidebar";
 import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
 import { useEffect, useState } from "react";
@@ -211,7 +210,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
             </MenuButton>
         </Menu>
         <LogoWrapper>
-            <Image src={imgLogo} style={{ objectFit: 'contain' }} width={220} height={220} alt="logo" />
+            <img src="/images/logo.png" style={{ objectFit: 'contain' }} width={220} height={220} alt="logo" />
         </LogoWrapper>
         <Buttons>
             <StyledLink href="/">

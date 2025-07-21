@@ -2,11 +2,11 @@ import { Avatar, Box, CircularProgress, Dialog, InputAdornment, InputBase, TextF
 import Image from "next/image"
 import Link from "next/link"
 import styled, { keyframes } from "styled-components"
-import imgLogo from '@/assets/images/logo.png';
-import imgForge0 from '@/assets/images/forge0.png';
-import imgForge1 from '@/assets/images/forge1.png';
-import imgForge2 from "@/assets/images/forge2.png";
-import imgBanner from "@/assets/images/banner.png"
+// import imgLogo from '@/assets/images/logo.png';
+// import imgForge0 from '@/assets/images/forge0.png';
+// import imgForge1 from '@/assets/images/forge1.png';
+// import imgForge2 from "@/assets/images/forge2.png";
+// import imgBanner from "@/assets/images/banner.png"
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CubeIcon, DialogHowItWorks, HomeIcon, TokenIcon, WalletIcon } from "./sidebar";
@@ -407,7 +407,7 @@ export default function Header() {
     if (isMobile)
         return <>
             <HeaderBox p="6px 8px" style={{ border: 'none' }}>
-                <Image src={imgForge2} width={54} height={54} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" />
+                <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" />
                 <Link href="/forge" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')} style={{ height: "40px" }}>
                         <TokenIcon />
@@ -468,7 +468,7 @@ export default function Header() {
         <HeaderBox p="6px 27px">
             <Box flex={1} display="flex" gap="36px" alignItems="center">
                 <Link href="/">
-                    <Image src={imgLogo} width={64} height={64} alt="logo" />
+                    <img src="/images/logo.png" width={64} height={64} alt="logo" />
                 </Link>
                 <SearchToken
                     placeholder="Search token"
@@ -493,8 +493,8 @@ export default function Header() {
                 />
             </Box>
             <Box display="flex" justifyContent="center" alignItems="center" onClick={() => setModal("how")} style={{ cursor: "pointer" }}>
-                <Image src={imgForge0} width={82} height={82} alt="logo" style={{ top: "0px", position: "relative" }} />
-                <Image src={imgForge1} width={281} height={52} alt="logo" />
+                <img src="/images/forge0.png" width={82} height={82} alt="logo" style={{ top: "0px", position: "relative" }} />
+                <img src="/images/forge1.png" width={281} height={52} alt="logo" />
             </Box>
             <Box flex={1} display="flex" gap="18px" alignItems="center" justifyContent="flex-end">
                 <SocialLinks>
@@ -574,7 +574,7 @@ export default function Header() {
                     </ScrollBox>
                 }
                 <Link href="/forge">
-                    <Image src={imgForge2} width={127} height={127} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" className="logo" />
+                    <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" className="logo" />
                 </Link>
                 {
                     trades?.length > 0 &&

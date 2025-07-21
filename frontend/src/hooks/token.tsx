@@ -106,7 +106,7 @@ export function useNewTrades() {
     const { data, mutate } = useSWR(
         '/list/trades',
         async () => {
-            const { data: { trades } } = await axios.get(API_ENDPOINT, {
+            const { data: { trades } } = await axios.get(`${API_ENDPOINT}/trades/recent`, {
                 params: {
                     latestTradeId,
                 }

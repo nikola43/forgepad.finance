@@ -18,12 +18,12 @@ import { priceFormatter } from "@/utils/price";
 import Toggle from "@/components/toggle";
 import { Creator, User, UserName } from "@/components/cards/user";
 
-import imgUniswap from '@/assets/images/uniswap.png';
-import marketcapIcon from '@/assets/images/marketcap.png';
+// import imgUniswap from '@/assets/images/uniswap.png';
+// import marketcapIcon from '@/assets/images/marketcap.png';
 import TelegramIcon from '@/assets/images/telegram.svg';
 import TwitterIcon from '@/assets/images/x.svg';
 import WebsiteIcon from '@/assets/images/website.svg';
-import ethIcon from '@/assets/images/coin/eth-1.png';
+// import ethIcon from '@/assets/images/coin/eth-1.png';
 
 import { TVChartContainer as TVChartContainerAdvanced } from '@/components/tvchart';
 import { TimeDiff } from "@/components/time";
@@ -32,7 +32,7 @@ import { useHandlers, useTokenInfo } from "@/hooks/token";
 import toast from "react-hot-toast";
 import { useAppKit, useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { useMainContext } from "@/context";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 // import { useUserInfo } from "@/hooks/user";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "@/hooks/config";
@@ -445,7 +445,9 @@ const SwapContent = ({
 
 export default function Token() {
     const { address } = useAppKitAccount()
-    const { network, address: id } = useParams()
+    const searchParams = useSearchParams()
+    const network = searchParams.get('network')
+    const id = searchParams.get('address')
     // const [detailData, setDetailData] = React.useState<any>(null);
     // const [chatList, setChatList] = React.useState<any[]>([]);
     // const [tradeData, setTradeData] = React.useState<any>([]);
@@ -1010,7 +1012,7 @@ export default function Token() {
                             <Typography color="#9E9E9E" fontSize={14}>replies</Typography>
                         </Box> */}
                                         <Box display="flex" gap="0.2rem" mt={1}>
-                                            <Avatar sx={{ width: 24, height: 24, mr: '0.5rem' }} src={marketcapIcon.src} />
+                                            <Avatar sx={{ width: 24, height: 24, mr: '0.5rem' }} src="/images/marketcap.png" />
                                             <Typography color="#D9D9D9" fontSize={14}>${priceFormatter(marketCap, 2)}</Typography>
                                             <Typography color="#9E9E9E" fontSize={14}>—</Typography>
                                             <Typography color="#9E9E9E" fontSize={14}>Market cap</Typography>

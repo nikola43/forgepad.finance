@@ -15,6 +15,7 @@ import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import axios from 'axios'
 import { ethers } from 'ethers'
 import { SWRConfig } from 'swr'
+import Loading from '@/components/loading'
 
 const theme = createTheme({
   palette: {
@@ -68,7 +69,7 @@ interface MainContextProps {
 
 const MainContext = createContext<MainContextProps | undefined>(undefined);
 
-function ContextProvider({ children, cookies }: { children: ReactNode; cookies: string | null }) {
+function ContextProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false)
   const [chains, setChains] = useState<any[]>()
 
@@ -120,9 +121,7 @@ function ContextProvider({ children, cookies }: { children: ReactNode; cookies: 
   }
 
   if (!initialized)
-    return <Box display="flex" justifyContent="center" alignItems="center" width="100%" height="100%" position="fixed">
-      <CircularProgress />
-    </Box>
+    return <Loading />
 
   return (
     <MainContext.Provider value={contextValue}>
