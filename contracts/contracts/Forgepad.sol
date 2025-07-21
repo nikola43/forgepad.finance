@@ -155,7 +155,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         require(_feeAddress != address(0), "Fee address cannot be zero");
         feeAddress = _feeAddress;
-        MAX_BUY_PERCENT = 1000; // 5%
+        MAX_BUY_PERCENT = 1000; // 10%
         CREATE_TOKEN_FEE_AMOUNT = 0;
         TOKEN_OWNER_FEE_PERCENT = 0;
         TARGET_MARKET_CAP = _targetMarketCap;
@@ -166,7 +166,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         initialTokenLPAmount = 800_000_000 ether;
 
         firstBuyFeeUSD = 0;
-        MAX_SELL_PERCENT = 1000; // 5%
+        MAX_SELL_PERCENT = 1000; // 10%
         PLATFORM_BUY_FEE_PERCENT = 1; // 1%
         PLATFORM_SELL_FEE_PERCENT = 1; // 1%
         platformLPFee = 0.1 ether; // 0.1 ETH
@@ -804,10 +804,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             }
 
             // Update pool state
-            // tokenPools[token].tokenReserve = 0;
-            // tokenPools[token].ethReserve = 0;
-            // tokenPools[token].virtualEthReserve = 0;
-            // tokenPools[token].virtualTokenReserve = 0;
+            tokenPools[token].tokenReserve = 0;
+            tokenPools[token].ethReserve = 0;
+            tokenPools[token].virtualEthReserve = 0;
+            tokenPools[token].virtualTokenReserve = 0;
 
             emit TokenLaunched(token, block.timestamp);
         }
