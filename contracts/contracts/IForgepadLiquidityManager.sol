@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-interface IEthismLiquidityManager {
+interface IForgepadLiquidityManager {
     function getAmountsOut(
         uint amountIn,
         address[] memory path
