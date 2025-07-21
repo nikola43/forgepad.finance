@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {IEthismLiquidityManager} from "./IEthismLiquidityManager.sol";
+import {IForgepadLiquidityManager} from "./IForgepadLiquidityManager.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -52,7 +52,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     // Contract variables
-    IEthismLiquidityManager public liquidityManager;
+    IForgepadLiquidityManager public liquidityManager;
     AggregatorV3Interface internal priceFeed;
     mapping(uint256 => address) public tokenList;
     mapping(address => PoolInfo) public tokenPools;
@@ -126,7 +126,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     constructor(
         address _dataFeedAddress,
-        address _ethismLiquidityManagerAddress,
+        address _liquidityManagerAddress,
         address _feeAddress,
         address _distributorAddress,
         uint256 _targetMarketCap,
@@ -139,7 +139,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
 
         require(
-            _ethismLiquidityManagerAddress != address(0),
+            _liquidityManagerAddress != address(0),
             "Liquidity manager cannot be zero"
         );
 
@@ -149,13 +149,13 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         );
         distributorAddress = _distributorAddress;
 
-        liquidityManager = IEthismLiquidityManager(
-            _ethismLiquidityManagerAddress
+        liquidityManager = IForgepadLiquidityManager(
+            _liquidityManagerAddress
         );
 
         require(_feeAddress != address(0), "Fee address cannot be zero");
         feeAddress = _feeAddress;
-        MAX_BUY_PERCENT = 1000; // 5%
+        MAX_BUY_PERCENT = 1000; // 10%
         CREATE_TOKEN_FEE_AMOUNT = 0;
         TOKEN_OWNER_FEE_PERCENT = 0;
         TARGET_MARKET_CAP = _targetMarketCap;
@@ -166,7 +166,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         initialTokenLPAmount = 800_000_000 ether;
 
         firstBuyFeeUSD = 0;
-        MAX_SELL_PERCENT = 1000; // 5%
+        MAX_SELL_PERCENT = 1000; // 10%
         PLATFORM_BUY_FEE_PERCENT = 1; // 1%
         PLATFORM_SELL_FEE_PERCENT = 1; // 1%
         platformLPFee = 0.1 ether; // 0.1 ETH
@@ -804,10 +804,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             }
 
             // Update pool state
-            // tokenPools[token].tokenReserve = 0;
-            // tokenPools[token].ethReserve = 0;
-            // tokenPools[token].virtualEthReserve = 0;
-            // tokenPools[token].virtualTokenReserve = 0;
+            tokenPools[token].tokenReserve = 0;
+            tokenPools[token].ethReserve = 0;
+            tokenPools[token].virtualEthReserve = 0;
+            tokenPools[token].virtualTokenReserve = 0;
 
             emit TokenLaunched(token, block.timestamp);
         }
@@ -969,7 +969,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             newLiquidityManagerAddress != address(0),
             "Liquidity manager cannot be zero"
         );
-        liquidityManager = IEthismLiquidityManager(newLiquidityManagerAddress);
+        liquidityManager = IForgepadLiquidityManager(newLiquidityManagerAddress);
     }
 
     function updatePool(

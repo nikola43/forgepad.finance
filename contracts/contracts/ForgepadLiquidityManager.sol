@@ -416,13 +416,17 @@ contract ForgepadLiquidityManager is
             .mint(params);
 
         if (IERC20(token).balanceOf(address(this)) > 0) {
-            IERC20(token).transfer(address(0xdead), IERC20(token).balanceOf(address(this)));
+            IERC20(token).transfer(
+                address(0xdead),
+                IERC20(token).balanceOf(address(this))
+            );
         }
-        
+
         uint256 wad = IWETH(routerV2.WETH()).balanceOf(address(this));
         if (wad > 0) {
             IWETH(routerV2.WETH()).withdraw(wad);
             (bool success, ) = address(marginRecipient).call{value: wad}("");
+            if (!success) revert TransferFailed();
         }
     }
 
@@ -566,13 +570,17 @@ contract ForgepadLiquidityManager is
         positionManager.multicall(params);
 
         if (IERC20(token).balanceOf(address(this)) > 0) {
-            IERC20(token).transfer(address(0xdead), IERC20(token).balanceOf(address(this)));
+            IERC20(token).transfer(
+                address(0xdead),
+                IERC20(token).balanceOf(address(this))
+            );
         }
 
         uint256 wad = IWETH(routerV2.WETH()).balanceOf(address(this));
         if (wad > 0) {
             IWETH(routerV2.WETH()).withdraw(wad);
             (bool success, ) = address(marginRecipient).call{value: wad}("");
+            if (!success) revert TransferFailed();
         }
     }
 

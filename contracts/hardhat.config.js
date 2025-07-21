@@ -162,7 +162,7 @@ module.exports = {
     gasReporter: {
         token: "ETH",
         currency: 'USD',
-        gasPrice: 3,
+        gasPrice: 2,
         enabled: true,
         coinmarketcap: '0caa3779-3cb2-4665-a7d3-652823b53908'
     },
