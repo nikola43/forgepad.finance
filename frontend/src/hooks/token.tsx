@@ -40,7 +40,7 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
             try {
                 const tokenChain = chains?.find(chain => chain.network === network)
                 const networks = ChainController.getCaipNetworks()
-                const tokenNetwork = networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
+                const tokenNetwork = networks?.find(net => net && (net.id === tokenChain?.chainId || net.chainNamespace === tokenChain?.chainId))
                 if (tokenChain && tokenNetwork) {
                     if (tokenNetwork.chainNamespace === "eip155" && evmProvider) {
                         const provider = new BrowserProvider(evmProvider, chainId)

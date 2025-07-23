@@ -80,8 +80,15 @@ function ContextProvider({ children }: { children: ReactNode }) {
           return solana
         else if (chain.chainId === 'bitcoin')
           return bitcoin
-        return (allNetworks as any)[chain.network]
-      })
+        const network = (allNetworks as any)[chain.network]
+        return network || null
+      }).filter(Boolean)
+
+      if (networks.length === 0) {
+        console.error('No valid networks found')
+        return
+      }
+
       // const wagmiAdapter = new WagmiAdapter({
       //   ssr: false,
       //   projectId,
@@ -90,7 +97,7 @@ function ContextProvider({ children }: { children: ReactNode }) {
       const ethersAdapter = new EthersAdapter()
       const solanaAdapter = new SolanaAdapter()
       createAppKit({
-        adapters: [ethersAdapter, solanaAdapter],
+        adapters: [ethersAdapter],
         projectId,
         networks,
         metadata,
@@ -109,6 +116,9 @@ function ContextProvider({ children }: { children: ReactNode }) {
       })
       setInitialized(true)
       setChains(data.chains)
+    }).catch((error) => {
+      console.error('Failed to initialize app config:', error)
+      setInitialized(true) // Still initialize to prevent infinite loading
     })
     return () => {
       setInitialized(false)
@@ -140,7 +150,7 @@ export const useMainContext = () => {
   const context = useContext(MainContext)
 
   if (!context) {
-      throw new Error('MainContext must be used within a MainContextProvider');
+    throw new Error('MainContext must be used within a MainContextProvider');
   }
   return context;
 }
