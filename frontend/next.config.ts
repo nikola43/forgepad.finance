@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  // output: 'export',
   compress: true,
   webpack: config => {
     config.externals.push('pino-pretty', 'lokijs', 'encoding')
