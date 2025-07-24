@@ -1,6 +1,6 @@
 const { ethers } = require("hardhat");
 
-const contractAddress = "0x034dE400A1adF5E215D75b04a095F10786687b9f"
+const contractAddress = "0xBe246D0eBD173486B0b50961159eE053f753Df4f"
 let fairLaunchFactory;
 describe("Fair Launch", async () => {
   before(async () => {
@@ -64,7 +64,7 @@ describe("Fair Launch", async () => {
       await EthismLiquidityManager.deployed();
 
 
-      const contractAddress = "0x034dE400A1adF5E215D75b04a095F10786687b9f"
+      const contractAddress = "0xBe246D0eBD173486B0b50961159eE053f753Df4f"
       const fairLaunchFactory = await ethers.getContractAt("EthismV2", contractAddress, deployer);
       await fairLaunchFactory.setLiquidityManager(EthismLiquidityManager.address);
       const newToken = "0xf9E38A5A47df2fe2492c48BF9781AaBA213b3591"

@@ -3,7 +3,7 @@ const { ethers, network } = require("hardhat")
 const fs = require("fs")
 
 const API_ENDPOINT = 'https://api.forgepad.finance'
-const ETHISM_ADDRESS = '0x4f2580738917c4b2bF862994eC1c223d66857104'
+const ETHISM_ADDRESS = '0xa348f2f1ac90350d587c0c1ef85b8bec3a066762'
 
 async function main() {
     let [deployer] = await ethers.getSigners()
@@ -31,7 +31,7 @@ async function main() {
     // deployer = await ethers.getImpersonatedSigner("0x0b0ac2ebb54ae5eb9977124953e1835a6ef7afa5");
 
 
-    const ethism = await ethers.getContractAt("EthismV2", "0x4f2580738917c4b2bF862994eC1c223d66857104")
+    const ethism = await ethers.getContractAt("EthismV2", "0xa348f2f1ac90350d587c0c1ef85b8bec3a066762")
     const tokens = []
     for (const _token of tokensInfo.tokenList) {
         try {

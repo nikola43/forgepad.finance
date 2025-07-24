@@ -71,7 +71,7 @@ const main = async () => {
         await hre.run('verify:verify', {
             address: distributor.address,
             contract: 'contracts/Distributor.sol:Distributor',
-            // referenceContract: "0x034de400a1adf5e215d75b04a095f10786687b9f",
+            // referenceContract: "0xBe246D0eBD173486B0b50961159eE053f753Df4f",
             constructorArguments: args
         })
     }

@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 async function main() {
     // Contract details
-    const CONTRACT_ADDRESS = "0x034dE400A1adF5E215D75b04a095F10786687b9f"; // Replace with actual address
+    const CONTRACT_ADDRESS = "0xBe246D0eBD173486B0b50961159eE053f753Df4f"; // Replace with actual address
     const CONTRACT_ABI = [
         // Example ABI - replace with your contract's ABI
         "event Migrated(address indexed from, address indexed token, address indexed newToken)",
