@@ -236,6 +236,15 @@ main .tradingview-widget-copyright {
   }
 }
 
+@keyframes rotate-animation {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -359;
+  }
+}
+
 .animation-g1 {
   animation: opacity-animation1 1.2s infinite ease-in-out;
   animation-delay: 0;
@@ -255,4 +264,18 @@ main .tradingview-widget-copyright {
 
 :host wui-ux-by-reown.branding-only, :host w3m-legal-footer {
   display: none;
+}
+
+.spin-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  svg {
+    rect {
+      animation: rotate-animation 1s linear infinite;
+    }
+  }
 }

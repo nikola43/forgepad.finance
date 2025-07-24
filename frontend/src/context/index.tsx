@@ -147,8 +147,8 @@ function ContextProvider({ children }: { children: ReactNode }) {
     chains
   }
 
-  // if (!initialized)
-  return <Loading />
+  if (!initialized)
+    return <Loading />
 
   return (
     <MainContext.Provider value={contextValue}>
