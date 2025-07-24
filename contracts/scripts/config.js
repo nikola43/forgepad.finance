@@ -19,7 +19,7 @@ async function main() {
 
 
 
-    const address = "0x4f2580738917c4b2bF862994eC1c223d66857104"
+    const address = "0xa348f2f1ac90350d587c0c1ef85b8bec3a066762"
     const Ethism = await ethers.getContractAt("EthismV2", address);
     await Ethism.emergencyWithdrawETH("81566623335059065")
 }

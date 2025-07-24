@@ -1,5 +1,5 @@
 import { Avatar, Box, Menu, MenuItem, Typography, styled } from "@mui/material";
-import marketcapIcon from '@/assets/images/marketcap.png';
+// import marketcapIcon from '@/assets/images/marketcap.png';
 // import { priceFormatter } from "../tvchart/chart";
 import { CreatorName } from "./user";
 import { API_ENDPOINT } from "@/config";
@@ -114,7 +114,7 @@ function TokenCard({ token, mode, ...props }: any) {
 
   if (mode === "trends") {
     return (
-      <StyledCard {...props} className="effect-button" p="16px" alignItems="stretch" onClick={() => router.push(`/${token.network}/${token.tokenAddress}`)}>
+      <StyledCard {...props} className="effect-button" p="16px" alignItems="stretch" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
         <Box mx="auto" position="relative">
           <TokenLogo logo={token.tokenImage} size="150px" style={{ borderRadius: '8px' }} />
         </Box>
@@ -156,7 +156,7 @@ function TokenCard({ token, mode, ...props }: any) {
   }
 
   return (
-    <StyledCard {...props} className="effect-button" p="8px 16px 8px 8px" onClick={() => router.push(`/${token.network}/${token.tokenAddress}`)}>
+    <StyledCard {...props} className="effect-button" p="8px 16px 8px 8px" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
       <Box display="flex" gap="8px">
         <Box display="flex" flexDirection="column" alignItems="center" gap="8px">
           <TokenLogo logo={token.tokenImage} size="64px" style={{ margin: '4px', borderRadius: '8px' }} />
@@ -180,7 +180,7 @@ function TokenCard({ token, mode, ...props }: any) {
               {token.tokenSymbol.length > 20 ? `${token.tokenSymbol.substring(0, 10)}...` : token.tokenSymbol}
             </Typography>
             <Box display="flex" gap="4px" alignItems="center" ml="auto">
-              {!!token.telegramLink && <Link href={token.telegramLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TelegramIcon} width={16} height={16} alt="telegram" /></Link>}
+              {!!token.telegramLink && <Link href={token.telegramLink} target="_blank" style={{ opacity: 0.5 }}><TelegramIcon width={16} height={16} /></Link>}
               {!!token.twitterLink && <Link href={token.twitterLink} target="_blank" style={{ opacity: 0.5 }}><Image src={TwitterIcon} width={16} height={16} alt="twitter" /></Link>}
               {!!token.webLink && <Link href={token.webLink} target="_blank" style={{ opacity: 0.5 }}><Image src={WebsiteIcon} width={16} height={16} alt="website" /></Link>}
             </Box>
@@ -216,7 +216,7 @@ function TokenCard({ token, mode, ...props }: any) {
       {
         token.launchedAt &&
         <Box display="flex" gap="8px" alignItems="center" alignSelf="center">
-          <Image width={20} height={20} alt="mc" src={marketcapIcon} />
+          <img width={20} height={20} alt="mc" src="/images/marketcap.png" />
           <Typography color="#FBFF00" fontSize={11}>Bonding Complete and Listed on swap</Typography>
         </Box>
       }

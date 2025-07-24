@@ -3,4 +3,6 @@ yarn.lock
 package-lock.json
 */node_modules/
 frontend/.next/
+frontend/out/
 backend/uploads/*
+backend/out/

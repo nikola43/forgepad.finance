@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { headers } from 'next/headers' // added
 import ContextProvider from '@/context'
 import MainLayout from "@/components/layout"
 import '@/assets/globals.css'
@@ -16,13 +15,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const headersData = await headers();
-  const cookies = headersData.get('cookie');
+  // const headersData = await headers();
+  // const cookies = headersData.get('cookie');
 
   return (
     <html lang="en">
       <body>
-        <ContextProvider cookies={cookies}>
+        <ContextProvider>
           <MainLayout>{children}</MainLayout>
         </ContextProvider>
       </body>

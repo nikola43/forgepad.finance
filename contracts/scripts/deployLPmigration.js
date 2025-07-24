@@ -64,7 +64,7 @@ async function main() {
     });
     await EthismLiquidityManager.deployed();
 
-    const fairLaunchFactory = await ethers.getContractAt("EthismV2", "0x034dE400A1adF5E215D75b04a095F10786687b9f", deployer);
+    const fairLaunchFactory = await ethers.getContractAt("EthismV2", "0xBe246D0eBD173486B0b50961159eE053f753Df4f", deployer);
     await fairLaunchFactory.setLiquidityManager(EthismLiquidityManager.address);
     await fairLaunchFactory.unpause()
 }

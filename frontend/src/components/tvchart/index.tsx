@@ -8,7 +8,7 @@ import {
 import * as React from 'react';
 import { Box, styled, useMediaQuery } from '@mui/material';
 
-import Logo from '@/assets/images/logo.png';
+// import Logo from '@/assets/images/logo.png';
 import axios from 'axios';
 import { API_ENDPOINT } from '@/config';
 import { priceFormatter } from '@/utils/price';
@@ -31,7 +31,7 @@ const Container = styled(Box)`
     left: 0;
     right: 0;
     bottom: 0;
-    background: url(${Logo}) no-repeat center;
+    background: url(/images/logo.png) no-repeat center;
     opacity: 0.3;
     filter: grayscale(0.7);
     z-index: 0;

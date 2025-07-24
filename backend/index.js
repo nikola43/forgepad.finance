@@ -25,6 +25,7 @@ app.use(express.json());
 // parse requests of content-type - application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
 
+// app.use('/', express.static('out'))
 app.use('/uploads', express.static('uploads'))
 
 //Database connection
@@ -45,7 +46,7 @@ app.use('/uploads', express.static('uploads'))
 
 // Websocket communication
 require("./app/controllers/websocket")(io);
-const tradesController = require("./app/controllers/trades.controller");
+// const tradesController = require("./app/controllers/trades.controller");
 const { CHAINS } = require("./app/config/web3.config");
 //const usersController = require("./app/controllers/users.controller");
 // const e = require("express");
@@ -203,7 +204,7 @@ const { CHAINS } = require("./app/config/web3.config");
 
 // })
 
-app.get('/', tradesController.getLatestTrades); // all trades on token address
+// app.get('/trades/recent', tradesController.getLatestTrades); // all trades on token address
 app.get('/config', (req, res) => {
   res.json({
     chains: CHAINS

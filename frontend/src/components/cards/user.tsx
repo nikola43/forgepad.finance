@@ -1,6 +1,6 @@
 import { Avatar, Box, Typography } from "@mui/material";
 import { FILE_ENDPOINT } from "@/config";
-import verifiedIcon from "@/assets/images/verified.png";
+// import verifiedIcon from "@/assets/images/verified.png";
 import SecurityIcon from '@mui/icons-material/Security';
 import styled from "styled-components";
 

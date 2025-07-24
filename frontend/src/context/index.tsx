@@ -15,6 +15,7 @@ import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import axios from 'axios'
 import { ethers } from 'ethers'
 import { SWRConfig } from 'swr'
+import Loading from '@/components/loading'
 
 const theme = createTheme({
   palette: {
@@ -68,7 +69,7 @@ interface MainContextProps {
 
 const MainContext = createContext<MainContextProps | undefined>(undefined);
 
-function ContextProvider({ children, cookies }: { children: ReactNode; cookies: string | null }) {
+function ContextProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false)
   const [chains, setChains] = useState<any[]>()
 
@@ -79,8 +80,15 @@ function ContextProvider({ children, cookies }: { children: ReactNode; cookies: 
           return solana
         else if (chain.chainId === 'bitcoin')
           return bitcoin
-        return (allNetworks as any)[chain.network]
-      })
+        const network = (allNetworks as any)[chain.network]
+        return network || null
+      }).filter(Boolean)
+
+      if (networks.length === 0) {
+        console.error('No valid networks found')
+        return
+      }
+
       // const wagmiAdapter = new WagmiAdapter({
       //   ssr: false,
       //   projectId,
@@ -89,7 +97,7 @@ function ContextProvider({ children, cookies }: { children: ReactNode; cookies: 
       const ethersAdapter = new EthersAdapter()
       const solanaAdapter = new SolanaAdapter()
       createAppKit({
-        adapters: [ethersAdapter, solanaAdapter],
+        adapters: [ethersAdapter],
         projectId,
         networks,
         metadata,
@@ -108,6 +116,9 @@ function ContextProvider({ children, cookies }: { children: ReactNode; cookies: 
       })
       setInitialized(true)
       setChains(data.chains)
+    }).catch((error) => {
+      console.error('Failed to initialize app config:', error)
+      setInitialized(true) // Still initialize to prevent infinite loading
     })
     return () => {
       setInitialized(false)
@@ -120,9 +131,7 @@ function ContextProvider({ children, cookies }: { children: ReactNode; cookies: 
   }
 
   if (!initialized)
-    return <Box display="flex" justifyContent="center" alignItems="center" width="100%" height="100%" position="fixed">
-      <CircularProgress />
-    </Box>
+    return <Loading />
 
   return (
     <MainContext.Provider value={contextValue}>
@@ -141,7 +150,7 @@ export const useMainContext = () => {
   const context = useContext(MainContext)
 
   if (!context) {
-      throw new Error('MainContext must be used within a MainContextProvider');
+    throw new Error('MainContext must be used within a MainContextProvider');
   }
   return context;
 }

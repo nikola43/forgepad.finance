@@ -7,7 +7,7 @@ module.exports = app => {
 
   router.post('/', tradesController.getAllTradesByToken); // all trades on token address
   router.get('/getChartData', tradesController.getChartData); // all trades on token address
-  router.get('/getLatestTrade', tradesController.getLatestTrade);
+  router.get('/recent', tradesController.getLatestTrades);
 
   app.use('/trades', router);
 };
