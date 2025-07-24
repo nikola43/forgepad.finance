@@ -502,7 +502,7 @@ export default function Header() {
                     <Link href={FORGE_TWITTER_URL} target="_blank"><Image src={TwitterIcon} width={50} height={35} alt="twitter" /></Link>
                 </SocialLinks>
                 <Link href="/forge" style={{ textDecoration: "none" }}>
-                    <StyledButton className="effect-button" onClick={() => setModal('how')}>
+                    <StyledButton className="effect-button">
                         <TokenIcon />
                         Create Token
                     </StyledButton>

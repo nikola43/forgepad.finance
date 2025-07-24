@@ -40,10 +40,10 @@ const queryClient = new QueryClient()
 
 // Set up metadata
 const metadata = {
-  name: 'next-reown-appkit',
-  description: 'next-reown-appkit',
-  url: 'https://github.com/0xonerb/next-reown-appkit-ssr', // origin must match your domain & subdomain
-  icons: ['https://avatars.githubusercontent.com/u/179229932']
+  name: 'ForgePad',
+  description: 'ForgePad Finance',
+  url: 'https://forgepad.finance', // origin must match your domain & subdomain
+  icons: ['https://forgepad.finance/favicon.ico']
 }
 
 interface Chain {
@@ -97,7 +97,7 @@ function ContextProvider({ children }: { children: ReactNode }) {
       const ethersAdapter = new EthersAdapter()
       const solanaAdapter = new SolanaAdapter()
       createAppKit({
-        adapters: [ethersAdapter],
+        adapters: [ethersAdapter, solanaAdapter],
         projectId,
         networks,
         metadata,
