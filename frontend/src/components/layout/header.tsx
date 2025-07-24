@@ -371,7 +371,7 @@ export default function Header() {
 
     useEffect(() => {
         // console.log("network", chainId, caipNetwork)
-        close()
+        // close()
         setSwitching(false)
     }, [caipNetwork])
 
