@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     config.externals.push('pino-pretty', 'lokijs', 'encoding')
     config.optimization.splitChunks = {
       chunks: 'all',
-      maxSize: 240 * 1024,
+      maxSize: 200 * 1024,
       minSize: 20 * 1024,
     }
     config.cache = false
