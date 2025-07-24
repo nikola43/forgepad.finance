@@ -4,12 +4,10 @@ import { API_ENDPOINT, projectId } from '@/config'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createAppKit } from '@reown/appkit/react'
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { cookieToInitialState, WagmiProvider, type Config } from 'wagmi'
-import { Box, CircularProgress, createTheme } from '@mui/material'
+import { createTheme } from '@mui/material'
 import { ThemeProvider } from '@emotion/react'
-import * as allNetworks from 'viem/chains'
-import { solana, bitcoin } from '@reown/appkit/networks'
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+// import * as allNetworks from 'viem/chains'
+import { solana, bitcoin, defineChain } from '@reown/appkit/networks'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import axios from 'axios'
@@ -80,7 +78,25 @@ function ContextProvider({ children }: { children: ReactNode }) {
           return solana
         else if (chain.chainId === 'bitcoin')
           return bitcoin
-        const network = (allNetworks as any)[chain.network]
+        const network = defineChain({
+          id: chain.chainId,
+          caipNetworkId: `eip155:${chain.chainId}`,
+          chainNamespace: 'eip155',
+          name: chain.name,
+          nativeCurrency: {
+            decimals: 18,
+            name: 'Ether',
+            symbol: chain.currency,
+          },
+          rpcUrls: {
+            default: {
+              http: [chain.rpcUrl],
+            },
+          },
+          blockExplorers: {
+            default: { name: 'Explorer', url: chain.explorerUrl },
+          },
+        })
         return network || null
       }).filter(Boolean)
 
@@ -109,6 +125,7 @@ function ContextProvider({ children }: { children: ReactNode }) {
         },
         enableReconnect: false,
         enableWalletGuide: false,
+        defaultAccountTypes: { eip155: 'eoa', solana: 'eoa' },
         themeVariables: {
           '--w3m-accent': '#FFF',
           '--w3m-border-radius-master': '2px'
@@ -130,8 +147,8 @@ function ContextProvider({ children }: { children: ReactNode }) {
     chains
   }
 
-  if (!initialized)
-    return <Loading />
+  // if (!initialized)
+  return <Loading />
 
   return (
     <MainContext.Provider value={contextValue}>
