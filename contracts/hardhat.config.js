@@ -41,7 +41,7 @@ module.exports = {
     networks: {
         hardhat: {
             forking: {
-                url: `https://eth.llamarpc.com`
+                url: `https://eth.merkle.io`
             },
             accounts: {
                 accountsBalance: '1000000000000000000000000000000000000000'
@@ -51,7 +51,7 @@ module.exports = {
         },
         localhost: {
             forking: {
-                url: `https://eth.llamarpc.com`,
+                url: `https://eth.merkle.io`,
             },
             gasPrice: 6510331748
         },
@@ -115,15 +115,7 @@ module.exports = {
         timeout: 1000000000,
     },
     etherscan: {
-        apiKey: {
-            sepolia: process.env.ETHERSCAN_API_KEY,
-            bsc: process.env.BSCSCAN_API_KEY,
-            pulsechainmainnet: 'pulsechainmainnet',
-            pulsechaintestnet: 'pulsechaintestnet',
-            base: '9AJVKWM6M31X24NEYBI93SYW99IVDI5ZCG',
-            mainnet: "ZF8UZTCMKDNN555XW2CGBJ2HXWCVIRZFFG",
-            eth_mainnet: 'eth_mainnet',
-        },
+        apiKey: "ZF8UZTCMKDNN555XW2CGBJ2HXWCVIRZFFG",
         customChains: [
             {
                 network: "eth_mainnet",
@@ -166,7 +158,7 @@ module.exports = {
         enabled: true,
         coinmarketcap: '0caa3779-3cb2-4665-a7d3-652823b53908'
     },
-    sourcify: {
-        enabled: true
-    }
+    // sourcify: {
+    //     enabled: true
+    // }
 };
