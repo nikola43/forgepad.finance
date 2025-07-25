@@ -328,10 +328,11 @@ export default function Header() {
     const pathname = usePathname()
     const [modal, setModal] = useState<string>()
 
-    const { open, close } = useAppKit()
+    const { appKit } = useMainContext()
+    // const { open, close } = useAppKit()
     const { isConnected, address, caipAddress } = useAppKitAccount()
-    const { chainId, caipNetwork, switchNetwork } = useAppKitNetwork()
-    const { disconnect } = useDisconnect()
+    const { chainId, caipNetwork } = useAppKitNetwork()
+    // const { disconnect } = useDisconnect()
     const { walletInfo } = useWalletInfo()
     // const state = useAppKitState()
 
@@ -396,7 +397,7 @@ export default function Header() {
 
     const handleSwitch = (network: any) => {
         setSwitching(true)
-        switchNetwork(network)
+        appKit?.switchNetwork(network)
         // open({
         //     view: "Networks", namespace: network.chainNamespace, 
         // })
@@ -510,7 +511,7 @@ export default function Header() {
                 {
                     isConnected
                     ? <StyledDropdownButton ref={dropdownRef}>
-                        <StyledButton className="effect-button" onClick={() => open({ view: 'Networks' })}>
+                        <StyledButton className="effect-button" onClick={() => appKit?.open({ view: 'Networks' })}>
                             {
                                 walletInfo
                                 ? <Avatar src={walletInfo.icon} sx={{ width: 24, height: 24 }} />
@@ -539,14 +540,14 @@ export default function Header() {
                                     </StyledButton>
                                 )
                             }
-                            <StyledButton className="effect-button" onClick={() => disconnect()}>
+                            <StyledButton className="effect-button" onClick={() => appKit?.disconnect()}>
                                 <LogoutIcon sx={{ color: "white" }} />
                                 Disconnect
                             </StyledButton>
                         </div>
                         {/* <SettingsIcon sx={{ color: "white", ml: 1 }} /> */}
                     </StyledDropdownButton>
-                    : <StyledButton onClick={() => open({ view: 'Connect' })} className="effect-button">
+                    : <StyledButton onClick={() => appKit?.open({ view: 'Connect' })} className="effect-button">
                         <WalletIcon />
                         Connect Wallet
                     </StyledButton>
@@ -596,5 +597,6 @@ export default function Header() {
             </TradesBox>
         }
         <DialogHowItWorks open={modal === 'how'} onClose={() => setModal(undefined)} />
+        {/* <appkit-modal class="appkit-modal" /> */}
     </>
 }

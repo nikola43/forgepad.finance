@@ -147,14 +147,14 @@ const Transition = React.forwardRef(function Transition(
 });
 
 export default function Create() {
-    const { open: connect } = useAppKit()
+    // const { open: connect } = useAppKit()
 
     const [deployModal, setDeployModal] = React.useState(false);
     // const [tokenAddressDeployed, setTokenAddressDeployed] = React.useState<string>();
     const { address } = useAppKitAccount();
     const { caipNetwork: network } = useAppKitNetwork()
 
-    const { chains } = useMainContext()
+    const { chains, appKit } = useMainContext()
     const { userInfo } = useUserInfo()
 
     const [coinName, setCoinName] = React.useState("");
@@ -478,7 +478,7 @@ export default function Create() {
                 {
                     address
                     ? <Button sx={{ background: 'white', color: 'black', padding: '12px', borderRadius: '16px' }} className="effect-button" fullWidth onClick={handleClickOpen}>Deploy on {network?.name}</Button>
-                    : <Button sx={{ background: 'white', color: 'black', padding: '12px', borderRadius: '16px' }} className="effect-button" fullWidth onClick={() => connect()}>Connect Wallet</Button>
+                    : <Button sx={{ background: 'white', color: 'black', padding: '12px', borderRadius: '16px' }} className="effect-button" fullWidth onClick={() => appKit?.open()}>Connect Wallet</Button>
                 }
             </Box>
             <FixWidthDialog

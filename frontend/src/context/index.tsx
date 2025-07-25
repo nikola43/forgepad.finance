@@ -1,20 +1,19 @@
 'use client'
 
-import { API_ENDPOINT, projectId } from '@/config'
+import { API_ENDPOINT } from '@/config'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppKit, createAppKit } from '@reown/appkit/react'
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createTheme } from '@mui/material'
 import { ThemeProvider } from '@emotion/react'
-// import * as allNetworks from 'viem/chains'
-import { solana, bitcoin, defineChain, mainnet, base } from '@reown/appkit/networks'
-import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
-import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import axios from 'axios'
 import { ethers } from 'ethers'
 import { SWRConfig } from 'swr'
 import Loading from '@/components/loading'
-import { ChainController } from "@reown/appkit-controllers"
+import { EthersAdapter } from "@reown/appkit-adapter-ethers";
+import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
+import { solana, bitcoin, defineChain, mainnet, base } from '@reown/appkit/networks'
+import { projectId } from '@/config'
 
 const theme = createTheme({
   palette: {
@@ -38,12 +37,12 @@ const theme = createTheme({
 const queryClient = new QueryClient()
 
 // Set up metadata
-const metadata = {
-  name: 'ForgePad',
-  description: 'ForgePad Finance',
-  url: 'https://forgepad.finance', // origin must match your domain & subdomain
-  icons: ['https://forgepad.finance/favicon.ico']
-}
+// const metadata = {
+//   name: 'ForgePad',
+//   description: 'ForgePad Finance',
+//   url: 'https://forgepad.finance', // origin must match your domain & subdomain
+//   icons: ['https://forgepad.finance/favicon.ico']
+// }
 
 interface Chain {
   name: string,
@@ -67,11 +66,9 @@ interface MainContextProps {
   appKit?: AppKit
 }
 
-const MainContext = createContext<MainContextProps | undefined>(undefined);
-
 const ethersAdapter = new EthersAdapter()
 const solanaAdapter = new SolanaAdapter()
-createAppKit({
+const appKit = createAppKit({
   adapters: [ethersAdapter, solanaAdapter],
   projectId,
   networks: [mainnet, base, solana],
@@ -86,15 +83,16 @@ createAppKit({
   enableWalletGuide: false,
   defaultAccountTypes: { eip155: 'eoa', solana: 'eoa' },
   themeVariables: {
-    '--w3m-accent': '#FFF',
-    '--w3m-border-radius-master': '2px'
+    '--w3m-accent': '#FFA600',
+    '--w3m-border-radius-master': '2px',
   }
 })
+
+const MainContext = createContext<MainContextProps | undefined>(undefined);
 
 function ContextProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false)
   const [chains, setChains] = useState<any[]>()
-  const [appKit, setAppKit] = useState<AppKit>()
 
   useEffect(() => {
     axios.get(`${API_ENDPOINT}/config`).then(({ data }) => {
@@ -173,7 +171,7 @@ function ContextProvider({ children }: { children: ReactNode }) {
     chains, appKit
   }
 
-  if (!initialized)
+  if (!initialized || !appKit)
     return <Loading />
 
   return (

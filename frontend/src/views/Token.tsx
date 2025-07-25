@@ -335,10 +335,9 @@ const SwapContent = ({
     amountIn, approveHandler, detailData, error, estimateAmount, ethBalance, exactInput, isLoading, swapHandler, tokenAllowance, tokenBalance, tradeType,
     setAmountIn, setExactInput, setShowSlipaggeDialog
 }: any) => {
-    const { open: connect } = useAppKit()
-    const { chains } = useMainContext()
+    const { chains, appKit } = useMainContext()
     const { isConnected } = useAppKitAccount()
-    const { caipNetwork, switchNetwork } = useAppKitNetwork()
+    const { caipNetwork } = useAppKitNetwork()
     const tokenChain = useMemo(() => chains?.find(c => c.network === detailData?.network), [chains, detailData])
     const networks = ChainController.getCaipNetworks()
     const tokenNetwork = useMemo(() => {
@@ -421,7 +420,7 @@ const SwapContent = ({
         {
             isConnected
                 ? tokenNetwork?.caipNetworkId !== caipNetwork?.caipNetworkId
-                    ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => switchNetwork(tokenNetwork as AppKitNetwork)}>
+                    ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.switchNetwork(tokenNetwork as AppKitNetwork)}>
                         Switch Network
                     </Button>
                     : tradeType === "sell" && amountIn && tokenAllowance < ethers.parseEther(amountIn)
@@ -431,7 +430,7 @@ const SwapContent = ({
                         : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
                             {tradeType === "buy" ? "Buy" : "Sell"} {isLoading && <CircularProgress size={18} style={{ color: "black", marginLeft: "1em" }} />}
                         </Button>
-                : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => connect()}>
+                : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.open()}>
                     Connect Wallet
                 </Button>
         }
@@ -487,7 +486,7 @@ export default function Token() {
 
     // Check if this is a Solana token
     const isSolanaToken = network === 'solana';
-    console.log(isSolanaToken)
+    // console.log(isSolanaToken)
 
     const { chains } = useMainContext()
     const { userInfo } = useUserInfo()
