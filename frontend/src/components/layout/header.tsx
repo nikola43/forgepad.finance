@@ -408,7 +408,9 @@ export default function Header() {
     if (isMobile)
         return <>
             <HeaderBox p="6px 8px" style={{ border: 'none' }}>
-                <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" />
+                <Link href="/">
+                    <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" />
+                </Link>
                 <Link href="/forge" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')} style={{ height: "40px" }}>
                         <TokenIcon />

@@ -10,7 +10,8 @@ import { CircularProgress } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
 import { useAppKit, useAppKitAccount, useAppKitNetwork, useDisconnect } from "@reown/appkit/react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useMainContext } from "@/context";
 
 const Menu = styled.div`
     position: fixed;
@@ -164,25 +165,25 @@ const SocialLinks = styled.div`
 `
 
 export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenuOpen: (isOpen: boolean) => void }) {
-    const { open: connect,  } = useAppKit()
+    // const { open: connect,  } = useAppKit()
     const { isConnected } = useAppKitAccount()
-    const { disconnect } = useDisconnect()
+    // const { disconnect } = useDisconnect()
     const [modal, setModal] = useState<string>()
-    const router = useRouter()
-    const { switchNetwork } = useAppKitNetwork()
+    const pathname = usePathname()
+    // const { switchNetwork } = useAppKitNetwork()
 
-    const chains: any[] = []
-    const chain: any = undefined
+    const { appKit } = useMainContext()
+    // const chain: any = undefined
 
-    const isSwitching = false
-    const switchChain = (c: any) => {}
+    // const isSwitching = false
+    // const switchChain = (c: any) => {}
 
     // const { chain, chains } = useChainInfo()
     // const { isSwitching, switchChain } = useSwitchChain()
 
     useEffect(() => {
         onMenuOpen(false)
-    }, [router])
+    }, [pathname])
 
     if (!open)
         return <Menu>
@@ -192,15 +193,15 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
                 </svg>
             </MenuButton>
             {
-                chains?.filter((c: any) => c.chainId !== chain?.chainId).map((c: any) =>
-                    <MenuButton key={`chain-${c.chainId}`} className="effect-button" onClick={() => switchChain(c.chainId)}>
-                        {
-                            isSwitching 
-                            ? <CircularProgress color="inherit" size={20} /> 
-                            : <img src={`/networks/${c.network}.svg`} alt="" height={24} />
-                        }                        
-                    </MenuButton>
-                )
+                // chains?.filter((c: any) => c.chainId !== chain?.chainId).map((c: any) =>
+                //     <MenuButton key={`chain-${c.chainId}`} className="effect-button" onClick={() => switchChain(c.chainId)}>
+                //         {
+                //             isSwitching 
+                //             ? <CircularProgress color="inherit" size={20} /> 
+                //             : <img src={`/networks/${c.network}.svg`} alt="" height={24} />
+                //         }                        
+                //     </MenuButton>
+                // )
             }
         </Menu>
     return <MenuBack>
@@ -222,7 +223,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
 
             {
                 !isConnected &&
-                <Button onClick={() => connect()} className="effect-button">
+                <Button onClick={() => appKit?.open()} className="effect-button">
                     <WalletIcon />
                     Connect Wallet
                 </Button>
@@ -242,7 +243,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
 
             {
                 isConnected &&
-                <Button onClick={() => disconnect()} className="effect-button">
+                <Button onClick={() => appKit?.disconnect()} className="effect-button">
                     <LogoutIcon />
                     Disconnect Wallet
                 </Button>
