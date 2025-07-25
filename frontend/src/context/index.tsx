@@ -14,6 +14,7 @@ import axios from 'axios'
 import { ethers } from 'ethers'
 import { SWRConfig } from 'swr'
 import Loading from '@/components/loading'
+import { ChainController } from "@reown/appkit-controllers"
 
 const theme = createTheme({
   palette: {
@@ -131,6 +132,8 @@ function ContextProvider({ children }: { children: ReactNode }) {
           '--w3m-border-radius-master': '2px'
         }
       })
+      const cnetworks = ChainController.getCaipNetworks()
+      console.log('networks', cnetworks)
       setInitialized(true)
       setChains(data.chains)
     }).catch((error) => {
