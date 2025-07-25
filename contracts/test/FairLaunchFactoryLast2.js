@@ -272,9 +272,31 @@ describe("Forgepad", function () {
           const pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress);
           let [reserve0, reserve1] = await pair.getReserves();
 
-          const tokenPriceInPair = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
+          let token0 = await pair.token0();
+          const tokenIsToken0 = token0.toLowerCase() === token.address.toLowerCase();
+
+          const tokenReserve = tokenIsToken0 ? reserve0 : reserve1;
+          const ethReserve = tokenIsToken0 ? reserve1 : reserve0;
+
+          // Token price in ETH: how much ETH for 1 token
+          const tokenPriceInPair = ethReserve.mul(ethers.utils.parseEther("1")).div(tokenReserve);
+
+          // Get ETH price in USD
+          const ethPriceUSD = await EthismV2.getETHPriceByUSD(); // should return a BigNumber with 18 decimals
+
+          // Token price in USD = tokenPriceInPair (ETH) × ethPriceUSD (USD)
+          const tokenPriceUSD = tokenPriceInPair.mul(ethPriceUSD).div(ethers.utils.parseEther("1"));
+
+          // Get total token supply
+          const totalSupply = await token.totalSupply(); // assume 18 decimals
+
+          // Market Cap = tokenPriceUSD × totalSupply / 1e18
+          const marketCapAfterMigration = tokenPriceUSD.mul(totalSupply).div(ethers.utils.parseEther("1"));
+
           console.log("Pair Address:", pairAddress);
-          console.log("Token Price in Pair:", ethers.utils.formatEther(tokenPriceInPair));
+          console.log("Token Price in ETH:", ethers.utils.formatEther(tokenPriceInPair));
+          console.log("Token Price in USD:", ethers.utils.formatUnits(tokenPriceUSD, 18));
+          console.log("Market Cap After Migration (USD):", ethers.utils.formatUnits(marketCapAfterMigration, 18));
 
           const addr1TokenBalance = await token.balanceOf(addr1.address);
           const ethBalanceBeforeSell = await ethers.provider.getBalance(addr1.address);

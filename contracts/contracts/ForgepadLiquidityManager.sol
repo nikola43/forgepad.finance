@@ -307,7 +307,7 @@ contract ForgepadLiquidityManager is
         // Add liquidity
         routerV2.addLiquidityETH{value: ethAmount}(
             token,
-            tokenAmount,
+            155_000_000 ether,
             0, // Accept any amount of tokens
             0, // Accept any amount of ETH
             recipient,
