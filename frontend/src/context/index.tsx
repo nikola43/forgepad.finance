@@ -2,12 +2,12 @@
 
 import { API_ENDPOINT, projectId } from '@/config'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createAppKit } from '@reown/appkit/react'
+import { AppKit, createAppKit } from '@reown/appkit/react'
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createTheme } from '@mui/material'
 import { ThemeProvider } from '@emotion/react'
 // import * as allNetworks from 'viem/chains'
-import { solana, bitcoin, defineChain } from '@reown/appkit/networks'
+import { solana, bitcoin, defineChain, mainnet, base } from '@reown/appkit/networks'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import axios from 'axios'
@@ -64,76 +64,99 @@ interface Chain {
 
 interface MainContextProps {
   chains?: Chain[]
+  appKit?: AppKit
 }
 
 const MainContext = createContext<MainContextProps | undefined>(undefined);
 
+const ethersAdapter = new EthersAdapter()
+const solanaAdapter = new SolanaAdapter()
+createAppKit({
+  adapters: [ethersAdapter, solanaAdapter],
+  projectId,
+  networks: [mainnet, base, solana],
+  metadata,
+  themeMode: 'dark',
+  features: {
+    email: false,
+    socials: false,
+    // emailShowWallets: false,
+  },
+  enableReconnect: false,
+  enableWalletGuide: false,
+  defaultAccountTypes: { eip155: 'eoa', solana: 'eoa' },
+  themeVariables: {
+    '--w3m-accent': '#FFF',
+    '--w3m-border-radius-master': '2px'
+  }
+})
+
 function ContextProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false)
   const [chains, setChains] = useState<any[]>()
+  const [appKit, setAppKit] = useState<AppKit>()
 
   useEffect(() => {
     axios.get(`${API_ENDPOINT}/config`).then(({ data }) => {
-      const networks = data.chains.map((chain: any) => {
-        if (chain.chainId === 'solana')
-          return solana
-        else if (chain.chainId === 'bitcoin')
-          return bitcoin
-        const network = defineChain({
-          id: chain.chainId,
-          caipNetworkId: `eip155:${chain.chainId}`,
-          chainNamespace: 'eip155',
-          name: chain.name,
-          nativeCurrency: {
-            decimals: 18,
-            name: 'Ether',
-            symbol: chain.currency,
-          },
-          rpcUrls: {
-            default: {
-              http: [chain.rpcUrl],
-            },
-          },
-          blockExplorers: {
-            default: { name: 'Explorer', url: chain.explorerUrl },
-          },
-        })
-        return network || null
-      }).filter(Boolean)
+      // const networks = data.chains.map((chain: any) => {
+      //   if (chain.chainId === 'solana')
+      //     return solana
+      //   else if (chain.chainId === 'bitcoin')
+      //     return bitcoin
+      //   const network = defineChain({
+      //     id: chain.chainId,
+      //     caipNetworkId: `eip155:${chain.chainId}`,
+      //     chainNamespace: 'eip155',
+      //     name: chain.name,
+      //     nativeCurrency: {
+      //       decimals: 18,
+      //       name: 'Ether',
+      //       symbol: chain.currency,
+      //     },
+      //     rpcUrls: {
+      //       default: {
+      //         http: [chain.rpcUrl],
+      //       },
+      //     },
+      //     blockExplorers: {
+      //       default: { name: 'Explorer', url: chain.explorerUrl },
+      //     },
+      //   })
+      //   return network || null
+      // }).filter(Boolean)
 
-      if (networks.length === 0) {
-        console.error('No valid networks found')
-        return
-      }
+      // if (networks.length === 0) {
+      //   console.error('No valid networks found')
+      //   return
+      // }
 
       // const wagmiAdapter = new WagmiAdapter({
       //   ssr: false,
       //   projectId,
       //   networks
       // })
-      const ethersAdapter = new EthersAdapter()
-      const solanaAdapter = new SolanaAdapter()
-      createAppKit({
-        adapters: [ethersAdapter, solanaAdapter],
-        projectId,
-        networks,
-        metadata,
-        themeMode: 'dark',
-        features: {
-          email: false,
-          socials: false,
-          // emailShowWallets: false,
-        },
-        enableReconnect: false,
-        enableWalletGuide: false,
-        defaultAccountTypes: { eip155: 'eoa', solana: 'eoa' },
-        themeVariables: {
-          '--w3m-accent': '#FFF',
-          '--w3m-border-radius-master': '2px'
-        }
-      })
-      const cnetworks = ChainController.getCaipNetworks()
-      console.log('networks', cnetworks)
+      // const ethersAdapter = new EthersAdapter()
+      // const solanaAdapter = new SolanaAdapter()
+      // const modal = createAppKit({
+      //   adapters: [ethersAdapter, solanaAdapter],
+      //   projectId,
+      //   networks,
+      //   metadata,
+      //   themeMode: 'dark',
+      //   features: {
+      //     email: false,
+      //     socials: false,
+      //     // emailShowWallets: false,
+      //   },
+      //   enableReconnect: false,
+      //   enableWalletGuide: false,
+      //   defaultAccountTypes: { eip155: 'eoa', solana: 'eoa' },
+      //   themeVariables: {
+      //     '--w3m-accent': '#FFF',
+      //     '--w3m-border-radius-master': '2px'
+      //   }
+      // })
+      // setAppKit(modal)
       setInitialized(true)
       setChains(data.chains)
     }).catch((error) => {
@@ -147,7 +170,7 @@ function ContextProvider({ children }: { children: ReactNode }) {
 
   // const initialState = cookieToInitialState(wagmiAdapter.wagmiConfig as Config, cookies)
   const contextValue: MainContextProps = {
-    chains
+    chains, appKit
   }
 
   if (!initialized)
