@@ -23,6 +23,7 @@ import TwitterIcon from '@/assets/images/x.svg';
 import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
 import TokenLogo from "../tokenLogo";
 import { useNewTrades, useTokens } from "@/hooks/token";
+import { priceFormatter } from "@/utils/price";
 
 const beat = keyframes`
     from {
@@ -568,7 +569,7 @@ export default function Header() {
                                     <TokenLogo logo={trades[i]?.tokenImage} size={48} />
                                     <Box>
                                         <Typography color="white" fontSize={14} fontWeight={700}>{trades[i]?.tokenSymbol}</Typography>
-                                        <Typography color={trades[i]?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{trades[i]?.type}</Typography>
+                                        <Typography color={trades[i]?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{trades[i]?.type} {priceFormatter(trades[i]?.tokenAmount ?? 0, 2, true, true)}</Typography>
                                         <Typography color="#AAA" fontSize={10}>{trades[i]?.tokenAddress?.slice(0, 6)}...{trades[i]?.tokenAddress?.slice(-4)}</Typography>
                                     </Box>
                                 </Box>
@@ -588,7 +589,7 @@ export default function Header() {
                                     <TokenLogo logo={(trades[i+count] ?? trades[0])?.tokenImage} size={48} />
                                     <Box>
                                         <Typography color="white" fontSize={14} fontWeight={700}>{(trades[i+count] ?? trades[0])?.tokenSymbol}</Typography>
-                                        <Typography color={(trades[i+count] ?? trades[0])?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{(trades[i+count] ?? trades[0])?.type}</Typography>
+                                        <Typography color={(trades[i+count] ?? trades[0])?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{(trades[i+count] ?? trades[0])?.type} {priceFormatter((trades[i+count] ?? trades[0])?.tokenAmount ?? 0, 2, true, true)}</Typography>
                                         <Typography color="#AAA" fontSize={10}>{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(0, 6)}...{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(-4)}</Typography>
                                     </Box>
                                 </Box>
