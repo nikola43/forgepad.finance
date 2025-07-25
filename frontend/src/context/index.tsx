@@ -3,6 +3,7 @@
 import { API_ENDPOINT } from '@/config'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppKit, createAppKit } from '@reown/appkit/react'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createTheme } from '@mui/material'
 import { ThemeProvider } from '@emotion/react'
@@ -14,6 +15,7 @@ import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
 import { solana, bitcoin, defineChain, mainnet, base } from '@reown/appkit/networks'
 import { projectId } from '@/config'
+import { WagmiProvider } from 'wagmi'
 
 const theme = createTheme({
   palette: {
@@ -66,10 +68,15 @@ interface MainContextProps {
   appKit?: AppKit
 }
 
+const wagmiAdapter = new WagmiAdapter({
+  ssr: false,
+  projectId,
+  networks: [mainnet, base, solana]
+})
 const ethersAdapter = new EthersAdapter()
 const solanaAdapter = new SolanaAdapter()
 const appKit = createAppKit({
-  adapters: [ethersAdapter, solanaAdapter],
+  adapters: [wagmiAdapter, solanaAdapter],
   projectId,
   networks: [mainnet, base, solana],
   // metadata,
@@ -176,11 +183,13 @@ function ContextProvider({ children }: { children: ReactNode }) {
 
   return (
     <MainContext.Provider value={contextValue}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <SWRConfig>{children}</SWRConfig>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider theme={theme}>
+            <SWRConfig>{children}</SWRConfig>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
     </MainContext.Provider>
   )
 }
