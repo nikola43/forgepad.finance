@@ -53,7 +53,7 @@ const CHAINS = [
     virtualTokenAmount: 800000000,
     totalSupply: 1000000000,
     targetMarketCap: 69000,
-    pools: ['uniswap:v2', 'uniswap:v3', 'uniswap:v4']
+    pools: ['uniswap:v2', 'uniswap:v3']
   },
   {
     name: 'Solana',
