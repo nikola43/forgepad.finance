@@ -110,6 +110,11 @@ module.exports = {
             // gas: 15000000,        // Much higher
             // gasPrice: 2500000000, // 25 gwei (2 gwei is too low for mainnet)
         },
+        bsc: {
+            chainId: 56,
+            url: "https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593",
+            accounts: [process.env.PRIVATE_KEY || ''],
+        },
     },
     mocha: {
         timeout: 1000000000,
