@@ -37,7 +37,22 @@ const CHAINS = [
     virtualEthAmount: 1.2,
     virtualTokenAmount: 800000000,
     totalSupply: 1000000000,
-    targetMarketCap: 30000,
+    targetMarketCap: 69000,
+    pools: ['uniswap:v2', 'uniswap:v3', 'uniswap:v4']
+  },
+  {
+    name: 'BSC',
+    network: 'BSC',
+    chainId: 56,
+    currency: 'BNB',
+    rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
+    explorerUrl: 'https://bscscan.com',
+    contractAddress: '0xcff81F0B6f8a9eC58e566f0D45C0654bDc6e82e8',
+    abi: abiEthism.v1,
+    virtualEthAmount: 5.4,
+    virtualTokenAmount: 800000000,
+    totalSupply: 1000000000,
+    targetMarketCap: 69000,
     pools: ['uniswap:v2', 'uniswap:v3', 'uniswap:v4']
   },
   {
