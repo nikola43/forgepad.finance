@@ -48,9 +48,8 @@ contract ForgepadLiquidityManager is
     /// @dev Tick spacing for pool positions
     int24 private constant TICK_SPACING = 60;
 
-    /// @dev Default pool fee (0.3%)
-    uint24 private constant POOL_FEE = 3000;
-
+    /// @dev Default pool fee (0.1%)
+    uint24 private constant POOL_FEE = 100;
     /// @dev Default deadline buffer for transactions
     uint256 private constant DEADLINE_BUFFER = 10 minutes;
 
@@ -82,6 +81,9 @@ contract ForgepadLiquidityManager is
     IPermit2 permit2;
 
     address public marginRecipient;
+
+    uint16 ethAmountPercentToLP = 10000; // 100%
+    uint16 tokenAmountPercentToLP = 5000; //50%
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -193,7 +195,9 @@ contract ForgepadLiquidityManager is
         address _positionManager,
         address _permit2,
         address _marginRecipient,
-        address _owner
+        address _owner,
+        uint16 _ethAmountPercentToLP,
+        uint16 _tokenAmountPercentToLP
     ) Ownable(_owner) {
         if (_routerV2 == address(0)) revert ZeroAddress();
         if (_routerV3 == address(0)) revert ZeroAddress();
@@ -210,6 +214,8 @@ contract ForgepadLiquidityManager is
         positionManager = IPositionManager(_positionManager);
         permit2 = IPermit2(_permit2);
         marginRecipient = _marginRecipient;
+        ethAmountPercentToLP = _ethAmountPercentToLP;
+        tokenAmountPercentToLP = _tokenAmountPercentToLP;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -304,10 +310,14 @@ contract ForgepadLiquidityManager is
         // Approve router to spend tokens
         IERC20(token).approve(address(routerV2), tokenAmount);
 
+        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
+        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
+            10000; // Calculate token amount to LP
+
         // Add liquidity
-        routerV2.addLiquidityETH{value: ethAmount}(
+        routerV2.addLiquidityETH{value: ethAmountToLP}(
             token,
-            155_000_000 ether,
+            tokenAmountToLP,
             0, // Accept any amount of tokens
             0, // Accept any amount of ETH
             recipient,
@@ -366,8 +376,12 @@ contract ForgepadLiquidityManager is
         address token0Address = token;
         address token1Address = routerV2.WETH();
 
-        uint256 amount0Desired = tokenAmount;
-        uint256 amount1Desired = ethAmount;
+        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
+        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
+            10000; // Calculate token amount to LP
+
+        uint256 amount0Desired = tokenAmountToLP;
+        uint256 amount1Desired = ethAmountToLP;
 
         if (token0Address > token1Address) {
             (token0Address, token1Address) = (token1Address, token0Address);
@@ -465,25 +479,18 @@ contract ForgepadLiquidityManager is
         address token0Address = token;
         address token1Address = routerV2.WETH();
 
-        uint256 amount0Desired = tokenAmount;
-        uint256 amount1Desired = ethAmount;
+        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
+        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
+            10000; // Calculate token amount to LP
+
+        uint256 amount0Desired = tokenAmountToLP;
+        uint256 amount1Desired = ethAmountToLP;
 
         if (token0Address > token1Address) {
             (token0Address, token1Address) = (token1Address, token0Address);
             amount0Desired = ethAmount;
             amount1Desired = tokenAmount;
         }
-
-        // address token0Address = token;
-        // address token1Address = routerV2.WETH();
-        // uint256 token0Amount = tokenAmount;
-        // uint256 token1Amount = ethAmount;
-
-        // // Sort tokens (V4 requirement: token0 < token1)
-        // if (token0Address > token1Address) {
-        //     (token0Address, token1Address) = (token1Address, token0Address);
-        //     (token0Amount, token1Amount) = (token1Amount, token0Amount);
-        // }
 
         PoolKey memory poolKey = PoolKey({
             currency0: Currency.wrap(token0Address),
@@ -541,13 +548,6 @@ contract ForgepadLiquidityManager is
             abi.encode(actions, mintParams),
             block.timestamp + 3600
         );
-
-        // // If the pool is an ETH pair, native tokens are to be transferred
-        // uint256 valueToPass = Currency
-        //     .wrap(address(token0Address))
-        //     .isAddressZero()
-        //     ? amount0Desired + 1
-        //     : 0;
 
         IWETH(routerV2.WETH()).deposit{value: ethAmount}();
 
@@ -832,5 +832,13 @@ contract ForgepadLiquidityManager is
 
         bool success = IERC20(token).transfer(to, amount);
         if (!success) revert TransferFailed();
+    }
+
+    function setEthAmountPercentToLP(uint16 _ethAmountPercentToLP) external onlyOwner {
+        ethAmountPercentToLP = _ethAmountPercentToLP;
+    }   
+
+    function setTokenAmountPercentToLP(uint16 _tokenAmountPercentToLP) external onlyOwner {
+        tokenAmountPercentToLP = _tokenAmountPercentToLP;
     }
 }
