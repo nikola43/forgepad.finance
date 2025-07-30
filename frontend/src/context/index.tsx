@@ -13,7 +13,7 @@ import { SWRConfig } from 'swr'
 import Loading from '@/components/loading'
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
-import { solana, bitcoin, defineChain, mainnet, base } from '@reown/appkit/networks'
+import { solana, bitcoin, defineChain, mainnet, base, bsc } from '@reown/appkit/networks'
 import { projectId } from '@/config'
 import { WagmiProvider } from 'wagmi'
 
@@ -71,14 +71,14 @@ interface MainContextProps {
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [mainnet, base, solana]
+  networks: [mainnet, base, bsc, solana]
 })
 const ethersAdapter = new EthersAdapter()
 const solanaAdapter = new SolanaAdapter()
 const appKit = createAppKit({
   adapters: [wagmiAdapter, solanaAdapter],
   projectId,
-  networks: [mainnet, base, solana],
+  networks: [mainnet, base, bsc, solana],
   // metadata,
   themeMode: 'dark',
   // features: {
