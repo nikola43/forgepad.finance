@@ -42,7 +42,7 @@ const CHAINS = [
   },
   {
     name: 'BSC',
-    network: 'BSC',
+    network: 'bsc',
     chainId: 56,
     currency: 'BNB',
     rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
