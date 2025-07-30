@@ -804,10 +804,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             }
 
             // Update pool state
-            // tokenPools[token].tokenReserve = 0;
-            // tokenPools[token].ethReserve = 0;
-            // tokenPools[token].virtualEthReserve = 0;
-            // tokenPools[token].virtualTokenReserve = 0;
+            tokenPools[token].tokenReserve = 0;
+            tokenPools[token].ethReserve = 0;
+            tokenPools[token].virtualEthReserve = 0;
+            tokenPools[token].virtualTokenReserve = 0;
 
             emit TokenLaunched(token, block.timestamp);
         }
