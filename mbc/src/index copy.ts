@@ -1,5 +1,5 @@
 import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
-import { ActivationType, BaseFeeMode, BuildCurveBaseParam, buildCurveWithMarketCap, BuildCurveWithMarketCapParam, CollectFeeMode, ConfigParameters, DynamicBondingCurveClient, MigrationFeeOption, MigrationOption, TokenDecimal, TokenType } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { ActivationType, BaseFeeMode, BuildCurveBaseParam, buildCurveWithMarketCap, CollectFeeMode, DynamicBondingCurveClient, MigrationFeeOption, MigrationOption, TokenDecimal, TokenType } from '@meteora-ag/dynamic-bonding-curve-sdk'
 const BN = require('bn.js');
 import bs58 from 'bs58'
 
@@ -47,8 +47,8 @@ const main = async () => {
         baseFeeParams: {
             baseFeeMode: BaseFeeMode.FeeSchedulerLinear,
             feeSchedulerParam: {
-                startingFeeBps: 100,
-                endingFeeBps: 100,
+                startingFeeBps: 250,
+                endingFeeBps: 250,
                 numberOfPeriod: 0,
                 totalDuration: 0,
             },
@@ -66,15 +66,15 @@ const main = async () => {
         leftover: 0,
         tokenUpdateAuthority: 0,
         migrationFee: {
-            feePercentage: 10,
-            creatorFeePercentage: 20,
+            feePercentage: 100,
+            creatorFeePercentage: 0,
         },
     }
 
     const config = buildCurveWithMarketCap({
         ...baseParams,
         initialMarketCap: 30,
-        migrationMarketCap: 40,
+        migrationMarketCap: 388,
     })
 
     console.log(

@@ -28,59 +28,79 @@ module.exports = {
         try {
             const body = req.body
 
-            // if (signature) {
-            // const sig = util.fromRpcSig(signature);
-            // const prefix = Buffer.from("\x19Ethereum Signed Message:\n");
-            // const prefixedMsg = util.keccak256(
-            //     Buffer.concat([prefix, Buffer.from(String(msg.length)), Buffer.from(msg)])
-            // );
-
-            // const pubKey = util.ecrecover(prefixedMsg, sig.v, sig.r, sig.s);
-            // const addrBuf = util.pubToAddress(pubKey);
-            // const address = util.toChecksumAddress(util.bufferToHex(addrBuf));
-
-            if (!body.tokenAddress) {
-                const request = await requestTable.create({
-                    address: body.mintAddress ?? body.creatorAddress, body: JSON.stringify(body),
-                })
-
-                res.status(200).json({
-                    success: true, sig: request.id
-                })
-            } else {
-                const token = await tokenTable.findOne({
-                    where: {
-                        tokenAddress: body.tokenAddress,
-                        creatorAddress: body.creatorAddress
-                    }
-                })
-                if (!token)
-                    throw new Error("No token to update")
-                if (body.tokenBanner)
-                    token.tokenBanner = body.tokenBanner
-                if (body.telegramLink)
-                    token.telegramLink = body.telegramLink
-                if (body.twitterLink)
-                    token.twitterLink = body.twitterLink
-                if (body.webLink)
-                    token.webLink = body.webLink
-                await token.save()
-                res.status(200).json({
-                    success: true
+            // Input validation
+            if (!body.creatorAddress) {
+                return res.status(400).json({ 
+                    error: 'Validation Error', 
+                    message: 'creatorAddress is required' 
                 })
             }
-            // } else {
-            //     const request = await requestTable.findByPk(body.sig)
-            //     if (request) {
-            //         await tokenTable.create(body)
-            //         await request.destroy()
-            //     }
-            //     res.status(200).json({
-            //         success: true
-            //     })
-            // }
+
+            if (!body.tokenName || !body.tokenSymbol) {
+                return res.status(400).json({ 
+                    error: 'Validation Error', 
+                    message: 'tokenName and tokenSymbol are required' 
+                })
+            }
+
+            // Sanitize inputs
+            const sanitizedBody = {
+                ...body,
+                tokenName: body.tokenName.trim().substring(0, 100),
+                tokenSymbol: body.tokenSymbol.trim().toUpperCase().substring(0, 10),
+                tokenDescription: body.tokenDescription ? body.tokenDescription.trim().substring(0, 500) : '',
+                creatorAddress: body.creatorAddress.trim(),
+                network: body.network || 'ethereum'
+            }
+
+            if (!sanitizedBody.tokenAddress) {
+                // Create new token request
+                const request = await requestTable.create({
+                    address: sanitizedBody.mintAddress ?? sanitizedBody.creatorAddress, 
+                    body: JSON.stringify(sanitizedBody),
+                })
+
+                res.status(200).json({
+                    success: true, 
+                    sig: request.id,
+                    message: 'Token creation request submitted'
+                })
+            } else {
+                // Update existing token
+                const token = await tokenTable.findOne({
+                    where: {
+                        tokenAddress: sanitizedBody.tokenAddress,
+                        creatorAddress: sanitizedBody.creatorAddress
+                    }
+                })
+                
+                if (!token) {
+                    return res.status(404).json({ 
+                        error: 'Not Found', 
+                        message: 'Token not found or you are not the creator' 
+                    })
+                }
+
+                // Update allowed fields
+                const updateFields = {}
+                if (sanitizedBody.tokenBanner) updateFields.tokenBanner = sanitizedBody.tokenBanner
+                if (sanitizedBody.telegramLink) updateFields.telegramLink = sanitizedBody.telegramLink
+                if (sanitizedBody.twitterLink) updateFields.twitterLink = sanitizedBody.twitterLink
+                if (sanitizedBody.webLink) updateFields.webLink = sanitizedBody.webLink
+
+                await token.update(updateFields)
+                
+                res.status(200).json({
+                    success: true,
+                    message: 'Token updated successfully'
+                })
+            }
         } catch (error) {
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in createToken:', error)
+            res.status(500).json({ 
+                error: 'Internal Server Error', 
+                message: error.message || 'An unexpected error occurred' 
+            })
         }
     },
     async moveToken(req, res) {

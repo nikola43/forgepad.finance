@@ -1,5 +1,4 @@
 const ethers = require('ethers')
-// const { AnchorProvider, Program } = require('@coral-xyz/anchor')
 const { CHAINS } = require('../config/web3.config')
 const db = require("../models/index");
 const tokenTable = db.tokens;
@@ -19,6 +18,244 @@ function f(x) {
     return 1 / (1 + 0.0000001 * x * x + 0.000006 * x * x * x + 0.00000006 * x * x * x * x)
 }
 
+// Solana event handlers
+async function handleTokenCreation(tx, signature, io, chain) {
+    try {
+        if (!tx.transaction || !tx.transaction.message) {
+            console.warn(`[${chain.network}] Invalid transaction structure for ${signature}`)
+            return
+        }
+
+        // Extract token address from transaction accounts
+        const instructions = tx.transaction.message.instructions
+        if (!instructions || instructions.length === 0) {
+            console.warn(`[${chain.network}] No instructions found in transaction ${signature}`)
+            return
+        }
+
+        // For Meteora DBC, the token mint is typically in the accounts
+        const tokenAddress = instructions[0].accounts?.[3] || instructions[0].accounts?.[1]
+        if (!tokenAddress) {
+            console.warn(`[${chain.network}] Could not extract token address from ${signature}`)
+            return
+        }
+
+        const tokenAddressString = new PublicKey(tokenAddress).toBase58()
+        
+        // Find matching request
+        const request = await requestTable.findOne({
+            where: {
+                address: tokenAddressString
+            }
+        })
+
+        if (request) {
+            const requestBody = typeof request.body === 'string' ? JSON.parse(request.body) : request.body
+            const createdAt = new Date(Number(tx.blockTime) * 1000)
+
+            // Emit deployment event
+            io.emit('deployed', JSON.stringify({
+                ...requestBody,
+                tokenAddress: tokenAddressString,
+                txHash: signature
+            }))
+
+            // Create token record
+            await tokenTable.create({
+                ...requestBody,
+                tokenAddress: tokenAddressString,
+                network: chain.network,
+                marketcap: chain.virtualEthAmount * chain.totalSupply / chain.virtualTokenAmount,
+                price: chain.virtualEthAmount / chain.virtualTokenAmount,
+                virtualEthAmount: chain.virtualEthAmount,
+                virtualTokenAmount: chain.virtualTokenAmount,
+                volume: 0,
+                score: 0,
+                replies: 0,
+                creationTime: createdAt,
+                updateTime: createdAt,
+                createdAt,
+                updatedAt: createdAt
+            })
+
+            // Remove request
+            await requestTable.destroy({
+                where: { id: request.id }
+            })
+
+            console.log(`[${chain.network}] Token created: ${requestBody.tokenSymbol} at ${tokenAddressString}`)
+        }
+    } catch (error) {
+        console.error(`[${chain.network}] Error handling token creation:`, error)
+    }
+}
+
+async function handleSwapEvent(tx, signature, io, chain) {
+    try {
+        if (!tx.transaction || !tx.transaction.message) {
+            console.warn(`[${chain.network}] Invalid transaction structure for ${signature}`)
+            return
+        }
+
+        // Extract swap information from transaction
+        const instructions = tx.transaction.message.instructions
+        if (!instructions || instructions.length === 0) return
+
+        // Get pre and post token balances to determine swap amounts
+        const preBalances = tx.meta?.preTokenBalances || []
+        const postBalances = tx.meta?.postTokenBalances || []
+
+        if (preBalances.length === 0 || postBalances.length === 0) {
+            console.warn(`[${chain.network}] No token balance changes found in ${signature}`)
+            return
+        }
+
+        // Calculate balance changes
+        const balanceChanges = postBalances.map(post => {
+            const pre = preBalances.find(p => p.accountIndex === post.accountIndex)
+            if (!pre) return null
+
+            const preAmount = parseFloat(pre.uiTokenAmount.uiAmountString || '0')
+            const postAmount = parseFloat(post.uiTokenAmount.uiAmountString || '0')
+            const change = postAmount - preAmount
+
+            return {
+                mint: post.mint,
+                owner: post.owner,
+                change,
+                decimals: post.uiTokenAmount.decimals
+            }
+        }).filter(Boolean)
+
+        if (balanceChanges.length === 0) return
+
+        // Determine if this is a buy or sell based on SOL balance change
+        const solChange = balanceChanges.find(change => 
+            change.mint === 'So11111111111111111111111111111111111111112'
+        )
+
+        if (!solChange) return
+
+        const isBuy = solChange.change < 0 // User spent SOL
+        const swapType = isBuy ? 'BUY' : 'SELL'
+        const swapperAddress = solChange.owner
+
+        // Find the token being swapped
+        const tokenChange = balanceChanges.find(change => 
+            change.mint !== 'So11111111111111111111111111111111111111112'
+        )
+
+        if (!tokenChange) return
+
+        const tokenAddress = tokenChange.mint
+        const tokenAmount = Math.abs(tokenChange.change)
+        const solAmount = Math.abs(solChange.change)
+
+        // Find token in database
+        const token = await tokenTable.findOne({
+            where: {
+                tokenAddress,
+                network: chain.network
+            }
+        })
+
+        if (!token) return
+
+        // Calculate price and volume
+        const tokenPrice = solAmount / tokenAmount
+        const volume = tokenAmount * tokenPrice
+        const createdAt = new Date(Number(tx.blockTime) * 1000)
+
+        // Update token data
+        const currentVirtualEth = parseFloat(token.virtualEthAmount)
+        const currentVirtualToken = parseFloat(token.virtualTokenAmount)
+        
+        const newVirtualEth = isBuy ? currentVirtualEth + solAmount : currentVirtualEth - solAmount
+        const newVirtualToken = isBuy ? currentVirtualToken - tokenAmount : currentVirtualToken + tokenAmount
+        
+        const newPrice = newVirtualEth / newVirtualToken
+        const newMarketCap = newPrice * chain.totalSupply
+        const newVolume = parseFloat(token.volume) + volume
+
+        // Update score
+        const now = createdAt
+        const last = new Date(token.updatedAt)
+        const timeDiff = Math.max(0, now - last) * 100 / 1800
+        const newScore = (parseFloat(token.score) * f(timeDiff) + volume).toFixed(8)
+
+        await tokenTable.update({
+            price: newPrice.toFixed(12),
+            marketcap: newMarketCap.toFixed(2),
+            virtualEthAmount: newVirtualEth.toFixed(9),
+            virtualTokenAmount: newVirtualToken.toFixed(9),
+            volume: newVolume.toFixed(6),
+            score: newScore,
+            updateTime: createdAt,
+            updatedAt: createdAt
+        }, {
+            where: { tokenAddress, network: chain.network }
+        })
+
+        // Update or create holder record
+        const holder = await holderTable.findOne({
+            where: {
+                tokenAddress,
+                holderAddress: swapperAddress,
+                network: chain.network
+            }
+        })
+
+        if (holder) {
+            const currentAmount = parseFloat(holder.tokenAmount)
+            const newAmount = isBuy ? currentAmount + tokenAmount : currentAmount - tokenAmount
+            await holderTable.update({
+                tokenAmount: Math.max(0, newAmount).toFixed(9)
+            }, {
+                where: { id: holder.id }
+            })
+        } else if (isBuy) {
+            await holderTable.create({
+                tokenName: token.tokenName,
+                tokenSymbol: token.tokenSymbol,
+                creatorAddress: token.creatorAddress,
+                tokenAddress,
+                holderAddress: swapperAddress,
+                tokenAmount: tokenAmount.toFixed(9),
+                network: chain.network
+            })
+        }
+
+        // Create trade record
+        const trade = {
+            tokenName: token.tokenName,
+            tokenSymbol: token.tokenSymbol,
+            tokenAddress,
+            tokenImage: token.tokenImage,
+            swapperAddress,
+            type: swapType,
+            ethAmount: solAmount.toFixed(9),
+            tokenAmount: tokenAmount.toFixed(9),
+            network: chain.network,
+            txHash: signature,
+            ethPrice: '1', // SOL price in USD would need external API
+            tokenPrice: tokenPrice.toFixed(12),
+            date: Math.floor(tx.blockTime),
+            createdAt,
+            updatedAt: createdAt
+        }
+
+        await tradeTable.create(trade)
+
+        // Emit events
+        io.emit('m', `${tokenAddress}~${trade.date}~${tokenPrice}~${volume.toFixed(2)}`)
+        
+        console.log(`[${chain.network}] ${swapperAddress.slice(0, 6)} ${swapType.toLowerCase()} ${token.tokenSymbol} (vol: $${volume.toFixed(2)})`)
+
+    } catch (error) {
+        console.error(`[${chain.network}] Error handling swap event:`, error)
+    }
+}
+
 function subscribe(io, chain) {
     const url = new URL(chain.rpcUrl)
     const clientRequest = http.get({
@@ -28,52 +265,72 @@ function subscribe(io, chain) {
     }, async () => {
         try {
             if (chain.network === 'solana') {
-                const connection = new Connection(chain.rpcUrl)
-                // const provider = new AnchorProvider(connection)
-                // const program = new Program(chain.idl, provider)
-                // program.addEventListener(
-                //     'EvtSwap',
-                //     (event, slot, signature) => {
-                //         console.log(`[${chain.network}]`, `Found in tx ${signature}`)
-                //         console.log(`[${chain.network}]`, 'Event data:', event)
-                //     }
-                // )
-                connection.onLogs(
-                    new PublicKey(chain.contractAddress), 
-                    async ({signature, logs}) => {
-                        if (logs[1] === 'Program log: Instruction: InitializeVirtualPoolWithSplToken') {
-                            const tx = await connection.getParsedTransaction(signature, { maxSupportedTransactionVersion: 0 })
-                            const tokenAddress = new PublicKey(tx.transaction.message.instructions[0].accounts[3]).toBase58()
-                            const request = await requestTable.findOne({
-                                where: {
-                                    address: tokenAddress
-                                }
-                            })
-                            if (request) {
-                                io.emit('deployed', JSON.stringify({
-                                    ...request.body,
-                                    tokenAddress,
-                                    txHash: signature
-                                }))
-                                const createdAt = new Date(Number(tx.blockTime) * 1000)
-                                await tokenTable.create({
-                                    ...request.body,
-                                    tokenAddress,
-                                    creationTime: createdAt,
-                                    updateTime: createdAt,
-                                    createdAt,
-                                    updatedAt: createdAt
-                                })
-                                await requestTable.destroy({
-                                    where: {
-                                        id: request.id
-                                    }
-                                })
-                            }
-                        }
+                const connection = new Connection(chain.rpcUrl, 'confirmed')
+                
+                // Enhanced Solana event listener with proper error handling
+                const handleSolanaLogs = async ({signature, logs, err}) => {
+                    if (err) {
+                        console.error(`[${chain.network}] Transaction error:`, err)
+                        return
                     }
+
+                    try {
+                        // Check for different types of Meteora DBC events
+                        const relevantLogs = logs.filter(log => 
+                            log.includes('InitializeVirtualPoolWithSplToken') ||
+                            log.includes('Swap') ||
+                            log.includes('Buy') ||
+                            log.includes('Sell')
+                        )
+
+                        if (relevantLogs.length === 0) return
+
+                        console.log(`[${chain.network}] Processing transaction:`, signature)
+                        
+                        const tx = await connection.getParsedTransaction(signature, { 
+                            maxSupportedTransactionVersion: 0,
+                            commitment: 'confirmed'
+                        })
+
+                        if (!tx || !tx.transaction) {
+                            console.warn(`[${chain.network}] Could not fetch transaction:`, signature)
+                            return
+                        }
+
+                        // Handle token creation
+                        if (logs.some(log => log.includes('InitializeVirtualPoolWithSplToken'))) {
+                            await handleTokenCreation(tx, signature, io, chain)
+                        }
+
+                        // Handle swap events
+                        if (logs.some(log => log.includes('Swap') || log.includes('Buy') || log.includes('Sell'))) {
+                            await handleSwapEvent(tx, signature, io, chain)
+                        }
+
+                    } catch (error) {
+                        console.error(`[${chain.network}] Error processing logs for ${signature}:`, error)
+                    }
+                }
+
+                // Subscribe to program logs
+                const subscriptionId = connection.onLogs(
+                    new PublicKey(chain.contractAddress),
+                    handleSolanaLogs,
+                    'confirmed'
                 )
-                console.log("🔔 Subscribing ", chain.contractAddress, "on", chain.network)
+
+                console.log(`🔔 Subscribing to ${chain.contractAddress} on ${chain.network} (subscription: ${subscriptionId})`)
+
+                // Handle connection errors
+                connection._rpcWebSocket.on('error', (error) => {
+                    console.error(`[${chain.network}] WebSocket error:`, error)
+                    setTimeout(() => subscribe(io, chain), 10000)
+                })
+
+                connection._rpcWebSocket.on('close', () => {
+                    console.log(`[${chain.network}] WebSocket closed, reconnecting...`)
+                    setTimeout(() => subscribe(io, chain), 5000)
+                })
             } else {            
                 const provider = chain.rpcUrl.startsWith('wss://')
                     ? new ethers.WebSocketProvider(chain.rpcUrl)

@@ -75,7 +75,7 @@ module.exports = {
             chainId: 0xa4b1
         },
         base: {
-            url: "https://rpc.ankr.com/base/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593",
+            url: "https://mainnet.base.org",
             accounts: [process.env.PRIVATE_KEY],
             chainId: 0x2105
         },
@@ -112,7 +112,7 @@ module.exports = {
         },
         bsc: {
             chainId: 56,
-            url: "https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593",
+            url: "https://bsc-dataseed.bnbchain.org",
             accounts: [process.env.PRIVATE_KEY || ''],
         },
     },
