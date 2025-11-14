@@ -339,6 +339,115 @@ contract ForgepadLiquidityManager is
         );
     }
 
+    /**
+     * @notice Adds liquidity to a Uniswap V2 pool with target market cap preservation
+     * @dev Calculates optimal ETH and token amounts to maintain target market cap
+     * @param token The ERC20 token address to pair with ETH
+     * @param tokenAmount Available tokens to add as liquidity
+     * @param ethAmount Available ETH to add as liquidity
+     * @param recipient Address to receive the LP tokens
+     * @param targetMarketCap Target market cap in USD (18 decimals)
+     * @param ethPriceUSD Current ETH price in USD (18 decimals)
+     * @return pairAddress The address of the created or existing pair
+     */
+    function addLiquidityV2WithTargetMarketCap(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient,
+        uint256 targetMarketCap,
+        uint256 ethPriceUSD
+    )
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        validAmounts(tokenAmount, ethAmount)
+        notZeroAddress(token)
+        notZeroAddress(recipient)
+        returns (address pairAddress)
+    {
+        require(targetMarketCap > 0, "Target market cap must be positive");
+        require(ethPriceUSD > 0, "ETH price must be positive");
+
+        _validateTokenTransfer(token, tokenAmount);
+        _validateETHBalance(ethAmount);
+
+        // Transfer tokens from caller to this contract
+        _transferTokensFrom(token, tokenAmount);
+
+        // Get total supply of the token
+        uint256 totalSupply = IERC20(token).totalSupply();
+        require(totalSupply > 0, "Total supply must be positive");
+
+        // Calculate the required ratio: ethReserve / tokenReserve = targetMarketCap / (totalSupply * ethPriceUSD)
+        // To maintain precision, we calculate: tokenToAdd = ethToAdd * totalSupply * ethPriceUSD / targetMarketCap
+
+        // Calculate optimal amounts maintaining the target market cap
+        uint256 ethAmountToLP;
+        uint256 tokenAmountToLP;
+
+        // Try using all available ETH and calculate required tokens
+        uint256 requiredTokensForAllEth = (ethAmount * totalSupply) / 1e18;
+        requiredTokensForAllEth = (requiredTokensForAllEth * ethPriceUSD) / targetMarketCap;
+
+        if (requiredTokensForAllEth <= tokenAmount) {
+            // We can use all ETH
+            ethAmountToLP = ethAmount;
+            tokenAmountToLP = requiredTokensForAllEth;
+        } else {
+            // We need to use all tokens and calculate required ETH
+            ethAmountToLP = (tokenAmount * targetMarketCap) / totalSupply;
+            ethAmountToLP = (ethAmountToLP * 1e18) / ethPriceUSD;
+            tokenAmountToLP = tokenAmount;
+        }
+
+        // Ensure we have the amounts
+        require(ethAmountToLP > 0 && tokenAmountToLP > 0, "Calculated amounts must be positive");
+        require(ethAmountToLP <= ethAmount, "Not enough ETH");
+        require(tokenAmountToLP <= tokenAmount, "Not enough tokens");
+
+        // Approve router to spend tokens
+        IERC20(token).approve(address(routerV2), tokenAmountToLP);
+
+        // Add liquidity
+        routerV2.addLiquidityETH{value: ethAmountToLP}(
+            token,
+            tokenAmountToLP,
+            0, // Accept any amount of tokens
+            0, // Accept any amount of ETH
+            recipient,
+            block.timestamp + DEADLINE_BUFFER
+        );
+
+        // Get pair address
+        pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
+            token,
+            routerV2.WETH()
+        );
+
+        // Transfer any remaining tokens to dead address
+        uint256 remainingTokens = IERC20(token).balanceOf(address(this));
+        if (remainingTokens > 0) {
+            IERC20(token).transfer(address(0xdead), remainingTokens);
+        }
+
+        // Transfer any remaining ETH to margin recipient
+        uint256 remainingETH = address(this).balance;
+        if (remainingETH > 0) {
+            (bool success, ) = marginRecipient.call{value: remainingETH}("");
+            require(success, "ETH transfer failed");
+        }
+
+        emit LiquidityAddedV2(
+            token,
+            tokenAmountToLP,
+            ethAmountToLP,
+            pairAddress,
+            recipient
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                          UNISWAP V3 FUNCTIONS
     //////////////////////////////////////////////////////////////*/

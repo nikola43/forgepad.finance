@@ -833,11 +833,19 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         address pairAddress = address(0);
         if (pool.poolType == 1) {
             IERC20(token).approve(address(liquidityManager), tokenAmount);
-            pairAddress = liquidityManager.addLiquidityV2{value: ethAmount}(
+
+            // Get current ETH price in USD for market cap calculation
+            uint256 ethPriceUSD = getETHPriceByUSD();
+            uint256 targetMarketCapWei = safeMul(TARGET_MARKET_CAP, 1 ether);
+
+            // Use the new function that maintains target market cap
+            pairAddress = liquidityManager.addLiquidityV2WithTargetMarketCap{value: ethAmount}(
                 token,
                 tokenAmount,
                 ethAmount,
-                burnAddress
+                burnAddress,
+                targetMarketCapWei,
+                ethPriceUSD
             );
         } else if (pool.poolType == 2) {
             IERC20(token).approve(address(liquidityManager), tokenAmount);

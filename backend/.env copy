@@ -1,0 +1,8 @@
+PORT=5001
+JWT_SECRET_KEY="ym.19@Q<+{&jUH[&#0cQu3fw"
+API_KEY="hola"
+SUPABASE_URL="postgresql://postgres:9279fa6a314fb0728f7cfd93669cf7f35cc01b6389fd220664919f455b307203@db.vfffrmlgpqyryhjudhqy.supabase.co:5432/postgres"
+SUPABASE_S3_URL="https://vfffrmlgpqyryhjudhqy.storage.supabase.co/storage/v1/s3"
+SUPABASE_S3_REGION="eu-west-1"
+SUPABASE_S3_API_KEY="812d190397a1865053c944edd5e1aa0e"
+SUPABASE_S3_SECRET="dc048e055109f02497f34e6a368168582b1d90e8004d70c4456c876f37a91ec5"

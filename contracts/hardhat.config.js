@@ -41,17 +41,18 @@ module.exports = {
     networks: {
         hardhat: {
             forking: {
-                url: `https://eth.merkle.io`
+                url: `https://binance.llamarpc.com`
             },
             accounts: {
                 accountsBalance: '1000000000000000000000000000000000000000'
             },
-            gasPrice: 6510331748
+            gasPrice: 6510331748,
+            chainId: 56
 
         },
         localhost: {
             forking: {
-                url: `https://eth.merkle.io`,
+                url: `https://bsc-dataseed.bnbchain.org`,
             },
             gasPrice: 6510331748
         },
@@ -89,7 +90,7 @@ module.exports = {
             accounts: [process.env.PRIVATE_KEY],
         },
         bsc_main: {
-            url: "https://bsc-dataseed1.binance.org",
+            url: "https://binance.llamarpc.com",
             accounts: [process.env.PRIVATE_KEY],
         },
         eth_main: {

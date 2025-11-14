@@ -30,17 +30,17 @@ app.use('/uploads', express.static('uploads'))
 
 //Database connection
 
-// const db = require("./app/models");
-// db.sequelize.sync({ alter: true })
-//   .then(() => {
-//     console.log("Synced db.");
-//   })
-//   .catch((err) => {
-//     console.log({
-//       err
-//     })
-//     console.log("Failed to sync db: " + err.message);
-//   });
+const db = require("./app/models");
+db.sequelize.sync({ alter: true })
+  .then(() => {
+    console.log("Synced db.");
+  })
+  .catch((err) => {
+    console.log({
+      err
+    })
+    console.log("Failed to sync db: " + err.message);
+  });
 
 // const usersTable = db.users;
 

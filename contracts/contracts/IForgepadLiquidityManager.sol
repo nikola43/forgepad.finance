@@ -18,6 +18,15 @@ interface IForgepadLiquidityManager {
         address recipient
     ) external payable returns (address);
 
+    function addLiquidityV2WithTargetMarketCap(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmount,
+        address recipient,
+        uint256 targetMarketCap,
+        uint256 ethPriceUSD
+    ) external payable returns (address);
+
     function addLiquidityV3(
         address token,
         uint256 tokenAmount,
