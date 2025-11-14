@@ -149,7 +149,7 @@ describe("Forgepad", function () {
     it("2. Should buy", async function () {
       const firstFee = await EthismV2.getFirstBuyFee(token.address);
       console.log("First buy fee:", ethers.utils.formatEther(firstFee));
-      const tradeSize = ethers.utils.parseEther("0.1");
+      const tradeSize = ethers.utils.parseEther("0.01");
       const tradeTx = await EthismV2.connect(addr1).swapExactETHForTokens(
         token.address, tradeSize, 0, { value: tradeSize.add(firstFee) }
       );
