@@ -733,6 +733,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     function getTokenMarketCap(address token) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
+        if (tokenPools[token].ethReserve == 0 || tokenPools[token].tokenReserve == 0)
+            return 0;  
+
         return
             (getETHPriceByUSD() *
                 circulatingSupply *
@@ -745,6 +748,13 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         address token
     ) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
+
+        if (
+            tokenPools[token].virtualEthReserve == 0 ||
+            tokenPools[token].virtualTokenReserve == 0
+        ) 
+        return 0;
+
         return
             (getETHPriceByUSD() *
                 circulatingSupply *

@@ -6,7 +6,7 @@ const { getImplementationAddress } = require('@openzeppelin/upgrades-core')
 const fs = require("fs");
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const TARGET_MARKET_CAP = 69000; // Reduced to $69K for more controlled testing
+const TARGET_MARKET_CAP = 60000; // Reduced to $69K for more controlled testing
 const TOTAL_SUPPLY = 10 ** 9; // 1 billion
 
 // const routerV3 = "0x1238536071E1c677A632429e3655c799b22cDA52"

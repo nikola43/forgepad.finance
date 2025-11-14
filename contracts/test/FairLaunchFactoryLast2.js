@@ -21,7 +21,7 @@ const deployProxy = async (contractName, args = []) => {
 }
 
 // const TARGET_MARKET_CAP = 69000;
-const TARGET_MARKET_CAP = 69000;
+const TARGET_MARKET_CAP = 60000;
 const TOTAL_SUPPLY = 10 ** 9; // 1 billion
 
 // const UNISWAP_V2_ROUTER = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
@@ -85,7 +85,7 @@ describe("Forgepad", function () {
       });
     await EthismLiquidityManager.deployed();
 
-    await sleep(20000); // Wait for a second to ensure the contract is deployed
+    // await sleep(20000); // Wait for a second to ensure the contract is deployed
     console.log("EthismLiquidityManager deployed to:", EthismLiquidityManager.address);
 
     console.log("\n🚀 Deploying contracts...");
@@ -258,30 +258,30 @@ describe("Forgepad", function () {
           // console.log("Token Price in USD:", ethers.utils.formatUnits(tokenPriceUSD, 18));
           console.log("Market Cap After Migration (USD):", ethers.utils.formatUnits(marketCapAfterMigration, 18));
 
-          // const addr1TokenBalance = await token.balanceOf(addr1.address);
-          // const ethBalanceBeforeSell = await ethers.provider.getBalance(addr1.address);
-          // const deadline = Math.floor(Date.now() / 1000) + 60 * 100; // 10 minutes from now
+          const addr1TokenBalance = await token.balanceOf(addr1.address);
+          const ethBalanceBeforeSell = await ethers.provider.getBalance(addr1.address);
+          const deadline = Math.floor(Date.now() / 1000) + 60 * 100; // 10 minutes from now
 
-          // const newTokenContract = await ethers.getContractAt("Token", token.address);
-          // await newTokenContract.connect(addr1).approve(router1.address, ethers.constants.MaxUint256);
-          // await router1.connect(addr1).swapExactTokensForETHSupportingFeeOnTransferTokens(
-          //   addr1TokenBalance, 0, [token.address, wethAddress], addr1.address, deadline
-          // );
+          const newTokenContract = await ethers.getContractAt("Token", token.address);
+          await newTokenContract.connect(addr1).approve(router1.address, ethers.constants.MaxUint256);
+          await router1.connect(addr1).swapExactTokensForETHSupportingFeeOnTransferTokens(
+            addr1TokenBalance, 0, [token.address, wethAddress], addr1.address, deadline
+          );
 
-          // [reserve0, reserve1] = await pair.getReserves();
+          [reserve0, reserve1] = await pair.getReserves();
 
-          // const tokenPriceInPairAfterSell = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
-          // const ethBalanceAfterSell = await ethers.provider.getBalance(addr1.address);
-          // console.log("addr1 balance after sell:", ethers.utils.formatEther(ethBalanceAfterSell));
-          // console.log("addr1 token balance after sell:", ethers.utils.formatEther(await token.balanceOf(addr1.address)));
-          // console.log("Eth Balance Before Sell:", ethers.utils.formatEther(ethBalanceBeforeSell));
-          // console.log("Eth Balance After Sell:", ethers.utils.formatEther(ethBalanceAfterSell));
-          // console.log("Profit from Sell:", ethers.utils.formatEther(ethBalanceAfterSell.sub(ethBalanceBeforeSell)));
-          // console.log("Token Price in Pair After Sell:", ethers.utils.formatEther(tokenPriceInPairAfterSell));
+          const tokenPriceInPairAfterSell = reserve1.mul(ethers.utils.parseEther("1")).div(reserve0);
+          const ethBalanceAfterSell = await ethers.provider.getBalance(addr1.address);
+          console.log("addr1 balance after sell:", ethers.utils.formatEther(ethBalanceAfterSell));
+          console.log("addr1 token balance after sell:", ethers.utils.formatEther(await token.balanceOf(addr1.address)));
+          console.log("Eth Balance Before Sell:", ethers.utils.formatEther(ethBalanceBeforeSell));
+          console.log("Eth Balance After Sell:", ethers.utils.formatEther(ethBalanceAfterSell));
+          console.log("Profit from Sell:", ethers.utils.formatEther(ethBalanceAfterSell.sub(ethBalanceBeforeSell)));
+          console.log("Token Price in Pair After Sell:", ethers.utils.formatEther(tokenPriceInPairAfterSell));
 
 
-          // const addr1Balance = await ethers.provider.getBalance(addr1.address);
-          // console.log("addr1 balance after sell:", ethers.utils.formatEther(addr1Balance));
+          const addr1Balance = await ethers.provider.getBalance(addr1.address);
+          console.log("addr1 balance after sell:", ethers.utils.formatEther(addr1Balance));
 
 
           break
