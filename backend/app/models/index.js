@@ -16,9 +16,7 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
     acquire: dbConfig.pool.acquire,
     idle: dbConfig.pool.idle
   },
-  dialectOptions: {
-    connectTimeout: 30000
-  },
+  dialectOptions: dbConfig.dialectOptions,
   port: dbConfig.PORT,
   charset: 'utf8mb4',
 });

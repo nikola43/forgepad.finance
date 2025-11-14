@@ -132,11 +132,49 @@ export function useHandlers(network?: CaipNetwork) {
     const { connection } = useAppKitConnection()
     const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
     const { walletProvider: solProvider } = useAppKitProvider<SOLProvider>("solana")
+
+    console.log("useHandlers debug:", {
+        hasNetwork: !!network,
+        networkId: network?.id,
+        networkName: network?.name,
+        chainNamespace: network?.chainNamespace,
+        hasChains: !!chains,
+        chainsCount: chains?.length,
+        chainIds: chains?.map(c => ({ network: c.network, chainId: c.chainId }))
+    })
+
     if (!network || !chains)
         return undefined
-    const chain = chains.find(c => c.chainId === network.id || c.chainId === network.chainNamespace)
-    if (!chain)
+
+    // Match chain by chainId or network name, with special handling for localhost/hardhat
+    const chain = chains.find(c => {
+        // Direct chainId match
+        if (c.chainId === network.id || c.chainId === network.chainNamespace) {
+            return true
+        }
+        // Match localhost networks (both 1337 and 31337)
+        const isLocalhostChain = c.network === 'localhost' || c.chainId === 31337 || c.chainId === 1337
+        const isLocalhostNetwork = network.id === 31337 || network.id === 1337 || network.name?.toLowerCase().includes('localhost')
+        if (isLocalhostChain && isLocalhostNetwork) {
+            return true
+        }
+        return false
+    })
+
+    console.log("Chain match result:", {
+        foundChain: !!chain,
+        chainNetwork: chain?.network,
+        chainId: chain?.chainId,
+        networkId: network.id,
+        hasEvmProvider: !!evmProvider,
+        hasSolProvider: !!solProvider,
+        chainNamespace: network.chainNamespace
+    })
+
+    if (!chain) {
+        console.error("No matching chain found for network:", network)
         return undefined
+    }
     if (network.chainNamespace === "eip155" && evmProvider) {
         const provider = new BrowserProvider(evmProvider, network.id)
         return {

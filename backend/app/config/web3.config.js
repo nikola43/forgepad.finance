@@ -59,11 +59,11 @@ const CHAINS = [
   {
     name: 'Localhost',
     network: 'localhost',
-    chainId: 31337,
+    chainId: 1337,
     currency: 'ETH',
     rpcUrl: 'http://127.0.0.1:8545',
     explorerUrl: '',
-    contractAddress: '0x7851A817A63a2E94DEFb9b5B1e30aE202d160B1e',
+    contractAddress: '0xc99c22FCE7b3666590249333451542a328554eD2',
     abi: abiEthism.v1,
     virtualEthAmount: 14,
     virtualTokenAmount: 800000000,

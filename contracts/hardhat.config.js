@@ -41,7 +41,8 @@ module.exports = {
     networks: {
         hardhat: {
             forking: {
-                url: `https://binance.llamarpc.com`
+                chainId: 1337, // your custom chain ID
+                url: `https://bsc.drpc.org`
             },
             accounts: {
                 accountsBalance: '1000000000000000000000000000000000000000'

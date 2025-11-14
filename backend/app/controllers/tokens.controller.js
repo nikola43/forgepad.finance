@@ -9,7 +9,7 @@ dotenv.config();
 
 const db = require("../models/index");
 const { CHAINS } = require("../config/web3.config");
-const { uploadFile } = require("../config/storage.config");
+const { getSupabasePublicUrl } = require("../config/s3.config");
 const userTable = db.users;
 const tokenTable = db.tokens;
 const holderTable = db.holders;
@@ -145,7 +145,7 @@ module.exports = {
         try {
             // const { orderType = 'createdAt', orderFlag = 'DESC', searchWord, network, pageNumber = 1 } = req.body;
             //const orderType = 'updatedAt';
-            const orderType = req.query.orderType || 'bump'
+            const orderType = req.query.orderType || 'createdAt'
             const orderFlag = req.query.orderFlag || 'DESC'
             const searchWord = req.query.searchWord
             const network = req.query.network
@@ -207,7 +207,7 @@ module.exports = {
                 // }],
                 attributes: orderType === 'trends' || orderType === 'bump' ? {
                     include: [
-                        [Sequelize.literal('(UNIX_TIMESTAMP(now()) - UNIX_TIMESTAMP(updatedAt)) * 100 / 1800'), 'x']
+                        [Sequelize.literal('(EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM "updatedAt")) * 100 / 1800'), 'x']
                     ]
                 } : {},
                 where,
@@ -267,17 +267,17 @@ module.exports = {
                     'tokenPrice'
                 ],
                 where: {
-                    tokenAddress, createdAt: { [Sequelize.Op.lt]: Sequelize.literal('NOW() - INTERVAL 15 MINUTE') },
+                    tokenAddress, createdAt: { [Sequelize.Op.lt]: Sequelize.literal("NOW() - INTERVAL '15 minutes'") },
                 },
                 order: [['date', 'DESC']],
             })
 
             const trade1d = await tradeTable.findOne({
                 attributes: [
-                    [Sequelize.literal('SUM(IF(type="BUY", ethAmount, -ethAmount))'), 'liquidity']
+                    [Sequelize.literal('SUM(CASE WHEN type=\'BUY\' THEN "ethAmount" ELSE -"ethAmount" END)'), 'liquidity']
                 ],
                 where: {
-                    tokenAddress, createdAt: { [Sequelize.Op.gte]: Sequelize.literal('NOW() - INTERVAL 1 DAY') }
+                    tokenAddress, createdAt: { [Sequelize.Op.gte]: Sequelize.literal("NOW() - INTERVAL '1 day'") }
                 }
             })
 
@@ -359,29 +359,30 @@ module.exports = {
                 });
             }
 
-            // Upload to Supabase Storage
-            const result = await uploadFile(
-                req.file.buffer,
-                req.file.originalname,
-                req.file.mimetype
-            );
+            // multer-s3 automatically uploads to S3 and adds file info to req.file
+            console.log('File uploaded successfully to S3:', req.file);
+
+            // Generate the correct Supabase public URL
+            const publicUrl = getSupabasePublicUrl(req.file.key);
 
             res.status(200).json({
                 success: true,
-                message: 'File uploaded successfully to Supabase Storage.',
-                url: result.url,
-                path: result.path,
+                message: 'File uploaded successfully to Supabase S3.',
+                url: publicUrl, // Supabase public URL
+                key: req.file.key, // S3 key/path
                 file: {
                     originalname: req.file.originalname,
                     mimetype: req.file.mimetype,
-                    size: req.file.size
+                    size: req.file.size,
+                    bucket: req.file.bucket,
+                    etag: req.file.etag
                 }
             });
         } catch (error) {
             console.error('Error uploading logo:', error);
             res.status(500).json({
                 error: 'Internal Server Error',
-                message: error.message || 'Failed to upload file to Supabase Storage.'
+                message: error.message || 'Failed to upload file to Supabase S3.'
             });
         }
     }

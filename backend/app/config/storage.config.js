@@ -19,8 +19,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-// Storage bucket name
-const BUCKET_NAME = 'token-logos';
+// Storage bucket name from environment
+const BUCKET_NAME = process.env.SUPABASE_S3_BUCKET || 'forgepad';
 
 /**
  * Upload file to Supabase Storage
@@ -34,7 +34,9 @@ async function uploadFile(fileBuffer, fileName, contentType) {
     // Generate unique file name
     const timestamp = Date.now();
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `${timestamp}-${sanitizedFileName}`;
+    const filePath = `public/${timestamp}-${sanitizedFileName}`;
+
+    console.log(`Uploading to Supabase Storage: bucket=${BUCKET_NAME}, path=${filePath}, size=${fileBuffer.length}`);
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -46,16 +48,26 @@ async function uploadFile(fileBuffer, fileName, contentType) {
       });
 
     if (error) {
+      console.error('Supabase upload error:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        error: error
+      });
       throw error;
     }
+
+    console.log('Upload successful:', data);
 
     // Get public URL
     const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
       .getPublicUrl(filePath);
 
+    const publicUrl = urlData.publicUrl;
+    console.log('Public URL generated:', publicUrl);
+
     return {
-      url: urlData.publicUrl,
+      url: publicUrl,
       path: filePath
     };
   } catch (error) {

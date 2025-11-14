@@ -5,6 +5,13 @@ const nextConfig: NextConfig = {
   compress: true,
   webpack: (config, { isServer }) => {
     config.externals.push('pino-pretty', 'lokijs', 'encoding');
+
+    // Ignore React Native modules in browser build
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      '@react-native-async-storage/async-storage': false,
+    };
+
     // config.optimization.splitChunks = {
     //   chunks: 'all',
     //   maxSize: 244 * 1024,

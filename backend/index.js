@@ -28,24 +28,10 @@ app.use(express.urlencoded({ extended: true }));
 // app.use('/', express.static('out'))
 app.use('/uploads', express.static('uploads'))
 
-//Database connection
-
-const db = require("./app/models");
-db.sequelize.sync({ alter: true })
-  .then(() => {
-    console.log("Synced db.");
-  })
-  .catch((err) => {
-    console.log({
-      err
-    })
-    console.log("Failed to sync db: " + err.message);
-  });
-
 // const usersTable = db.users;
 
-// Websocket communication
-require("./app/controllers/websocket")(io);
+// Websocket communication (commented out to avoid database dependency)
+// require("./app/controllers/websocket")(io);
 // const tradesController = require("./app/controllers/trades.controller");
 const { CHAINS } = require("./app/config/web3.config");
 //const usersController = require("./app/controllers/users.controller");
@@ -221,7 +207,8 @@ require("./app/routes/tokens.routes")(app);
 require("./app/routes/trades.routes")(app);
 require("./app/routes/users.routes")(app);
 
-require("./app/listeners/tokens.listener")(io);
+// Listeners (commented out to avoid blocking on startup)
+// require("./app/listeners/tokens.listener")(io);
 
 // set port, listen for requests
 // eslint-disable-next-line no-undef
