@@ -41,7 +41,7 @@ module.exports = {
     networks: {
         hardhat: {
             forking: {
-                chainId: 1337, // your custom chain ID
+                chainId: 56, // your custom chain ID
                 url: `https://bsc.drpc.org`
             },
             accounts: {
@@ -49,7 +49,6 @@ module.exports = {
             },
             gasPrice: 6510331748,
             chainId: 56
-
         },
         localhost: {
             forking: {

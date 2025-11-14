@@ -82,12 +82,12 @@ interface MainContextProps {
   appKit?: AppKit;
 }
 
-localhost.id = 56;
+// localhost.id = 56;
 
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [localhost],
+  networks: [bsc],
   // networks: [localhost, mainnet, base, bsc, solana]
 });
 const ethersAdapter = new EthersAdapter();
@@ -95,7 +95,7 @@ const solanaAdapter = new SolanaAdapter();
 const appKit = createAppKit({
   adapters: [wagmiAdapter, solanaAdapter],
   projectId,
-  networks: [localhost],
+  networks: [bsc],
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
   themeMode: "dark",
@@ -104,7 +104,7 @@ const appKit = createAppKit({
   //   socials: false,
   //   // emailShowWallets: false,
   // },
-  enableReconnect: false,
+  enableReconnect: true,
   enableWalletGuide: false,
   defaultAccountTypes: { eip155: "eoa", solana: "eoa" },
   themeVariables: {

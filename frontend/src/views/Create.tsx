@@ -42,6 +42,9 @@ import { ethers } from "ethers";
 import toast from "react-hot-toast";
 import { useUserInfo } from "@/hooks/user";
 import { useHandlers } from "@/hooks/token";
+import Confetti from "react-confetti";
+import { useWindowSize } from "@/hooks/useWindowSize";
+import { socket } from "@/utils/socket";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "../hooks/config";
 //import { uploadImageToIPFS } from "../utils";
 
@@ -180,10 +183,46 @@ const Transition = React.forwardRef(function Transition(
 
 export default function Create() {
   // const { open: connect } = useAppKit()
+  const [isMounted, setIsMounted] = React.useState(false);
+  const { width, height } = useWindowSize();
 
   const [deployModal, setDeployModal] = React.useState(false);
-  // const [tokenAddressDeployed, setTokenAddressDeployed] = React.useState<string>();
+  const [successModal, setSuccessModal] = React.useState(false);
+  const [createdTokenData, setCreatedTokenData] = React.useState<any>(null);
+  const [waitingForDeploy, setWaitingForDeploy] = React.useState(false);
   const { address } = useAppKitAccount();
+
+  React.useEffect(() => {
+    setIsMounted(true);
+
+    // Listen for deployed event from backend
+    const handleDeployed = (data: string) => {
+      try {
+        const deployedData = JSON.parse(data);
+        console.log('Token deployed:', deployedData);
+
+        // Update created token data with the actual token address
+        setCreatedTokenData((prev: any) => {
+          if (prev && deployedData.tokenAddress) {
+            return {
+              ...prev,
+              tokenAddress: deployedData.tokenAddress,
+            };
+          }
+          return prev;
+        });
+        setWaitingForDeploy(false);
+      } catch (error) {
+        console.error('Error parsing deployed event:', error);
+      }
+    };
+
+    socket.on('deployed', handleDeployed);
+
+    return () => {
+      socket.off('deployed', handleDeployed);
+    };
+  }, []);
   const { caipNetwork: network } = useAppKitNetwork();
   console.log({
     network,
@@ -296,7 +335,7 @@ export default function Create() {
   const uploadLogo = async (img: any) => {
     let formData = new FormData(); // instantiate it
     formData.set("image", img);
-    const r = axios.post(`${API_ENDPOINT}/tokens/upload`, formData, {
+    const r = await axios.post(`${API_ENDPOINT}/tokens/upload`, formData, {
       headers: {
         "api-key": "hola",
         "content-type": "multipart/form-data", // do not forget this
@@ -321,7 +360,7 @@ export default function Create() {
       setIsLoading(true);
       if (!fileLogoRef.current?.files) throw Error("Choose token logo");
       const logoUploadResult = await uploadLogo(fileLogoRef.current.files[0]);
-      const logoLink = logoUploadResult.data.file.filename;
+      const logoLink = logoUploadResult.data.url;
 
       const metadata: any = {
         tokenDescription: description,
@@ -356,9 +395,24 @@ export default function Create() {
         },
         sig
       );
+
+      // Store created token data (address will be updated via socket event)
+      setCreatedTokenData({
+        tokenAddress: null, // Will be updated by socket event
+        name: coinName,
+        symbol: coinTicker,
+        description,
+        logo: logoLink,
+        network: chain?.network,
+        initialBuy: initBuyAmount || "0",
+        tokensReceived: tokenAmountOut,
+      });
+
+      setWaitingForDeploy(true);
       setDeployModal(false);
+      setSuccessModal(true);
       resetForm();
-      toast.success("Submitted successfully");
+      toast.success("Token created successfully!");
     } catch (ex: any) {
       console.error("Error deploying token:", ex);
       const messageError =
@@ -732,12 +786,148 @@ export default function Create() {
           // </Typography>
         }
       </FixWidthDialog>
-      {/* {
-                !!tokenAddressDeployed &&
-                <SuccessScreen>
-                    <Confetti shapeSize={20} mode="fall" particleCount={100} colors={['#ff577f', '#ff884b', '#2C945D', '#205998']} />
-                </SuccessScreen>
-            } */}
+
+      {/* Success Dialog */}
+      <Dialog
+        open={successModal}
+        TransitionComponent={Transition}
+        keepMounted
+        onClose={() => setSuccessModal(false)}
+        aria-describedby="success-dialog-description"
+        maxWidth={false}
+        slotProps={{
+          paper: {
+            sx: {
+              width: "620px",
+              maxWidth: "90vw",
+              minHeight: "auto",
+              m: 2,
+              overflow: "hidden",
+              position: "relative",
+              zIndex: 2,
+            }
+          }
+        }}
+      >
+        {isMounted && successModal && (
+          <Box sx={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 0, pointerEvents: "none" }}>
+            <Confetti
+              width={width}
+              height={height}
+              recycle={false}
+              numberOfPieces={500}
+              gravity={0.3}
+            />
+          </Box>
+        )}
+        <DialogTitle sx={{ pb: 1.5, pt: 2.5, px: 4 }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography fontSize={20} component="span" sx={{ color: "#FFD700" }}>
+              ✓
+            </Typography>
+            <Typography fontSize={20} fontWeight={600}>Token Created Successfully!</Typography>
+          </Box>
+          <IconButton
+            aria-label="close"
+            onClick={() => setSuccessModal(false)}
+            sx={{ position: "absolute", right: 12, top: 12 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 4, py: 0, overflow: "hidden" }}>
+          {createdTokenData && (
+            <Box>
+              <Box
+                display="flex"
+                alignItems="center"
+                gap={2.5}
+                p={2.5}
+                bgcolor="rgba(255, 255, 255, 0.05)"
+                borderRadius={2}
+                mb={2.5}
+              >
+                {createdTokenData.logo && (
+                  <Avatar
+                    src={createdTokenData.logo}
+                    sx={{ width: 64, height: 64, flexShrink: 0, borderRadius: 2 }}
+                  />
+                )}
+                <Box sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                  <Typography fontSize={20} fontWeight={600} noWrap>{createdTokenData.name}</Typography>
+                  <Typography fontSize={16} color="text.secondary" noWrap>
+                    ${createdTokenData.symbol}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box mb={2.5}>
+                <Typography fontSize={13} color="text.secondary" mb={1}>
+                  Token Address:
+                </Typography>
+                {waitingForDeploy || !createdTokenData.tokenAddress ? (
+                  <Box
+                    sx={{
+                      bgcolor: "rgba(255, 255, 255, 0.05)",
+                      p: 2,
+                      borderRadius: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                    }}
+                  >
+                    <CircularProgress size={18} />
+                    <Typography fontSize={13} color="text.secondary">
+                      Waiting for blockchain confirmation...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box
+                    sx={{
+                      bgcolor: "rgba(255, 255, 255, 0.05)",
+                      p: 2,
+                      borderRadius: 1,
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Typography
+                      fontSize={12}
+                      sx={{
+                        fontFamily: "monospace",
+                        wordBreak: "break-all",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {createdTokenData.tokenAddress}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 4, pb: 4, pt: 0 }}>
+          <Button
+            onClick={() => {
+              if (createdTokenData?.tokenAddress && createdTokenData?.network) {
+                window.location.href = `/token?network=${createdTokenData.network}&address=${createdTokenData.tokenAddress}`;
+              }
+            }}
+            variant="contained"
+            fullWidth
+            disabled={waitingForDeploy || !createdTokenData?.tokenAddress}
+            sx={{
+              py: 2,
+              fontSize: 18,
+              fontWeight: 700,
+              textTransform: "none",
+            }}
+          >
+            {waitingForDeploy ? "Waiting for confirmation..." : "View Token"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageBox>
   );
 }

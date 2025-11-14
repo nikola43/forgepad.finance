@@ -207,8 +207,8 @@ require("./app/routes/tokens.routes")(app);
 require("./app/routes/trades.routes")(app);
 require("./app/routes/users.routes")(app);
 
-// Listeners (commented out to avoid blocking on startup)
-// require("./app/listeners/tokens.listener")(io);
+// Listeners
+require("./app/listeners/tokens.listener")(io);
 
 // set port, listen for requests
 // eslint-disable-next-line no-undef

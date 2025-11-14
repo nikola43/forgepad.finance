@@ -40,37 +40,22 @@ const CHAINS = [
   //   targetMarketCap: 69000,
   //   pools: ['uniswap:v2', 'uniswap:v3', 'uniswap:v4']
   // },
-  // {
-  //   name: 'BSC',
-  //   network: 'bsc',
-  //   chainId: 56,
-  //   currency: 'BNB',
-  //   rpcUrl: 'https://bsc-rpc.publicnode.com',
-  //   // rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
-  //   explorerUrl: 'https://bscscan.com',
-  //   contractAddress: '0xcff81F0B6f8a9eC58e566f0D45C0654bDc6e82e8',
-  //   abi: abiEthism.v1,
-  //   virtualEthAmount: 5.4,
-  //   virtualTokenAmount: 800000000,
-  //   totalSupply: 1000000000,
-  //   targetMarketCap: 60000,
-  //   pools: ['pancakeswap:v2']
-  // },
   {
-    name: 'Localhost',
-    network: 'localhost',
-    chainId: 1337,
-    currency: 'ETH',
-    rpcUrl: 'http://127.0.0.1:8545',
-    explorerUrl: '',
-    contractAddress: '0xc99c22FCE7b3666590249333451542a328554eD2',
+    name: 'BSC',
+    network: 'bsc',
+    chainId: 56,
+    currency: 'BNB',
+    rpcUrl: 'https://bsc-rpc.publicnode.com',
+    // rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
+    explorerUrl: 'https://bscscan.com',
+    contractAddress: '0x391A58d604f8A51D97637194B4A0c32FCf42ECAf',
     abi: abiEthism.v1,
     virtualEthAmount: 14,
     virtualTokenAmount: 800000000,
     totalSupply: 1000000000,
     targetMarketCap: 60000,
- pools: ['pancakeswap:v2']
-  }
+    pools: ['pancakeswap:v2']
+  },
   // {
   //   name: 'Solana',
   //   network: 'solana',
