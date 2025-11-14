@@ -9,6 +9,7 @@ dotenv.config();
 
 const db = require("../models/index");
 const { CHAINS } = require("../config/web3.config");
+const { uploadFile } = require("../config/storage.config");
 const userTable = db.users;
 const tokenTable = db.tokens;
 const holderTable = db.holders;
@@ -350,12 +351,38 @@ module.exports = {
         }
     },
     async uploadLogo(req, res) {
-        if (!req.file) {
-            return res.status(400).send({ message: 'No file uploaded.' });
+        try {
+            if (!req.file) {
+                return res.status(400).json({
+                    error: 'Bad Request',
+                    message: 'No file uploaded.'
+                });
+            }
+
+            // Upload to Supabase Storage
+            const result = await uploadFile(
+                req.file.buffer,
+                req.file.originalname,
+                req.file.mimetype
+            );
+
+            res.status(200).json({
+                success: true,
+                message: 'File uploaded successfully to Supabase Storage.',
+                url: result.url,
+                path: result.path,
+                file: {
+                    originalname: req.file.originalname,
+                    mimetype: req.file.mimetype,
+                    size: req.file.size
+                }
+            });
+        } catch (error) {
+            console.error('Error uploading logo:', error);
+            res.status(500).json({
+                error: 'Internal Server Error',
+                message: error.message || 'Failed to upload file to Supabase Storage.'
+            });
         }
-        res.send({
-            message: 'File uploaded successfully.',
-            file: req.file
-        });
     }
 }
