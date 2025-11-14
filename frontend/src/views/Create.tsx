@@ -70,12 +70,23 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
   },
   "& .MuiInputBase-input": {
     color: "black",
-    fontSize: "18px",
-    borderRadius: "4px",
+    fontSize: "16px",
+    borderRadius: "8px",
     position: "relative",
     backgroundColor: "#FFF",
-    border: "none",
-    padding: "8px 20px",
+    border: "2px solid transparent",
+    padding: "12px 20px",
+    transition: "all 0.2s ease",
+    "&:focus": {
+      borderColor: "#FFA600",
+      boxShadow: "0 0 0 3px rgba(255, 166, 0, 0.1)",
+    },
+    "&:hover": {
+      borderColor: "rgba(255, 166, 0, 0.3)",
+    },
+  },
+  "& .MuiInputBase-inputMultiline": {
+    padding: "12px 20px",
   },
 }));
 
@@ -119,9 +130,22 @@ const AvatarWrapper = styled(Box)`
     position: absolute;
     right: 5px;
     bottom: 5px;
+    transition: all 0.2s ease;
+    &:hover {
+      transform: scale(1.1);
+    }
   }
   img {
     object-fit: contain;
+  }
+
+  & .MuiAvatar-root {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    &:hover {
+      border-color: #FFA600;
+      box-shadow: 0 4px 12px rgba(255, 166, 0, 0.3);
+    }
   }
 `;
 
@@ -149,20 +173,31 @@ const Banner = styled("img")`
 `;
 
 const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
-  border-radius: 4px;
-  background: ${({ checked }) => (checked ? "#FFF" : "#FFF2")};
+  border-radius: 8px;
+  background: ${({ checked }) => (checked ? "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)" : "rgba(255, 255, 255, 0.08)")};
   color: ${({ checked }) => (checked ? "black" : "#FFF")};
+  border: 2px solid ${({ checked }) => (checked ? "#FFA600" : "transparent")};
   display: flex;
   padding: 0;
   gap: 10px;
   flex-wrap: wrap;
   overflow: hidden;
-  font-size: 12px;
-  padding: 8px;
+  font-size: 13px;
+  font-weight: ${({ checked }) => (checked ? "700" : "500")};
+  padding: 10px 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${({ checked }) => (checked ? "0 4px 12px rgba(255, 166, 0, 0.3)" : "none")};
+
   &:hover {
-    background: ${({ checked }) => (checked ? "#FFF" : "#FFF2")};
+    background: ${({ checked }) => (checked ? "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)" : "rgba(255, 255, 255, 0.12)")};
     color: ${({ checked }) => (checked ? "black" : "#FFF")};
-    opacity: 0.7;
+    transform: translateY(-2px);
+    box-shadow: ${({ checked }) => (checked ? "0 6px 16px rgba(255, 166, 0, 0.4)" : "0 4px 12px rgba(255, 255, 255, 0.1)")};
+    border-color: ${({ checked }) => (checked ? "#FFB733" : "rgba(255, 166, 0, 0.3)")};
+  }
+
+  &:active {
+    transform: translateY(0px);
   }
 `;
 
@@ -668,12 +703,24 @@ export default function Create() {
         {address ? (
           <Button
             sx={{
-              background: "white",
+              background: "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
               color: "black",
-              padding: "12px",
-              borderRadius: "16px",
+              padding: "14px 24px",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "16px",
+              textTransform: "none",
+              boxShadow: "0 4px 12px rgba(255, 166, 0, 0.3)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                transform: "translateY(-2px)",
+                boxShadow: "0 8px 20px rgba(255, 166, 0, 0.4)",
+              },
+              "&:active": {
+                transform: "translateY(0px)",
+              },
             }}
-            className="effect-button"
             fullWidth
             onClick={handleClickOpen}
           >
@@ -682,12 +729,24 @@ export default function Create() {
         ) : (
           <Button
             sx={{
-              background: "white",
+              background: "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
               color: "black",
-              padding: "12px",
-              borderRadius: "16px",
+              padding: "14px 24px",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "16px",
+              textTransform: "none",
+              boxShadow: "0 4px 12px rgba(255, 166, 0, 0.3)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                transform: "translateY(-2px)",
+                boxShadow: "0 8px 20px rgba(255, 166, 0, 0.4)",
+              },
+              "&:active": {
+                transform: "translateY(0px)",
+              },
             }}
-            className="effect-button"
             fullWidth
             onClick={() => appKit?.open()}
           >
@@ -770,13 +829,43 @@ export default function Create() {
             disabled={isLoading || !!error}
             endIcon={
               isLoading ? (
-                <CircularProgress color="inherit" size={14} />
+                <CircularProgress color="inherit" size={18} />
               ) : undefined
             }
             onClick={deployToken}
             fullWidth
+            sx={{
+              background: isLoading || !!error
+                ? "rgba(255, 166, 0, 0.3)"
+                : "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+              color: "black",
+              padding: "14px 24px",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "16px",
+              textTransform: "none",
+              boxShadow: isLoading || !!error
+                ? "none"
+                : "0 4px 12px rgba(255, 166, 0, 0.3)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              "&:hover": {
+                background: isLoading || !!error
+                  ? "rgba(255, 166, 0, 0.3)"
+                  : "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                transform: isLoading || !!error ? "none" : "translateY(-2px)",
+                boxShadow: isLoading || !!error
+                  ? "none"
+                  : "0 8px 20px rgba(255, 166, 0, 0.4)",
+              },
+              "&:active": {
+                transform: isLoading || !!error ? "none" : "translateY(0px)",
+              },
+              "&:disabled": {
+                color: "rgba(0, 0, 0, 0.4)",
+              },
+            }}
           >
-            {isLoading ? "Creating token" : "Create token"}
+            {isLoading ? "Creating token..." : "Create token"}
           </Button>
         </DialogActions>
         {
@@ -917,11 +1006,44 @@ export default function Create() {
             variant="contained"
             fullWidth
             disabled={waitingForDeploy || !createdTokenData?.tokenAddress}
+            startIcon={
+              waitingForDeploy ? (
+                <CircularProgress size={20} sx={{ color: "rgba(0, 0, 0, 0.4)" }} />
+              ) : undefined
+            }
             sx={{
-              py: 2,
+              background: waitingForDeploy || !createdTokenData?.tokenAddress
+                ? "rgba(255, 166, 0, 0.3)"
+                : "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+              color: "black",
+              py: 2.5,
               fontSize: 18,
               fontWeight: 700,
               textTransform: "none",
+              borderRadius: "12px",
+              boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
+                ? "none"
+                : "0 4px 12px rgba(255, 166, 0, 0.3)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              "&:hover": {
+                background: waitingForDeploy || !createdTokenData?.tokenAddress
+                  ? "rgba(255, 166, 0, 0.3)"
+                  : "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                transform: waitingForDeploy || !createdTokenData?.tokenAddress
+                  ? "none"
+                  : "translateY(-2px)",
+                boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
+                  ? "none"
+                  : "0 8px 20px rgba(255, 166, 0, 0.4)",
+              },
+              "&:active": {
+                transform: waitingForDeploy || !createdTokenData?.tokenAddress
+                  ? "none"
+                  : "translateY(0px)",
+              },
+              "&:disabled": {
+                color: "rgba(0, 0, 0, 0.4)",
+              },
             }}
           >
             {waitingForDeploy ? "Waiting for confirmation..." : "View Token"}

@@ -19,9 +19,9 @@ import { useMainContext } from "@/context";
 
 const StyledCard = styled(Box)`
   position: relative;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid #FFA600;
-  background: #18181D;
+  background: linear-gradient(145deg, #1a1a1f 0%, #18181D 100%);
   overflow: hidden;
   height: 100%;
   box-sizing: border-box;
@@ -31,14 +31,22 @@ const StyledCard = styled(Box)`
   text-decoration: none;
   overflow: hidden;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 
   ${({ theme }) => theme.breakpoints.down("sm")} {
     padding: 16px;
   }
 
   &:hover {
-    opacity: 0.8;
-    border: 1px solid gray;
+    transform: translateY(-4px);
+    border-color: #FFB733;
+    box-shadow: 0 12px 24px rgba(255, 166, 0, 0.2), 0 0 20px rgba(255, 166, 0, 0.1);
+    background: linear-gradient(145deg, #1f1f24 0%, #1a1a1f 100%);
+  }
+
+  &:active {
+    transform: translateY(-2px);
   }
   z-index: 1;
 `;
@@ -48,12 +56,25 @@ const Progress = styled('div') <{ value: number }>`
   margin-left: 1em;
   margin-right: 2em;
   margin-bottom: 0.8em;
-  height: 10px;
-  background: black;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.5);
   position: relative;
   transform: skewX(-33deg);
   border-radius: 8px;
   overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+    animation: shimmer 2s infinite;
+  }
+
   &::after {
     content: "";
     position: absolute;
@@ -61,17 +82,36 @@ const Progress = styled('div') <{ value: number }>`
     top: 0;
     bottom: 0;
     width: ${({ value }) => value}%;
-    background: white;
+    background: linear-gradient(90deg, #FFA600 0%, #FFD700 100%);
+    box-shadow: 0 0 10px rgba(255, 166, 0, 0.5);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 `
 
 const PriceChange = styled(Typography)<{ negative?: "true", ends?: "true" }>`
-  color: ${({ negative }) => negative ? "red" : "lightgreen" };
-  background: ${({ negative }) => negative ? "#FF333633" : "#6CFF3233" };
+  color: ${({ negative }) => negative ? "#ff4444" : "#00ff88" };
+  background: ${({ negative }) => negative ? "rgba(255, 68, 68, 0.15)" : "rgba(0, 255, 136, 0.15)" };
+  border: 1px solid ${({ negative }) => negative ? "rgba(255, 68, 68, 0.3)" : "rgba(0, 255, 136, 0.3)" };
   border-radius: ${({ ends: right }) => right ? "20px 0 0 20px" : "0 20px 20px 0" };
   width: fit-content;
-  padding: 2px 8px;
+  padding: 4px 10px;
   position: relative;
+  font-weight: 600;
+  box-shadow: ${({ negative }) => negative ? "0 2px 8px rgba(255, 68, 68, 0.2)" : "0 2px 8px rgba(0, 255, 136, 0.2)" };
+  transition: all 0.2s ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: ${({ negative }) => negative ? "linear-gradient(135deg, rgba(255, 68, 68, 0.1) 0%, transparent 100%)" : "linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, transparent 100%)" };
+  }
 `
 
 function TokenCard({ token, mode, ...props }: any) {
