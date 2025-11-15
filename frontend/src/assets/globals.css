@@ -1,13 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Londrina+Solid:wght@100;300;400;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 body {
-  background: linear-gradient(135deg, #1E1E2F 0%, #18181D 100%);
+  background: #0a0a0f;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(255, 166, 0, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(138, 43, 226, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(255, 166, 0, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(138, 43, 226, 0.08) 0px, transparent 50%);
+  background-attachment: fixed;
   /* min-height: 100vh; */
-  font-family: Inter;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
   /* overflow: overlay !important; */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: #ffffff;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 ::-webkit-scrollbar {
@@ -46,7 +55,17 @@ body {
 }
 
 .App {
-  font-family: Inter;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 main [id^=tradingview_][id$=-wrapper] {
@@ -79,16 +98,18 @@ main .tradingview-widget-copyright {
 }
 
 .MuiDialog-root .MuiDialog-paper {
-  border-radius: 8px;
-  box-shadow: 0px 15px 32px 0px #0000001A;
-  background: #1A0D1A;
-  border: 1px solid transparent;
+  border-radius: 24px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(255, 166, 0, 0.15);
   margin: 0;
   width: 100%;
 }
 
 .MuiDialog-root .MuiBackdrop-root {
-  backdrop-filter: blur(15px);
+  backdrop-filter: blur(20px);
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
 .MuiDialog-root .MuiDialogTitle-root {
@@ -99,10 +120,14 @@ main .tradingview-widget-copyright {
 }
 
 .MuiDialog-root .MuiDialogTitle-root {
-  background: linear-gradient(90deg, #FF8E08 0.14%, #FDFFB3 11.87%, #FFED4C 23.15%, #FBE4A8 54.37%, #F8D185 74.22%, #E66606 79.32%, #FCF3A0 86.96%, #FF7629 100%);
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA600 50%, #FFD700 100%);
   background-clip: text;
+  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  /* text-fill-color: transparent; */
+  text-shadow: 0 0 40px rgba(255, 166, 0, 0.3);
 }
 
 .MuiDialog-root .MuiDialogContent-root {
@@ -127,16 +152,21 @@ main .tradingview-widget-copyright {
 
 .MuiButton-root.MuiButton-colorPrimary {
   background: linear-gradient(135deg, #FFA600 0%, #FFD700 100%);
-  color: black;
-  font-family: "Londrina Solid";
-  box-shadow: 0 4px 12px rgba(255, 166, 0, 0.3);
+  color: #0a0a0f;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  box-shadow:
+    0 8px 24px rgba(255, 166, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   text-transform: none;
-  font-size: 24px;
-  border-radius: 8px;
+  font-size: 16px;
+  border-radius: 16px;
   font-weight: 700;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 .MuiButton-root.MuiButton-colorPrimary::before {
@@ -146,7 +176,7 @@ main .tradingview-widget-copyright {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   transition: left 0.6s ease;
 }
 
@@ -156,24 +186,44 @@ main .tradingview-widget-copyright {
 
 .MuiButton-root.MuiButton-colorPrimary:hover {
   background: linear-gradient(135deg, #FFB733 0%, #FFE55C 100%);
-  color: black;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(255, 166, 0, 0.4);
+  color: #0a0a0f;
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 16px 32px rgba(255, 166, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 0 60px rgba(255, 166, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .MuiButton-root.MuiButton-colorPrimary:active {
-  transform: translateY(0px);
+  transform: translateY(-1px) scale(1.01);
 }
 
 .MuiButton-root.MuiButton-colorSecondary {
-  background-color: #FFFFFF1F;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.MuiButton-root.MuiButton-colorSecondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
 
 .MuiButton-root.Mui-disabled {
-  opacity: 0.3;
-  color: black !important;
+  opacity: 0.4;
+  color: rgba(255, 255, 255, 0.4) !important;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 @media (max-width: 1280px) {
@@ -208,8 +258,8 @@ main .tradingview-widget-copyright {
 }
 
 .effect-button {
-  backdrop-filter: blur(20px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(30px) saturate(150%);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   overflow: hidden;
 }
@@ -221,8 +271,8 @@ main .tradingview-widget-copyright {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 166, 0, 0.15), transparent);
-  transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, transparent, rgba(255, 166, 0, 0.2), transparent);
+  transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 1;
   pointer-events: none;
 }

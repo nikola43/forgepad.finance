@@ -49,19 +49,30 @@ import { socket } from "@/utils/socket";
 //import { uploadImageToIPFS } from "../utils";
 
 const Title = styled(Typography)`
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 48px;
+  letter-spacing: -0.03em;
   background: linear-gradient(
-    90deg,
-    #ff8e08 0.14%,
-    #fdffb3 11.87%,
-    #ffed4c 23.15%,
-    #fbe4a8 54.37%,
-    #f8d185 74.22%,
-    #e66606 79.32%,
-    #fcf3a0 86.96%,
-    #ff7629 100%
+    135deg,
+    #FFD700 0%,
+    #FFA600 25%,
+    #FFE55C 50%,
+    #FFA600 75%,
+    #FFD700 100%
   );
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
   background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   text-fill-color: transparent;
+  text-shadow: 0 0 80px rgba(255, 166, 0, 0.3);
+
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
 `;
 
 export const BootstrapInput = styled(InputBase)(({ theme }) => ({
@@ -69,24 +80,35 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
     marginTop: theme.spacing(3),
   },
   "& .MuiInputBase-input": {
-    color: "black",
+    color: "#0a0a0f",
     fontSize: "16px",
-    borderRadius: "8px",
+    fontWeight: 500,
+    fontFamily: "'Inter', sans-serif",
+    borderRadius: "16px",
     position: "relative",
-    backgroundColor: "#FFF",
-    border: "2px solid transparent",
-    padding: "12px 20px",
-    transition: "all 0.2s ease",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    border: "2px solid rgba(255, 255, 255, 0.1)",
+    padding: "14px 20px",
+    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05), inset 0 1px 2px rgba(255, 255, 255, 0.5)",
     "&:focus": {
       borderColor: "#FFA600",
-      boxShadow: "0 0 0 3px rgba(255, 166, 0, 0.1)",
+      backgroundColor: "#FFF",
+      boxShadow: "0 8px 24px rgba(255, 166, 0, 0.15), 0 0 0 4px rgba(255, 166, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.8)",
+      transform: "translateY(-1px)",
     },
     "&:hover": {
-      borderColor: "rgba(255, 166, 0, 0.3)",
+      borderColor: "rgba(255, 166, 0, 0.4)",
+      backgroundColor: "#FFF",
+      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08), inset 0 1px 2px rgba(255, 255, 255, 0.6)",
+    },
+    "&::placeholder": {
+      color: "rgba(10, 10, 15, 0.5)",
+      fontWeight: 400,
     },
   },
   "& .MuiInputBase-inputMultiline": {
-    padding: "12px 20px",
+    padding: "14px 20px",
   },
 }));
 
@@ -130,9 +152,10 @@ const AvatarWrapper = styled(Box)`
     position: absolute;
     right: 5px;
     bottom: 5px;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
     &:hover {
-      transform: scale(1.1);
+      transform: scale(1.15);
     }
   }
   img {
@@ -140,11 +163,18 @@ const AvatarWrapper = styled(Box)`
   }
 
   & .MuiAvatar-root {
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
     &:hover {
-      border-color: #FFA600;
-      box-shadow: 0 4px 12px rgba(255, 166, 0, 0.3);
+      border-color: rgba(255, 166, 0, 0.5);
+      box-shadow:
+        0 12px 32px rgba(255, 166, 0, 0.3),
+        0 0 40px rgba(255, 166, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
     }
   }
 `;
@@ -173,31 +203,58 @@ const Banner = styled("img")`
 `;
 
 const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
-  border-radius: 8px;
-  background: ${({ checked }) => (checked ? "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)" : "rgba(255, 255, 255, 0.08)")};
-  color: ${({ checked }) => (checked ? "black" : "#FFF")};
-  border: 2px solid ${({ checked }) => (checked ? "#FFA600" : "transparent")};
+  border-radius: 16px;
+  background: ${({ checked }) =>
+    checked
+      ? "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)"
+      : "rgba(255, 255, 255, 0.04)"
+  };
+  backdrop-filter: blur(20px);
+  color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
+  border: 2px solid ${({ checked }) =>
+    checked
+      ? "rgba(255, 166, 0, 0.5)"
+      : "rgba(255, 255, 255, 0.08)"
+  };
   display: flex;
   padding: 0;
   gap: 10px;
   flex-wrap: wrap;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
   font-weight: ${({ checked }) => (checked ? "700" : "500")};
-  padding: 10px 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: ${({ checked }) => (checked ? "0 4px 12px rgba(255, 166, 0, 0.3)" : "none")};
+  letter-spacing: -0.01em;
+  padding: 12px 20px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: ${({ checked }) =>
+    checked
+      ? "0 8px 24px rgba(255, 166, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+      : "0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)"
+  };
 
   &:hover {
-    background: ${({ checked }) => (checked ? "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)" : "rgba(255, 255, 255, 0.12)")};
-    color: ${({ checked }) => (checked ? "black" : "#FFF")};
-    transform: translateY(-2px);
-    box-shadow: ${({ checked }) => (checked ? "0 6px 16px rgba(255, 166, 0, 0.4)" : "0 4px 12px rgba(255, 255, 255, 0.1)")};
-    border-color: ${({ checked }) => (checked ? "#FFB733" : "rgba(255, 166, 0, 0.3)")};
+    background: ${({ checked }) =>
+      checked
+        ? "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)"
+        : "rgba(255, 255, 255, 0.08)"
+    };
+    color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: ${({ checked }) =>
+      checked
+        ? "0 12px 32px rgba(255, 166, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)"
+        : "0 8px 20px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06)"
+    };
+    border-color: ${({ checked }) =>
+      checked
+        ? "rgba(255, 166, 0, 0.6)"
+        : "rgba(255, 166, 0, 0.3)"
+    };
   }
 
   &:active {
-    transform: translateY(0px);
+    transform: translateY(-1px) scale(1.01);
   }
 `;
 

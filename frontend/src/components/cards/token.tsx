@@ -19,9 +19,10 @@ import { useMainContext } from "@/context";
 
 const StyledCard = styled(Box)`
   position: relative;
-  border-radius: 12px;
-  border: 1px solid #FFA600;
-  background: linear-gradient(145deg, #1a1a1f 0%, #18181D 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(20, 20, 28, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
   overflow: hidden;
   height: 100%;
   box-sizing: border-box;
@@ -29,24 +30,48 @@ const StyledCard = styled(Box)`
   display: flex;
   flex-direction: column;
   text-decoration: none;
-  overflow: hidden;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow:
+    0 8px 16px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 
   ${({ theme }) => theme.breakpoints.down("sm")} {
     padding: 16px;
   }
 
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255, 166, 0, 0.3), rgba(138, 43, 226, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
   &:hover {
-    transform: translateY(-4px);
-    border-color: #FFB733;
-    box-shadow: 0 12px 24px rgba(255, 166, 0, 0.2), 0 0 20px rgba(255, 166, 0, 0.1);
-    background: linear-gradient(145deg, #1f1f24 0%, #1a1a1f 100%);
+    transform: translateY(-6px) scale(1.02);
+    border-color: rgba(255, 166, 0, 0.3);
+    box-shadow:
+      0 20px 40px rgba(255, 166, 0, 0.15),
+      0 0 0 1px rgba(255, 166, 0, 0.1),
+      0 0 80px rgba(255, 166, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: rgba(25, 25, 35, 0.8);
+
+    &::before {
+      opacity: 1;
+    }
   }
 
   &:active {
-    transform: translateY(-2px);
+    transform: translateY(-3px) scale(1.01);
   }
   z-index: 1;
 `;
@@ -56,13 +81,12 @@ const Progress = styled('div') <{ value: number }>`
   margin-left: 1em;
   margin-right: 2em;
   margin-bottom: 0.8em;
-  height: 12px;
-  background: rgba(0, 0, 0, 0.5);
+  height: 8px;
+  background: rgba(255, 255, 255, 0.04);
   position: relative;
-  transform: skewX(-33deg);
-  border-radius: 8px;
+  border-radius: 100px;
   overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 
   &::before {
     content: "";
@@ -71,8 +95,8 @@ const Progress = styled('div') <{ value: number }>`
     top: 0;
     bottom: 0;
     width: 100%;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
-    animation: shimmer 2s infinite;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+    animation: shimmer 2.5s infinite;
   }
 
   &::after {
@@ -82,35 +106,67 @@ const Progress = styled('div') <{ value: number }>`
     top: 0;
     bottom: 0;
     width: ${({ value }) => value}%;
-    background: linear-gradient(90deg, #FFA600 0%, #FFD700 100%);
-    box-shadow: 0 0 10px rgba(255, 166, 0, 0.5);
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(90deg, #FFA600 0%, #FFD700 50%, #FFA600 100%);
+    background-size: 200% 100%;
+    animation: progressShine 3s linear infinite;
+    box-shadow:
+      0 0 20px rgba(255, 166, 0, 0.6),
+      0 0 40px rgba(255, 166, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 100px;
   }
 
   @keyframes shimmer {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
   }
+
+  @keyframes progressShine {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
+  }
 `
 
 const PriceChange = styled(Typography)<{ negative?: "true", ends?: "true" }>`
-  color: ${({ negative }) => negative ? "#ff4444" : "#00ff88" };
-  background: ${({ negative }) => negative ? "rgba(255, 68, 68, 0.15)" : "rgba(0, 255, 136, 0.15)" };
-  border: 1px solid ${({ negative }) => negative ? "rgba(255, 68, 68, 0.3)" : "rgba(0, 255, 136, 0.3)" };
-  border-radius: ${({ ends: right }) => right ? "20px 0 0 20px" : "0 20px 20px 0" };
+  color: ${({ negative }) => negative ? "#ff5757" : "#00ffa3" };
+  background: ${({ negative }) =>
+    negative
+      ? "linear-gradient(135deg, rgba(255, 68, 68, 0.12) 0%, rgba(255, 68, 68, 0.08) 100%)"
+      : "linear-gradient(135deg, rgba(0, 255, 163, 0.12) 0%, rgba(0, 255, 163, 0.08) 100%)"
+  };
+  backdrop-filter: blur(10px);
+  border: 1px solid ${({ negative }) => negative ? "rgba(255, 87, 87, 0.25)" : "rgba(0, 255, 163, 0.25)" };
+  border-radius: ${({ ends: right }) => right ? "12px 0 0 12px" : "0 12px 12px 0" };
   width: fit-content;
-  padding: 4px 10px;
+  padding: 5px 12px;
   position: relative;
-  font-weight: 600;
-  box-shadow: ${({ negative }) => negative ? "0 2px 8px rgba(255, 68, 68, 0.2)" : "0 2px 8px rgba(0, 255, 136, 0.2)" };
-  transition: all 0.2s ease;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  box-shadow:
+    ${({ negative }) =>
+      negative
+        ? "0 4px 12px rgba(255, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+        : "0 4px 12px rgba(0, 255, 163, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+    };
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-shadow: ${({ negative }) =>
+    negative
+      ? "0 0 10px rgba(255, 68, 68, 0.5)"
+      : "0 0 10px rgba(0, 255, 163, 0.5)"
+  };
 
   &::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: ${({ negative }) => negative ? "linear-gradient(135deg, rgba(255, 68, 68, 0.1) 0%, transparent 100%)" : "linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, transparent 100%)" };
+    background: ${({ negative }) =>
+      negative
+        ? "linear-gradient(135deg, rgba(255, 87, 87, 0.15) 0%, transparent 100%)"
+        : "linear-gradient(135deg, rgba(0, 255, 163, 0.15) 0%, transparent 100%)"
+    };
   }
 `
 
