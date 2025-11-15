@@ -48,10 +48,10 @@ const CHAINS = [
     rpcUrl: 'https://bsc-rpc.publicnode.com',
     // rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
     explorerUrl: 'https://bscscan.com',
-    contractAddress: '0x391A58d604f8A51D97637194B4A0c32FCf42ECAf',
+    contractAddress: '0xAe98b6658d7477EbaCe6994440796F2cB57bF82e',
     abi: abiEthism.v1,
-    virtualEthAmount: 14,
-    virtualTokenAmount: 800000000,
+    virtualEthAmount: 6,
+    virtualTokenAmount: 900000000,
     totalSupply: 1000000000,
     targetMarketCap: 60000,
     pools: ['pancakeswap:v2']
