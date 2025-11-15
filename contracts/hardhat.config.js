@@ -48,13 +48,17 @@ module.exports = {
                 accountsBalance: '1000000000000000000000000000000000000000'
             },
             gasPrice: 6510331748,
-            chainId: 56
+            chainId: 56,
+            blockNumber: 68218718
         },
         localhost: {
             forking: {
-                url: `https://bsc-dataseed.bnbchain.org`,
+                chainId: 56, // your custom chain ID
+                url: `https://bsc.drpc.org`
             },
-            gasPrice: 6510331748
+            gasPrice: 6510331748,
+            chainId: 56,
+            blockNumber: 68218718
         },
         pulsechainmainnet: {
             url: "https://rpc-pulsechain.g4mm4.io",

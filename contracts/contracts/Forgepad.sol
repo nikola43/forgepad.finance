@@ -162,8 +162,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         TOTAL_SUPPLY = _totalSupply * 1e18;
         burnAddress = 0x000000000000000000000000000000000000dEaD;
 
-        initialEthLPAmount = 14 ether;
-        initialTokenLPAmount = 800_000_000 ether;
+        initialEthLPAmount = 6 ether;
+        initialTokenLPAmount = 900_000_000 ether;
 
         firstBuyFeeUSD = 0;
         MAX_SELL_PERCENT = 1000; // 10%
