@@ -558,7 +558,7 @@ export default function Token() {
             return undefined
         }
         estimate().then((amount) => {
-            setEstimateAmount(amount)
+            setEstimateAmount(amount as string | undefined)
             setError(undefined)
         }).catch(ex => {
             setEstimateAmount(undefined)

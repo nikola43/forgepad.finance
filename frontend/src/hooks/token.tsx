@@ -323,143 +323,143 @@ export function useHandlers(network?: CaipNetwork) {
             }
         },
         buyToken: async (token: string, amount: string, slippage: bigint, exactInput?: boolean) => {
-            if (!address)
-                return
-            const payer = new PublicKey(address)
-            const poolAccount = await client.state.getPoolByBaseMint(token)
-            if (!poolAccount)
-                throw Error("Invalid token")
-            let amountIn = new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL))
-            let minimumAmountOut = new BN(0)
-            const virtualPool = poolAccount.account
-            const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
-            if (exactInput) {
-                const quote = await client.pool.swapQuote({
-                    virtualPool: virtualPool,
-                    config: poolConfigData,
-                    swapBaseForQuote: false,
-                    amountIn,
-                    // slippageBps: 200,
-                    hasReferral: false,
-                    currentPoint: new BN(0)
-                })
-                minimumAmountOut = quote.amountOut.mul(new BN(10000n - slippage)).div(new BN(10000))
-            } else {
-                const quote = await client.pool.swapQuoteExactOut({
-                    virtualPool: virtualPool,
-                    config: poolConfigData,
-                    swapBaseForQuote: false,
-                    outAmount: new BN(Math.floor(Number(amount) * 1000000)),
-                    // slippageBps: 200,
-                    hasReferral: false,
-                    currentPoint: new BN(0)
-                })
-                amountIn = quote.amountOut.mul(new BN(10000n + slippage)).div(new BN(10000))
-                minimumAmountOut = new BN(Math.floor(Number(amount) * 1000000))
-            }
-            const buyTx = await client.pool.swap({
-                payer,
-                owner: payer,
-                amountIn,
-                minimumAmountOut,
-                swapBaseForQuote: false,
-                pool: poolAccount.publicKey,
-                referralTokenAccount: null,
-            })
-            const { blockhash } = await connection.getLatestBlockhash()
-            const tx = new VersionedTransaction(
-                new TransactionMessage({
-                    payerKey: payer,
-                    recentBlockhash: blockhash,
-                    instructions: buyTx.instructions
-                }).compileToV0Message()
-            )
-            return await solProvider.sendTransaction(tx, connection)
+            // if (!address)
+            //     return
+            // const payer = new PublicKey(address)
+            // const poolAccount = await client.state.getPoolByBaseMint(token)
+            // if (!poolAccount)
+            //     throw Error("Invalid token")
+            // let amountIn = new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL))
+            // let minimumAmountOut = new BN(0)
+            // const virtualPool = poolAccount.account
+            // const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
+            // if (exactInput) {
+            //     const quote = await client.pool.swapQuote({
+            //         virtualPool: virtualPool,
+            //         config: poolConfigData,
+            //         swapBaseForQuote: false,
+            //         amountIn,
+            //         // slippageBps: 200,
+            //         hasReferral: false,
+            //         currentPoint: new BN(0)
+            //     })
+            //     minimumAmountOut = quote.amountOut.mul(new BN(10000n - slippage)).div(new BN(10000))
+            // } else {
+            //     const quote = await client.pool.swapQuoteExactOut({
+            //         virtualPool: virtualPool,
+            //         config: poolConfigData,
+            //         swapBaseForQuote: false,
+            //         outAmount: new BN(Math.floor(Number(amount) * 1000000)),
+            //         // slippageBps: 200,
+            //         hasReferral: false,
+            //         currentPoint: new BN(0)
+            //     })
+            //     amountIn = quote.amountOut.mul(new BN(10000n + slippage)).div(new BN(10000))
+            //     minimumAmountOut = new BN(Math.floor(Number(amount) * 1000000))
+            // }
+            // const buyTx = await client.pool.swap({
+            //     payer,
+            //     owner: payer,
+            //     amountIn,
+            //     minimumAmountOut,
+            //     swapBaseForQuote: false,
+            //     pool: poolAccount.publicKey,
+            //     referralTokenAccount: null,
+            // })
+            // const { blockhash } = await connection.getLatestBlockhash()
+            // const tx = new VersionedTransaction(
+            //     new TransactionMessage({
+            //         payerKey: payer,
+            //         recentBlockhash: blockhash,
+            //         instructions: buyTx.instructions
+            //     }).compileToV0Message()
+            // )
+            // return await solProvider.sendTransaction(tx, connection)
         },
         sellToken: async (token: string, amount: string, slippage: bigint) => {
-            if (!address)
-                return
-            const payer = new PublicKey(address)
-            const poolAccount = await client.state.getPoolByBaseMint(token)
-            if (!poolAccount)
-                throw Error("Invalid token")
-            let amountIn = new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL))
-            const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
-            const virtualPool = poolAccount.account
-            const quote = await client.pool.swapQuote({
-                virtualPool: virtualPool,
-                config: poolConfigData,
-                swapBaseForQuote: true,
-                amountIn: new BN(Math.floor(Number(amount) * 1000000)),
-                // slippageBps: 200,
-                hasReferral: false,
-                currentPoint: new BN(0)
-            })
-            const minimumAmountOut = quote.amountOut.mul(new BN(10000n - slippage)).div(new BN(10000))
-            const sellTx = await client.pool.swap({
-                payer,
-                owner: payer,
-                amountIn,
-                minimumAmountOut,
-                swapBaseForQuote: true,
-                pool: poolAccount.publicKey,
-                referralTokenAccount: null,
-            })
-            const { blockhash } = await connection.getLatestBlockhash()
-            const tx = new VersionedTransaction(
-                new TransactionMessage({
-                    payerKey: payer,
-                    recentBlockhash: blockhash,
-                    instructions: sellTx.instructions
-                }).compileToV0Message()
-            )
-            return await solProvider.sendTransaction(tx, connection)
+            // if (!address)
+            //     return
+            // const payer = new PublicKey(address)
+            // const poolAccount = await client.state.getPoolByBaseMint(token)
+            // if (!poolAccount)
+            //     throw Error("Invalid token")
+            // let amountIn = new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL))
+            // const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
+            // const virtualPool = poolAccount.account
+            // const quote = await client.pool.swapQuote({
+            //     virtualPool: virtualPool,
+            //     config: poolConfigData,
+            //     swapBaseForQuote: true,
+            //     amountIn: new BN(Math.floor(Number(amount) * 1000000)),
+            //     // slippageBps: 200,
+            //     hasReferral: false,
+            //     currentPoint: new BN(0)
+            // })
+            // const minimumAmountOut = quote.amountOut.mul(new BN(10000n - slippage)).div(new BN(10000))
+            // const sellTx = await client.pool.swap({
+            //     payer,
+            //     owner: payer,
+            //     amountIn,
+            //     minimumAmountOut,
+            //     swapBaseForQuote: true,
+            //     pool: poolAccount.publicKey,
+            //     referralTokenAccount: null,
+            // })
+            // const { blockhash } = await connection.getLatestBlockhash()
+            // const tx = new VersionedTransaction(
+            //     new TransactionMessage({
+            //         payerKey: payer,
+            //         recentBlockhash: blockhash,
+            //         instructions: sellTx.instructions
+            //     }).compileToV0Message()
+            // )
+            // return await solProvider.sendTransaction(tx, connection)
         },
         quoteBuy: async (token: string, amount: string, exactInput?: boolean) => {
-            const poolAccount = await client.state.getPoolByBaseMint(token)
-            if (!poolAccount)
-                throw Error("Invalid token")
-            const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
-            const virtualPool = poolAccount.account
-            if (exactInput) {
-                const quote = await client.pool.swapQuote({
-                    virtualPool: virtualPool,
-                    config: poolConfigData,
-                    swapBaseForQuote: false,
-                    amountIn: new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL)),
-                    // slippageBps: 200,
-                    hasReferral: false,
-                    currentPoint: new BN(0)
-                })
-                return (quote.amountOut.toNumber() / 1000000).toString()
-            }
-            const quote = await client.pool.swapQuoteExactOut({
-                virtualPool: virtualPool,
-                config: poolConfigData,
-                swapBaseForQuote: false,
-                outAmount: new BN(Math.floor(Number(amount) * 1000000)),
-                // slippageBps: 200,
-                hasReferral: false,
-                currentPoint: new BN(0)
-            })
-            return (quote.amountOut.toNumber() / LAMPORTS_PER_SOL).toString()
+            // const poolAccount = await client.state.getPoolByBaseMint(token)
+            // if (!poolAccount)
+            //     throw Error("Invalid token")
+            // const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
+            // const virtualPool = poolAccount.account
+            // if (exactInput) {
+            //     const quote = await client.pool.swapQuote({
+            //         virtualPool: virtualPool,
+            //         config: poolConfigData,
+            //         swapBaseForQuote: false,
+            //         amountIn: new BN(Math.floor(Number(amount) * LAMPORTS_PER_SOL)),
+            //         // slippageBps: 200,
+            //         hasReferral: false,
+            //         currentPoint: new BN(0)
+            //     })
+            //     return (quote.amountOut.toNumber() / 1000000).toString()
+            // }
+            // const quote = await client.pool.swapQuoteExactOut({
+            //     virtualPool: virtualPool,
+            //     config: poolConfigData,
+            //     swapBaseForQuote: false,
+            //     outAmount: new BN(Math.floor(Number(amount) * 1000000)),
+            //     // slippageBps: 200,
+            //     hasReferral: false,
+            //     currentPoint: new BN(0)
+            // })
+            // return (quote.amountOut.toNumber() / LAMPORTS_PER_SOL).toString()
         },
         quoteSell: async (token: string, amount: string) => {
-            const poolAccount = await client.state.getPoolByBaseMint(token)
-            if (!poolAccount)
-                throw Error("Invalid token")
-            const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
-            const virtualPool = poolAccount.account
-            const quote = await client.pool.swapQuote({
-                virtualPool: virtualPool,
-                config: poolConfigData,
-                swapBaseForQuote: true,
-                amountIn: new BN(Math.floor(Number(amount) * 1000000)),
-                // slippageBps: 200,
-                hasReferral: false,
-                currentPoint: new BN(0)
-            })
-            return (quote.amountOut.toNumber() / LAMPORTS_PER_SOL).toString()
+            // const poolAccount = await client.state.getPoolByBaseMint(token)
+            // if (!poolAccount)
+            //     throw Error("Invalid token")
+            // const poolConfigData = await client.state.getPoolConfig(chain.contractAddress)
+            // const virtualPool = poolAccount.account
+            // const quote = await client.pool.swapQuote({
+            //     virtualPool: virtualPool,
+            //     config: poolConfigData,
+            //     swapBaseForQuote: true,
+            //     amountIn: new BN(Math.floor(Number(amount) * 1000000)),
+            //     // slippageBps: 200,
+            //     hasReferral: false,
+            //     currentPoint: new BN(0)
+            // })
+            // return (quote.amountOut.toNumber() / LAMPORTS_PER_SOL).toString()
         },
     }
 }
