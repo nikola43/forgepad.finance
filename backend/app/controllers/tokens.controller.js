@@ -9,7 +9,9 @@ dotenv.config();
 
 const db = require("../models/index");
 const { CHAINS } = require("../config/web3.config");
-const { getSupabasePublicUrl } = require("../config/s3.config");
+const useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true';
+const isMySQL = process.env.DB_DIALECT === 'mysql';
+const getSupabasePublicUrl = useLocalStorage ? null : require("../config/s3.config").getSupabasePublicUrl;
 const userTable = db.users;
 const tokenTable = db.tokens;
 const holderTable = db.holders;
@@ -230,7 +232,10 @@ module.exports = {
             const tokenList = await tokenTable.findAll({
                 attributes: orderType === 'trends' || orderType === 'bump' ? {
                     include: [
-                        [Sequelize.literal('(EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM "updatedAt")) * 100 / 1800'), 'x']
+                        [Sequelize.literal(isMySQL
+                            ? '(UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`updatedAt`)) * 100 / 1800'
+                            : '(EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM "updatedAt")) * 100 / 1800'
+                        ), 'x']
                     ]
                 } : {},
                 where,
@@ -283,17 +288,20 @@ module.exports = {
                     'tokenPrice'
                 ],
                 where: {
-                    tokenAddress, createdAt: { [Sequelize.Op.lt]: Sequelize.literal("NOW() - INTERVAL '15 minutes'") },
+                    tokenAddress, createdAt: { [Sequelize.Op.lt]: Sequelize.literal(isMySQL ? "NOW() - INTERVAL 15 MINUTE" : "NOW() - INTERVAL '15 minutes'") },
                 },
                 order: [['date', 'DESC']],
             })
 
             const trade1d = await tradeTable.findOne({
                 attributes: [
-                    [Sequelize.literal('SUM(CASE WHEN type=\'BUY\' THEN "ethAmount" ELSE -"ethAmount" END)'), 'liquidity']
+                    [Sequelize.literal(isMySQL
+                        ? "SUM(CASE WHEN type='BUY' THEN `ethAmount` ELSE -`ethAmount` END)"
+                        : 'SUM(CASE WHEN type=\'BUY\' THEN "ethAmount" ELSE -"ethAmount" END)'
+                    ), 'liquidity']
                 ],
                 where: {
-                    tokenAddress, createdAt: { [Sequelize.Op.gte]: Sequelize.literal("NOW() - INTERVAL '1 day'") }
+                    tokenAddress, createdAt: { [Sequelize.Op.gte]: Sequelize.literal(isMySQL ? "NOW() - INTERVAL 1 DAY" : "NOW() - INTERVAL '1 day'") }
                 }
             })
 
@@ -344,23 +352,25 @@ module.exports = {
                 });
             }
 
-            // multer-s3 automatically uploads to S3 and adds file info to req.file
-            console.log('File uploaded successfully to S3:', req.file.key);
-
-            // Generate the correct Supabase public URL
-            const publicUrl = getSupabasePublicUrl(req.file.key);
+            let publicUrl;
+            if (useLocalStorage) {
+                const localBaseUrl = process.env.LOCAL_FILE_URL || 'http://localhost/img';
+                publicUrl = `${localBaseUrl}/${req.file.filename}`;
+                console.log('File uploaded locally:', req.file.filename);
+            } else {
+                publicUrl = getSupabasePublicUrl(req.file.key);
+                console.log('File uploaded to S3:', req.file.key);
+            }
 
             res.status(200).json({
                 success: true,
-                message: 'File uploaded successfully to Supabase S3.',
-                url: publicUrl, // Supabase public URL
-                key: req.file.key, // S3 key/path
+                message: 'File uploaded successfully.',
+                url: publicUrl,
+                key: useLocalStorage ? req.file.filename : req.file.key,
                 file: {
                     originalname: req.file.originalname,
                     mimetype: req.file.mimetype,
-                    size: req.file.size,
-                    bucket: req.file.bucket,
-                    etag: req.file.etag
+                    size: req.file.size
                 }
             });
         } catch (error) {

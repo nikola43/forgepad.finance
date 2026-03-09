@@ -1,7 +1,8 @@
 import axios from "axios";
 import useSWR from "swr";
 import { API_ENDPOINT } from "@/config";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { socket } from "@/utils/socket";
 import { CaipNetwork, type Provider as EVMProvider, useAppKitAccount, useAppKitNetworkCore, useAppKitProvider } from "@reown/appkit/react";
 import type { Connection, Provider as SOLProvider } from "@reown/appkit-adapter-solana/react";
 import { useMainContext } from "@/context";
@@ -75,6 +76,21 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
         keepPreviousData: true,
     }
     )
+    // Listen for real-time trade events via WebSocket
+    useEffect(() => {
+        if (!tokenAddress) return
+        const handler = (data: string) => {
+            const lines = data.split('\n')
+            const hasMatch = lines.some(line => {
+                const addr = line.split('~')[0]
+                return addr?.toLowerCase() === tokenAddress.toLowerCase()
+            })
+            if (hasMatch) mutate()
+        }
+        socket.on('m', handler)
+        return () => { socket.off('m', handler) }
+    }, [tokenAddress, mutate])
+
     return {
         tokenInfo, reload: mutate
     }
@@ -93,6 +109,19 @@ export function useTokens(filter: any) {
         keepPreviousData: true
     }
     )
+
+    // Refresh token list on any trade or deploy event
+    useEffect(() => {
+        const onTrade = () => mutate()
+        const onDeploy = () => mutate()
+        socket.on('m', onTrade)
+        socket.on('deployed', onDeploy)
+        return () => {
+            socket.off('m', onTrade)
+            socket.off('deployed', onDeploy)
+        }
+    }, [mutate])
+
     return {
         tokens: data?.tokenList ?? [],
         count: data?.tokenCount ?? 0,

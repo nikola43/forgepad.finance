@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "updatedAt": 1773043365373,
+  "nodeCount": 12,
+  "nodes": {
+    "mem-MEMORY-system-setup": {
+      "id": "mem-MEMORY-system-setup",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-ruflo-configuration": {
+      "id": "mem-MEMORY-ruflo-configuration",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-user-preferences": {
+      "id": "mem-MEMORY-user-preferences",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-project-overview": {
+      "id": "mem-MEMORY-project-overview",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-key-paths": {
+      "id": "mem-MEMORY-key-paths",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-tech-stack": {
+      "id": "mem-MEMORY-tech-stack",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-architecture": {
+      "id": "mem-MEMORY-architecture",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-api-key": {
+      "id": "mem-MEMORY-api-key",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-openai-config": {
+      "id": "mem-MEMORY-openai-config",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-gradle": {
+      "id": "mem-MEMORY-gradle",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-color-palette--dark-glass-morp": {
+      "id": "mem-MEMORY-color-palette--dark-glass-morp",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    },
+    "mem-MEMORY-status": {
+      "id": "mem-MEMORY-status",
+      "category": "core",
+      "confidence": 0.5,
+      "accessCount": 0,
+      "createdAt": 1773043365356
+    }
+  },
+  "edges": [
+    {
+      "sourceId": "mem-MEMORY-system-setup",
+      "targetId": "mem-MEMORY-ruflo-configuration",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-ruflo-configuration",
+      "targetId": "mem-MEMORY-user-preferences",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-project-overview",
+      "targetId": "mem-MEMORY-key-paths",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-key-paths",
+      "targetId": "mem-MEMORY-tech-stack",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-tech-stack",
+      "targetId": "mem-MEMORY-architecture",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-architecture",
+      "targetId": "mem-MEMORY-api-key",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-api-key",
+      "targetId": "mem-MEMORY-openai-config",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-openai-config",
+      "targetId": "mem-MEMORY-gradle",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-gradle",
+      "targetId": "mem-MEMORY-color-palette--dark-glass-morp",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-color-palette--dark-glass-morp",
+      "targetId": "mem-MEMORY-status",
+      "type": "temporal",
+      "weight": 0.5
+    },
+    {
+      "sourceId": "mem-MEMORY-tech-stack",
+      "targetId": "mem-MEMORY-architecture",
+      "type": "similar",
+      "weight": 0.3277310924369748
+    }
+  ],
+  "pageRanks": {
+    "mem-MEMORY-system-setup": 0.02747648878777975,
+    "mem-MEMORY-ruflo-configuration": 0.05083149506388197,
+    "mem-MEMORY-user-preferences": 0.0706832281193158,
+    "mem-MEMORY-project-overview": 0.02747648878777975,
+    "mem-MEMORY-key-paths": 0.05083149506388197,
+    "mem-MEMORY-tech-stack": 0.0706832281193158,
+    "mem-MEMORY-architecture": 0.08755730879527994,
+    "mem-MEMORY-api-key": 0.10190038999939531,
+    "mem-MEMORY-openai-config": 0.11409203491742928,
+    "mem-MEMORY-gradle": 0.12445487785542604,
+    "mem-MEMORY-color-palette--dark-glass-morp": 0.13326313106650234,
+    "mem-MEMORY-status": 0.14074983342401198
+  }
+}

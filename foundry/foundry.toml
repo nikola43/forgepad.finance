@@ -1,0 +1,23 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+evm_version = "cancun"
+via_ir = true
+optimizer = true
+optimizer_runs = 1
+auto_detect_solc = true
+
+# BSC fork for testing
+[profile.default.fuzz]
+runs = 256
+
+[profile.default.invariant]
+runs = 256
+
+# Remappings loaded from remappings.txt
+
+# Fork configuration
+[rpc_endpoints]
+bsc = "https://bsc-rpc.publicnode.com"
+bsc_backup = "https://bsc-dataseed1.defibit.io"

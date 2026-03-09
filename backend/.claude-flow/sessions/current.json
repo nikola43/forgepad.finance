@@ -1,0 +1,14 @@
+{
+  "id": "session-1773043365335",
+  "startedAt": "2026-03-09T08:02:45.335Z",
+  "platform": "darwin",
+  "cwd": "/Users/nkt/dev/forgepad.finance/backend",
+  "context": {},
+  "metrics": {
+    "edits": 18,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "restoredAt": "2026-03-09T08:02:45.353Z"
+}

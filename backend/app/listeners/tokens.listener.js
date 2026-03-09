@@ -592,19 +592,16 @@ function subscribe(io, chain) {
 
                 if (lastIndex) {
                     const fromBlock = lastIndex.block + 1
-                    while (true) {
-                        const toBlock = await provider.getBlockNumber()
-                        if (fromBlock < toBlock) {
-                            for (let blockNumber = fromBlock; blockNumber < toBlock; blockNumber += 50000) {
-                                await processLogs(blockNumber, Math.min(toBlock, blockNumber + 50000)).catch(() => { })
-                                await indexTable.upsert({
-                                    network: chain.chainId,
-                                    block: Math.min(toBlock, blockNumber + 50000)
-                                })
-                                // Small delay between chunks to avoid RPC rate limits
-                                await sleep(BLOCK_CHUNK_DELAY_MS)
-                            }
-                            break
+                    const toBlock = await provider.getBlockNumber()
+                    if (fromBlock < toBlock) {
+                        for (let blockNumber = fromBlock; blockNumber < toBlock; blockNumber += 50000) {
+                            await processLogs(blockNumber, Math.min(toBlock, blockNumber + 50000)).catch(() => { })
+                            await indexTable.upsert({
+                                network: chain.chainId,
+                                block: Math.min(toBlock, blockNumber + 50000)
+                            })
+                            // Small delay between chunks to avoid RPC rate limits
+                            await sleep(BLOCK_CHUNK_DELAY_MS)
                         }
                     }
                 } else {

@@ -28,8 +28,23 @@ import {
   bsc,
   localhost,
 } from "@reown/appkit/networks";
-import { projectId } from "@/config";
+import { projectId, isDevEnv } from "@/config";
 import { WagmiProvider } from "wagmi";
+
+// In dev mode, override BSC to use local Anvil fork
+const bscNetwork = isDevEnv
+  ? defineChain({
+      id: 56,
+      caipNetworkId: "eip155:56",
+      chainNamespace: "eip155",
+      name: "BSC (Local)",
+      nativeCurrency: { decimals: 18, name: "BNB", symbol: "BNB" },
+      rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
+      blockExplorers: {
+        default: { name: "BscScan", url: "https://bscscan.com" },
+      },
+    })
+  : bsc;
 
 const theme = createTheme({
   palette: {
@@ -87,7 +102,7 @@ interface MainContextProps {
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [bsc],
+  networks: [bscNetwork],
   // networks: [localhost, mainnet, base, bsc, solana]
 });
 const ethersAdapter = new EthersAdapter();
@@ -95,7 +110,7 @@ const solanaAdapter = new SolanaAdapter();
 const appKit = createAppKit({
   adapters: [wagmiAdapter, solanaAdapter],
   projectId,
-  networks: [bsc],
+  networks: [bscNetwork],
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
   themeMode: "dark",

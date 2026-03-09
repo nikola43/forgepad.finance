@@ -1,55 +1,34 @@
-// import axios from "axios";
 import useSWR from "swr";
 import { ethers } from "ethers";
-import { useAppKitAccount, useAppKitBalance } from "@reown/appkit/react";
-// import { useMainContext } from "@/context";
+import { useAppKitAccount } from "@reown/appkit/react";
+import { isDevEnv } from "@/config";
+
+const LOCAL_RPC = "http://127.0.0.1:8545";
 
 export function useUserInfo() {
     const { address } = useAppKitAccount()
-    const { fetchBalance } = useAppKitBalance()
 
     const { data: userInfo, mutate } = useSWR(
       address ? '/info/user' : undefined,
       async () => {
-        // const { data } = await axios.get(`${SERVER_URL}/users`, {
-        //     params: {
-        //         userAddress: address,
-        //     },
-        // }).catch(() => ({ data: {} }))
-        if (fetchBalance) {
-          try {
-            const result = await fetchBalance()
-            console.log('Balance fetch result:', result)
-
-            // Get the balance from the result
-            const balanceData: any = result?.data
-            const balanceInWei = balanceData?.value || balanceData?.balance || balanceData?.formatted || '0'
-
-            // If the balance is already formatted as a string (e.g., "10.5"), use it directly
-            let balanceInEther: string
-            if (typeof balanceInWei === 'string' && balanceInWei.includes('.')) {
-              balanceInEther = balanceInWei
-            } else {
-              // Otherwise convert from Wei to Ether
-              balanceInEther = ethers.formatEther(balanceInWei.toString())
-            }
-
-            console.log('Balance in Wei:', balanceInWei)
-            console.log('Balance in Ether:', balanceInEther)
-
-            return {
-              balance: Number(balanceInEther)
-            } as any
-          } catch (error) {
-            console.error('Error fetching balance:', error)
-            return {
-              balance: 0
-            } as any
-          }
+        if (!address) return { balance: 0 } as any
+        try {
+          // In dev mode, query local Anvil directly; in prod, use wallet's provider
+          const provider = isDevEnv
+            ? new ethers.JsonRpcProvider(LOCAL_RPC)
+            : new ethers.BrowserProvider((window as any).ethereum)
+          const balanceWei = await provider.getBalance(address)
+          const balanceInEther = ethers.formatEther(balanceWei)
+          console.log('Balance:', balanceInEther, 'BNB')
+          return {
+            balance: Number(balanceInEther)
+          } as any
+        } catch (error) {
+          console.error('Error fetching balance:', error)
+          return {
+            balance: 0
+          } as any
         }
-        return {
-          balance: 0
-        } as any
       }, {
         refreshInterval: 5000,
       }
