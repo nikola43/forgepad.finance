@@ -14,6 +14,7 @@ import { CaipNetwork, useAppKit, useAppKitAccount, useAppKitNetwork, useAppKitSt
 import { AssetUtil, ChainController } from "@reown/appkit-controllers"
 import LogoutIcon from '@mui/icons-material/Logout';
 import { User, UserName } from "../cards/user";
+import { useAccount } from "@/hooks/user";
 import { useMainContext } from "@/context";
 import { AppKitNetwork } from "@reown/appkit/networks";
 import SearchIcon from '@mui/icons-material/Search';
@@ -39,25 +40,14 @@ const HeaderBox = styled(Box)`
     top: 0;
     left: 0;
     right: 0;
-    max-height: 68px;
-    // overflow: hidden;
+    max-height: 64px;
     z-index: 3;
-    background: #121212;
-    border-top: 1px solid #FF9D00;
-    border-bottom: 1px solid #FF9D00;
-    margin-top: 8px;
+    background: rgba(6, 6, 10, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     align-items: center;
     gap: 16px;
-    &::before {
-        position: fixed;
-        left: 0;
-        top: 0;
-        right: 0;
-        height: 8px;
-        background: #1E1E2F;
-        content: "";
-    }
 `
 
 const ScrollBox = styled(Box)<{ count: number }>`
@@ -79,12 +69,12 @@ const TradesBox = styled(Box)`
     position: relative;
     overflow-x: hidden;
     justify-content: center;
-    gap: 80px;
+    gap: 60px;
     box-sizing: border-box;
     align-items: center;
     &.gradient::after {
         content: "";
-        background: linear-gradient(90deg, #000A, #0000 150px), linear-gradient(-90deg, #000A 0%, #0000 150px);
+        background: linear-gradient(90deg, rgba(6,6,10,0.9), transparent 120px), linear-gradient(-90deg, rgba(6,6,10,0.9) 0%, transparent 120px);
         position: absolute;
         height: 63px;
         left: 0;
@@ -94,8 +84,8 @@ const TradesBox = styled(Box)`
     }
     &.gradient::before {
         content: "";
-        background: radial-gradient(51.54% 206.16% at 50% 50%, #000, #0000);
-        width: 400px;
+        background: radial-gradient(51.54% 206.16% at 50% 50%, rgba(6,6,10,0.95), transparent);
+        width: 360px;
         height: 100px;
         overflow: hidden;
         position: absolute;
@@ -106,8 +96,9 @@ const TradesBox = styled(Box)`
     img.logo {
         position: relative;
         z-index: 2;
+        transition: transform 0.3s ease;
         &:hover {
-            // animation: ${beat} 0.5s linear infinite;
+            transform: scale(1.05);
         }
     }
     &.move ${ScrollBox} > div {
@@ -151,30 +142,33 @@ const Banner = styled.div`
 `
 
 const StyledButton = styled.button`
-    padding: 0 24px;
-    height: 42px;
-    padding: 12px 16px;
-    background: #FFA600;
+    height: 40px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #FFA600 0%, #FFD700 100%);
     border: none;
-    border-radius: 8px;
-    color: black;
-    font-size: 20px;
-    font-family: "Londrina Solid";
-    font-weight: 700;
-    border-bottom: 3px solid white;
+    border-radius: 10px;
+    color: #0a0a0f;
+    font-size: 14px;
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-weight: 600;
     line-height: 20px;
-    letter-spacing: 0%;
+    letter-spacing: -0.01em;
     cursor: pointer;
     display: flex;
     gap: 8px;
     align-items: center;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     &:hover {
-        opacity: 0.7;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(255, 166, 0, 0.3);
+    }
+    &:active {
+        transform: translateY(0);
     }
     svg {
         flex-shrink: 0;
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
         fill: currentColor;
     }
 `
@@ -184,7 +178,7 @@ const StyledDropdownButton = styled.div`
     & > div {
         position: absolute;
         display: none;
-        top: 100%;
+        top: calc(100% + 6px);
         right: 0;
         &::before {
             position: absolute;
@@ -192,23 +186,42 @@ const StyledDropdownButton = styled.div`
             left: 0;
             right: 0;
             bottom: 0;
-            margin-top: 4px;
             content: "";
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            background: rgba(13, 13, 20, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
         }
-        padding: 8px 0;
+        &::after {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+        }
+        padding: 4px;
         min-width: 200px;
         z-index: 3;
         ${StyledButton} {
-            font-family: Inter;
-            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
             background: none;
-            border-radius: 0;
+            border-radius: 8px;
             border: none;
-            color: white;
+            color: #94A3B8;
+            width: 100%;
+            justify-content: flex-start;
+            height: 36px;
+            position: relative;
+            z-index: 1;
             &:hover {
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.06);
+                color: white;
+                box-shadow: none;
+                transform: none;
             }
         }
     }
@@ -227,22 +240,25 @@ const Buttons = styled.div`
 
 const SearchToken = styled(TextField)`
     & .MuiOutlinedInput-root {
-        border-radius: 8px;
-        border-bottom: 3px solid white;
-        background: #2E2E37;
-        // box-shadow: 0px 6px 8px 2px #9996 inset, 0px -4px 8px 0px #9991 inset, 0 0 10px #0008;
-        font-size: 1em;
-        // backdrop-filter: blur(10px);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 14px;
+        transition: all 0.2s ease;
 
         input {
-            padding: 8px;
-            font-family: "Londrina Solid";
-            font-size: 18px;
+            padding: 8px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: white;
+            &::placeholder {
+                color: rgba(255, 255, 255, 0.3);
+            }
         }
 
-        &:hover {
-            border-color: #AAA;
-            // box-shadow: 0px 4px 4px 2px rgba(6, 182, 212, 0.2) inset, 0px -4px 8px 0px rgba(6, 182, 212, 0.1) inset, 0 0 10px #0008;
+        &:hover, &.Mui-focused {
+            border-color: rgba(255, 166, 0, 0.3);
+            background: rgba(255, 255, 255, 0.06);
         }
 
         & fieldset {
@@ -327,11 +343,13 @@ export default function Header() {
     const isMobile = useMediaQuery('(max-width: 800px)')
     const [scrollTop, setScrollTop] = useState(0)
     const pathname = usePathname()
+    const router = useRouter()
     const [modal, setModal] = useState<string>()
 
     const { appKit } = useMainContext()
     // const { open, close } = useAppKit()
     const { isConnected, address, caipAddress } = useAppKitAccount()
+    const { account } = useAccount()
     const { chainId, caipNetwork } = useAppKitNetwork()
     // const { disconnect } = useDisconnect()
     const { walletInfo } = useWalletInfo()
@@ -521,7 +539,7 @@ export default function Header() {
                                 : <WalletIcon />
                             }
                             <UserName
-                                // user={userInfo}
+                                user={account}
                                 address={address}
                                 me
                                 mr={0}
@@ -543,6 +561,10 @@ export default function Header() {
                                     </StyledButton>
                                 )
                             }
+                            <StyledButton className="effect-button" onClick={() => router.push('/profile?address=me')}>
+                                <WalletIcon />
+                                My Profile
+                            </StyledButton>
                             <StyledButton className="effect-button" onClick={() => appKit?.disconnect()}>
                                 <LogoutIcon sx={{ color: "white" }} />
                                 Disconnect

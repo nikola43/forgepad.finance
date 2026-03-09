@@ -1,6 +1,7 @@
 'use client'
 
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CountUp from "react-countup";
 import { useTheme, useMediaQuery, styled } from '@mui/material';
 import { Alert, Avatar, Box, Button, Dialog, DialogContent, DialogTitle, FormControl, IconButton, Pagination, PaginationItem, Typography } from "@mui/material";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -10,13 +11,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import copy from 'copy-to-clipboard';
-import { ethers, MaxUint256 } from 'ethers';
+import { ethers, MaxUint256, BrowserProvider } from 'ethers';
 import { NumericFormat } from "react-number-format";
 import PageBox from "@/components/layout/pageBox";
 import TokenLogo from "@/components/tokenLogo";
 import { priceFormatter } from "@/utils/price";
 import Toggle from "@/components/toggle";
-import { Creator, User, UserName } from "@/components/cards/user";
+import { Creator, User, UserAvatar, UserName } from "@/components/cards/user";
 
 // import imgUniswap from '@/assets/images/uniswap.png';
 // import marketcapIcon from '@/assets/images/marketcap.png';
@@ -30,7 +31,7 @@ import { TimeDiff } from "@/components/time";
 // import { useContractInfo } from "@/hooks/contract";
 import { useHandlers, useTokenInfo } from "@/hooks/token";
 import toast from "react-hot-toast";
-import { useAppKit, useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
+import { useAppKit, useAppKitAccount, useAppKitNetwork, type Provider as EVMProvider, useAppKitProvider } from "@reown/appkit/react";
 import { useMainContext } from "@/context";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -39,6 +40,10 @@ import Link from "next/link";
 import { AssetUtil, ChainController } from "@reown/appkit-controllers"
 import { AppKitNetwork } from "@reown/appkit/networks";
 import { useUserInfo } from "@/hooks/user";
+import SendIcon from '@mui/icons-material/Send';
+import ReplyIcon from '@mui/icons-material/Reply';
+import axios from "axios";
+import { API_ENDPOINT } from "@/config";
 
 const SlippageInput = styled("input") <{ slippage: number }>`
   width: 48px;
@@ -67,16 +72,17 @@ const Divider = styled('hr')`
     margin: 0;
     padding: 0;
     border: none;
-    border-bottom: 1px solid #27272A;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 `
 
 const Progress = styled('div') <{ value: number }>`
     max-width: 400px;
     width: 100%;
-    height: 10px;
-    background: black;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
     position: relative;
-    transform: skewX(-33deg);
+    border-radius: 100px;
+    overflow: hidden;
     &::after {
         content: "";
         position: absolute;
@@ -84,7 +90,10 @@ const Progress = styled('div') <{ value: number }>`
         top: 0;
         bottom: 0;
         width: ${({ value }) => value}%;
-        background: white;
+        background: linear-gradient(90deg, #FFA600, #FFD700);
+        box-shadow: 0 0 12px rgba(255, 166, 0, 0.4);
+        border-radius: 100px;
+        transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @media(max-width: 800px) {
         min-width: 200px;
@@ -93,14 +102,19 @@ const Progress = styled('div') <{ value: number }>`
 
 const SmallButton = styled(Button)`
     &.MuiButton-root {
-        background: #121212;
-        border-radius: 4px;
-        color: #C1C1C1;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 8px;
+        color: #94A3B8;
         font-size: 12px;
-        padding: 2px 8px;
+        font-weight: 500;
+        padding: 3px 10px;
+        text-transform: none;
+        transition: all 0.2s ease;
         &:hover {
-            background: #121212;
-            color: #C1C1C1;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 166, 0, 0.2);
+            color: white;
         }
     }
 `
@@ -114,41 +128,56 @@ const TradeMenu = styled('div')`
     right: 0;
     justify-content: space-around;
     gap: 8px;
-    padding: 8px;
-    background: #121212;
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: rgba(6, 6, 10, 0.9);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
     & > button {
         flex: 1;
         padding: 12px 16px;
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         outline: none;
-        border-radius: 8px;
+        border-radius: 10px;
         color: white;
-        font-size: 16px;
+        font-size: 15px;
+        font-weight: 600;
         cursor: pointer;
+        transition: all 0.2s ease;
+        &:active {
+            transform: scale(0.97);
+        }
     }
 `
 
 const StatsBox = styled('div')`
     margin-top: 4px;
     display: flex;
-    background: #212121;
-    border-radius: 4px;
-    padding: 4px 8px;
-    gap: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 6px 10px;
+    gap: 6px;
 `
 
 const CurrencyInput = styled(Box)`
   display: flex;
   flex-direction: column;
-  background: #121212;
-  border-radius: 4px;
-  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px 16px;
   gap: 8px;
+  transition: border-color 0.2s ease;
+  &:focus-within {
+    border-color: rgba(255, 166, 0, 0.3);
+  }
   & span.balance {
     align-self: flex-end;
-    color: #FFF8;
-    font-size: small;
+    color: #64748B;
+    font-size: 12px;
+    font-weight: 500;
   }
   & input {
     font-size: 20px;
@@ -158,13 +187,14 @@ const CurrencyInput = styled(Box)`
     outline: none;
     width: 100%;
     text-align: right;
+    font-weight: 600;
   }
   ${({ theme }) => theme.breakpoints.down("sm")} {
-    padding: 8px 16px;
+    padding: 10px 14px;
   }
   & span.balance {
     ${({ theme }) => theme.breakpoints.down("sm")} {
-      font-size: x-small;
+      font-size: 11px;
     }
   }
   & input {
@@ -174,18 +204,48 @@ const CurrencyInput = styled(Box)`
   }
 `;
 
+const MarketCapValue = styled('span')<{ direction?: string }>`
+    font-size: 48px;
+    font-family: Arial;
+    font-weight: bold;
+    color: white;
+    transition: color 0.3s ease, text-shadow 0.3s ease;
+    ${({ direction }) => direction === 'up' ? `
+        color: #10B981;
+        text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    ` : direction === 'down' ? `
+        color: #EF4444;
+        text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    ` : ''}
+    @keyframes mcFlash {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    ${({ direction }) => direction && direction !== 'none' ? 'animation: mcFlash 0.4s ease;' : ''}
+`;
+
 const SocialLink = styled(Link)`
-  background: #27272A;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
   font-size: 12px;
-  color: white;
+  font-weight: 500;
+  color: #94A3B8;
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 12px;
+  transition: all 0.2s ease;
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 166, 0, 0.2);
+    color: white;
+  }
   ${({ theme }) => theme.breakpoints.down("sm")} {
     background: transparent;
+    border: none;
     padding: 0;
     opacity: 0.6;
     &:hover {
@@ -194,11 +254,108 @@ const SocialLink = styled(Link)`
   }
 `;
 
+const ChatContainer = styled(Box)`
+    background: rgba(13, 13, 20, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    margin: 1.5em 0;
+    max-height: 500px;
+    overflow: hidden;
+`
+
+const ChatMessages = styled(Box)`
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: rgba(255, 166, 0, 0.2); border-radius: 10px; }
+`
+
+const ChatBubble = styled(Box)<{ depth?: number }>`
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    margin-left: ${({ depth }) => Math.min((depth ?? 0) * 24, 72)}px;
+    transition: background 0.2s ease;
+    &:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+`
+
+const ChatInputBox = styled(Box)`
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    align-items: flex-end;
+    & textarea {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        color: white;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        padding: 10px 14px;
+        outline: none;
+        resize: none;
+        min-height: 40px;
+        max-height: 100px;
+        transition: border-color 0.2s ease;
+        &:focus {
+            border-color: rgba(255, 166, 0, 0.3);
+        }
+        &::placeholder {
+            color: #64748B;
+        }
+    }
+`
+
+const ChatSendButton = styled(IconButton)`
+    &.MuiIconButton-root {
+        background: linear-gradient(135deg, #FFA600, #FFD700);
+        border-radius: 10px;
+        width: 40px;
+        height: 40px;
+        color: #0a0a0f;
+        transition: all 0.2s ease;
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 166, 0, 0.3);
+        }
+        &.Mui-disabled {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.2);
+        }
+    }
+`
+
+const ReplyBadge = styled(Box)`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(255, 166, 0, 0.08);
+    border: 1px solid rgba(255, 166, 0, 0.15);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #FFA600;
+    margin: 0 16px;
+`
+
 const TradeBox = styled(Box)`
   display: grid;
   grid-template-columns: 1fr 0.5fr 0.5fr 0.5fr 1fr 1fr;
   align-items: center;
-  padding: 0.3em 1em;
+  padding: 0.4em 1.2em;
 
   ${({ theme }) => theme.breakpoints.down("sm")} {
     grid-template-columns: 0.5fr 0.5fr 0.5fr;
@@ -208,26 +365,31 @@ const TradeBox = styled(Box)`
 `;
 
 const HolderBox = styled(Box)`
-  background: #212121;
-  border-radius: 8px;
+  background: rgba(13, 13, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
   list-style-position: inside;
-  padding: 24px;
+  padding: 20px;
   color: white;
   h3 {
-    font-size: 18px;
+    font-size: 16px;
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-weight: 600;
     line-height: 18px;
     margin: 0;
     margin-bottom: 16px;
+    color: rgba(255, 255, 255, 0.9);
   }
   li {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px dotted #ddd6;
-    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 10px 0;
     gap: 8px;
     & > :first-of-type {
       flex: 0 0 1.5em;
+      color: #64748B;
     }
     & > :nth-of-type(2) {
       flex: 1;
@@ -238,6 +400,7 @@ const HolderBox = styled(Box)`
       flex: 0 0 auto;
       text-align: right;
       white-space: nowrap;
+      color: #94A3B8;
     }
   }
   max-width: 100%;
@@ -248,43 +411,48 @@ const HolderBox = styled(Box)`
   ${({ theme }) => theme.breakpoints.down("sm")} {
     font-size: 12px;
     h3 {
-      font-size: 16px;
+      font-size: 14px;
     }
     li {
-      padding: 6px 0;
+      padding: 8px 0;
     }
   }
 `;
 
 const SwapBox = styled(Box)`
-  background: #212121;
-  border-radius: 8px;
+  background: rgba(13, 13, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;  /* Center items horizontally */
-  justify-content: center;  /* Center items vertically */
-  gap: 15px;
-  padding: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
   width: 100%;
-  max-width: 385px;  /* Ensure a maximum width to prevent overflow */
-  margin: 0 auto;  /* Center the SwapBox */
+  max-width: 385px;
+  margin: 0 auto;
   box-sizing: border-box;
+  backdrop-filter: blur(12px);
 
   & button.medium, & button.small {
-    background: #FFFFFF0F;
-    color: #E7E3D8;
-    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #94A3B8;
+    border-radius: 8px;
     font-family: Inter;
     font-size: 12px;
     font-weight: 500;
-    padding: 8px 16px;
+    padding: 6px 14px;
     display: flex;
-    gap: 8px;
+    gap: 6px;
     text-transform: none;
     align-items: center;
     min-width: unset;
+    transition: all 0.2s ease;
     &.medium:hover {
-      background: #FFFFFF2F;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 166, 0, 0.2);
       color: white;
     }
   }
@@ -294,14 +462,14 @@ const SwapBox = styled(Box)`
   }
 
   &.disabled {
-    display: flex;  /* Ensure flex display for centering */
+    display: flex;
     flex-direction: column;
-    align-items: center;  /* Center items horizontally */
-    justify-content: center;  /* Center items vertically */
+    align-items: center;
+    justify-content: center;
     position: relative;
     overflow: hidden;
     filter: grayscale(0.8);
-    opacity: 0.5;
+    opacity: 0.4;
     &:after {
       position: absolute;
       content: '';
@@ -314,13 +482,13 @@ const SwapBox = styled(Box)`
 
   ${({ theme }) => theme.breakpoints.down("sm")} {
     padding: 16px;
-    border-radius: 24px;
+    border-radius: 16px;
   }
 
   & button.medium, & button.small {
     ${({ theme }) => theme.breakpoints.down("sm")} {
       font-size: 10px;
-      padding: 6px 12px;
+      padding: 5px 10px;
     }
   }
 
@@ -448,7 +616,11 @@ export default function Token() {
     const network = searchParams.get('network')
     const id = searchParams.get('address')
     // const [detailData, setDetailData] = React.useState<any>(null);
-    // const [chatList, setChatList] = React.useState<any[]>([]);
+    const [chatList, setChatList] = React.useState<any[]>([]);
+    const [chatComment, setChatComment] = React.useState('');
+    const [chatReplyTo, setChatReplyTo] = React.useState<any>(null);
+    const [chatLoading, setChatLoading] = React.useState(false);
+    const [chatSending, setChatSending] = React.useState(false);
     // const [tradeData, setTradeData] = React.useState<any>([]);
     // const [king, setKing] = React.useState<any>()
     // const [value, setValue] = React.useState('1');
@@ -508,10 +680,93 @@ export default function Token() {
         return networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
     }, [networks, tokenChain])
     const handlers = useHandlers(tokenNetwork)
+    const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
+    const chatMessagesRef = useRef<HTMLDivElement>(null)
 
+    // Chat: fetch messages
+    const fetchChats = useCallback(async () => {
+        if (!id || !network) return
+        setChatLoading(true)
+        try {
+            const { data } = await axios.post(`${API_ENDPOINT}/chats`, { tokenAddress: id, network })
+            setChatList(data)
+        } catch (err) {
+            console.error('Failed to fetch chats:', err)
+        } finally {
+            setChatLoading(false)
+        }
+    }, [id, network])
 
+    // Chat: load on tab switch
+    useEffect(() => {
+        if (mode === 'chat') {
+            fetchChats()
+        }
+    }, [mode, fetchChats])
+
+    // Chat: auto-scroll to bottom
+    useEffect(() => {
+        if (chatMessagesRef.current) {
+            chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
+        }
+    }, [chatList])
+
+    // Chat: build threaded structure
+    const threadedChats = useMemo(() => {
+        if (!chatList.length) return []
+        return chatList.map(chat => {
+            const codeParts = (chat.code || '').split('#')
+            return { ...chat, depth: codeParts.length - 1 }
+        })
+    }, [chatList])
+
+    // Chat: send message
+    const sendChat = useCallback(async () => {
+        if (!chatComment.trim() || !id || !network || !address || !evmProvider) return
+        if (chatComment.length > 1000) {
+            toast.error('Message must be 1000 characters or fewer')
+            return
+        }
+        setChatSending(true)
+        try {
+            const provider = new BrowserProvider(evmProvider)
+            const signer = await provider.getSigner()
+            const msg = `Post comment on ${id}`
+            const signature = await signer.signMessage(msg)
+
+            const { data } = await axios.post(`${API_ENDPOINT}/chats/reply`, {
+                tokenAddress: id,
+                replyAddress: address,
+                comment: chatComment.trim(),
+                network,
+                replyId: chatReplyTo?.id,
+                signature,
+                msg
+            })
+            setChatList(data)
+            setChatComment('')
+            setChatReplyTo(null)
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || err?.message || 'Failed to send message'
+            toast.error(msg)
+        } finally {
+            setChatSending(false)
+        }
+    }, [chatComment, id, network, address, evmProvider, chatReplyTo])
 
     const marketCap = useMemo(() => Number(detailData?.marketcap ?? 0), [detailData])
+    const prevMarketCap = useRef(0)
+    const [mcDirection, setMcDirection] = useState<'up' | 'down' | 'none'>('none')
+
+    useEffect(() => {
+        if (marketCap !== prevMarketCap.current && prevMarketCap.current > 0) {
+            const dir = marketCap > prevMarketCap.current ? 'up' : 'down'
+            setMcDirection(dir)
+            const timer = setTimeout(() => setMcDirection('none'), 2000)
+            return () => clearTimeout(timer)
+        }
+        prevMarketCap.current = marketCap
+    }, [marketCap])
 
     const pagesOfTrades = useMemo(() => tradesCount ? Math.floor(tradesCount / pageSize) + (tradesCount % pageSize === 0 ? 0 : 1) : 0, [pageSize, tradesCount])
 
@@ -650,13 +905,18 @@ export default function Token() {
         }
     }, [detailData, tradeType, amountIn, address, tokenContract])
 
-    const showSuccessToast = useCallback((message: string) => {
-        const link = `${tokenChain?.explorerUrl}/tx/${message}`
+    const showSuccessToast = useCallback((txHash: string, type?: string) => {
+        const link = `${tokenChain?.explorerUrl}/tx/${txHash}`
+        const shortHash = `${txHash.slice(0, 6)}...${txHash.slice(-6)}`
         toast.success(
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span>Transaction success!</span>
-                <a style={{ textDecoration: 'none', color: 'white' }} target="_blank" rel="noreferrer" href={link}>See tx in explorer <LinkIcon sx={{ fontSize: 14 }} /></a>
-            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontWeight: 600 }}>{type === 'sell' ? 'Sell' : 'Buy'} successful</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
+                    <a style={{ textDecoration: 'none', color: '#FFA600', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
+                </div>
+            </div>,
+            { duration: 8000 }
         );
     }, [tokenChain])
 
@@ -668,10 +928,10 @@ export default function Token() {
             const _slippage = BigInt(Math.floor(slippage * 100));
             if (tradeType === "buy") {
                 const tx = await handlers.buyToken(detailData.tokenAddress, amountIn ?? '0', _slippage, exactInput)
-                showSuccessToast(tx.hash)
+                showSuccessToast(tx.hash, 'buy')
             } else {
                 const tx = await handlers.sellToken(detailData.tokenAddress, amountIn ?? '0', _slippage)
-                showSuccessToast(tx.hash)
+                showSuccessToast(tx.hash, 'sell')
             }
             setAmountIn(undefined)
             setIsLoading(false);
@@ -747,7 +1007,7 @@ export default function Token() {
     // }, [detailData, poolInfo])
 
     return (
-        <PageBox display="flex" flexDirection="column" justifyContent="space-between" gap="1.5em" maxWidth="100%" overflow="hidden" pt={6} bgcolor="#101012">
+        <PageBox display="flex" flexDirection="column" justifyContent="space-between" gap="1.5em" maxWidth="100%" overflow="hidden" pt={6}>
             {/* {!!detailData?.tokenBanner && (
                 <Banner src={`${IPFS_GATEWAY_URL}/${detailData.tokenBanner}`} />
             )} */}
@@ -768,8 +1028,17 @@ export default function Token() {
                             !isMobile &&
                             <Box>
                                 <Box display="flex" gap="8px" alignItems="baseline" position="relative" width="fit-content">
-                                    <Typography fontSize={48} fontFamily="Arial" fontWeight="bold" color="white">${priceFormatter(marketCap, 2)}</Typography>
-                                    <Typography fontSize={12} color="white">Market cap</Typography>
+                                    <MarketCapValue direction={mcDirection}>
+                                        $<CountUp
+                                            start={prevMarketCap.current || 0}
+                                            end={marketCap}
+                                            duration={1.2}
+                                            decimals={2}
+                                            separator=","
+                                            preserveValue
+                                        />
+                                    </MarketCapValue>
+                                    <Typography fontSize={12} color="rgba(255,255,255,0.6)">Market cap</Typography>
                                     <Box
                                         position="absolute"
                                         right={0} top={12}
@@ -858,8 +1127,17 @@ export default function Token() {
                     isMobile &&
                     <Box mt={1}>
                         <Box display="flex" gap="8px" alignItems="baseline">
-                            <Typography fontSize={32} fontFamily="Arial" fontWeight="bold" color="white">${priceFormatter(marketCap, 2)}</Typography>
-                            <Typography fontSize={12} color="white">Market cap</Typography>
+                            <MarketCapValue direction={mcDirection} style={{ fontSize: 32 }}>
+                                $<CountUp
+                                    start={prevMarketCap.current || 0}
+                                    end={marketCap}
+                                    duration={1.2}
+                                    decimals={2}
+                                    separator=","
+                                    preserveValue
+                                />
+                            </MarketCapValue>
+                            <Typography fontSize={12} color="rgba(255,255,255,0.6)">Market cap</Typography>
                         </Box>
                         <Box display="flex" gap="8px" alignItems="baseline">
                             <Typography fontSize={14} color="lightgreen">
@@ -925,6 +1203,7 @@ export default function Token() {
                             <Box display="flex" justifyContent="space-between" flexDirection={{ xs: 'column', sm: 'row' }}>
                                 <Toggle inner="true">
                                     <div className={mode === "trades" ? "active" : ""} onClick={() => setMode("trades")}>Trades</div>
+                                    <div className={mode === "chat" ? "active" : ""} onClick={() => setMode("chat")}>Chat</div>
                                     <div className={mode === "info" ? "active" : ""} onClick={() => setMode("info")}>Info</div>
                                     {
                                         isMobile &&
@@ -934,7 +1213,7 @@ export default function Token() {
                             </Box>
                             {mode === "trades" && (
                                 <Box mb="1.5em">
-                                    <Box display="flex" flexDirection="column" my="1.5em" borderRadius="12px" overflow="hidden" bgcolor="#191919" border="1px solid #27272A">
+                                    <Box display="flex" flexDirection="column" my="1.5em" borderRadius="16px" overflow="hidden" bgcolor="rgba(13, 13, 20, 0.6)" border="1px solid rgba(255, 255, 255, 0.05)">
                                         <TradeBox sx={{ pt: 3, pb: 2 }}>
                                             <Typography color="white" fontSize={14} fontWeight="bold" display={{ sm: 'block', xs: 'none' }}>Date</Typography>
                                             <Typography color="white" fontSize={14} fontWeight="bold">Type</Typography>
@@ -989,9 +1268,90 @@ export default function Token() {
                                     />
                                 </Box>
                             )}
+                            {mode === "chat" && (
+                                <ChatContainer>
+                                    <ChatMessages ref={chatMessagesRef}>
+                                        {chatLoading ? (
+                                            <Box display="flex" justifyContent="center" py={4}>
+                                                <CircularProgress size={24} sx={{ color: '#FFA600' }} />
+                                            </Box>
+                                        ) : threadedChats.length === 0 ? (
+                                            <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1}>
+                                                <Typography color="#64748B" fontSize={14}>No messages yet</Typography>
+                                                <Typography color="#475569" fontSize={12}>Be the first to comment</Typography>
+                                            </Box>
+                                        ) : (
+                                            threadedChats.map((chat: any) => (
+                                                <ChatBubble key={chat.id} depth={chat.depth}>
+                                                    <UserAvatar address={chat.replyAddress} size={28} mr="0" />
+                                                    <Box flex={1} minWidth={0}>
+                                                        <Box display="flex" alignItems="center" gap="6px" mb="4px">
+                                                            <Typography fontSize={12} fontWeight={600} color="white" noWrap>
+                                                                {chat.replyAddress?.slice(0, 6)}...{chat.replyAddress?.slice(-4)}
+                                                            </Typography>
+                                                            <Typography fontSize={11} color="#64748B">
+                                                                {Date.now() - new Date(chat.date || chat.createdAt).getTime() < 3600000
+                                                                    ? <TimeDiff time={new Date(chat.date || chat.createdAt)} postfix="ago" />
+                                                                    : new Date(chat.date || chat.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+                                                                }
+                                                            </Typography>
+                                                        </Box>
+                                                        <Typography fontSize={13} color="#E2E8F0" sx={{ wordBreak: 'break-word', lineHeight: 1.5 }}>
+                                                            {chat.comment}
+                                                        </Typography>
+                                                        <Box
+                                                            display="flex"
+                                                            alignItems="center"
+                                                            gap="4px"
+                                                            mt="6px"
+                                                            sx={{ cursor: 'pointer', opacity: 0.5, '&:hover': { opacity: 1 }, transition: 'opacity 0.2s' }}
+                                                            onClick={() => setChatReplyTo(chat)}
+                                                        >
+                                                            <ReplyIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
+                                                            <Typography fontSize={11} color="#94A3B8">Reply</Typography>
+                                                        </Box>
+                                                    </Box>
+                                                </ChatBubble>
+                                            ))
+                                        )}
+                                    </ChatMessages>
+                                    {chatReplyTo && (
+                                        <ReplyBadge>
+                                            <ReplyIcon sx={{ fontSize: 14 }} />
+                                            <Typography fontSize={12} noWrap flex={1}>
+                                                Replying to {chatReplyTo.replyAddress?.slice(0, 6)}...{chatReplyTo.replyAddress?.slice(-4)}
+                                            </Typography>
+                                            <IconButton size="small" onClick={() => setChatReplyTo(null)} sx={{ padding: '2px' }}>
+                                                <CloseIcon sx={{ fontSize: 14, color: '#FFA600' }} />
+                                            </IconButton>
+                                        </ReplyBadge>
+                                    )}
+                                    <ChatInputBox>
+                                        <textarea
+                                            value={chatComment}
+                                            onChange={(e) => setChatComment(e.target.value)}
+                                            placeholder={address ? "Write a message..." : "Connect wallet to chat"}
+                                            disabled={!address || chatSending}
+                                            rows={1}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault()
+                                                    sendChat()
+                                                }
+                                            }}
+                                        />
+                                        <ChatSendButton
+                                            onClick={sendChat}
+                                            disabled={!address || !chatComment.trim() || chatSending}
+                                        >
+                                            {chatSending ? <CircularProgress size={18} sx={{ color: 'inherit' }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                        </ChatSendButton>
+                                    </ChatInputBox>
+                                </ChatContainer>
+                            )}
                             {
                                 mode === "info" &&
-                                <Box bgcolor="#212121" borderRadius="16px" display="flex" gap="16px" padding="24px" my="1.5em">
+                                <Box bgcolor="rgba(13, 13, 20, 0.6)" border="1px solid rgba(255, 255, 255, 0.05)" borderRadius="16px" display="flex" gap="16px" padding="24px" my="1.5em">
                                     <TokenLogo logo={detailData?.tokenImage} size="120px" />
                                     <Box>
                                         <Box display="flex" gap="0.2rem">

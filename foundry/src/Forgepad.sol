@@ -163,7 +163,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         require(_feeAddress != address(0), "Fee address cannot be zero");
         feeAddress = _feeAddress;
-        MAX_BUY_PERCENT = 1000; // 10%
+        MAX_BUY_PERCENT = 10000; // 100%
         CREATE_TOKEN_FEE_AMOUNT = 0;
         TOKEN_OWNER_FEE_PERCENT = 0;
         TARGET_MARKET_CAP = _targetMarketCap;
@@ -174,7 +174,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         initialTokenLPAmount = 900_000_000 ether;
 
         firstBuyFeeUSD = 0;
-        MAX_SELL_PERCENT = 1000; // 10%
+        MAX_SELL_PERCENT = 10000; // 100%
         PLATFORM_BUY_FEE_PERCENT = 3; // 3%
         PLATFORM_SELL_FEE_PERCENT = 3; // 3%
         platformLPFee = 0.5 ether; // 0.5 ETH
@@ -914,7 +914,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     function setMaxBuyPercent(uint256 percent) external onlyOwner {
-        require(percent <= 1000, "Max buy cannot exceed 10%"); // Max 10%
+        require(percent <= 10000, "Max buy cannot exceed 100%"); // Max 100%
         MAX_BUY_PERCENT = percent;
     }
 
@@ -985,18 +985,18 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     function setMaxSellPercent(uint256 percent) external onlyOwner {
-        require(percent <= 1000, "Max sell cannot exceed 10%"); // Max 10%
+        require(percent <= 10000, "Max sell cannot exceed 100%"); // Max 100%
         MAX_SELL_PERCENT = percent;
     }
 
     function setPlatformBuyFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10, "Buy fee cannot exceed 10%");
-        require(percent + TOKEN_OWNER_FEE_PERCENT < 100, "Combined fees too high");
+        require(percent <= 10000, "Buy fee cannot exceed 100%");
+        require(percent + TOKEN_OWNER_FEE_PERCENT < 10000, "Combined fees too high");
         PLATFORM_BUY_FEE_PERCENT = percent;
     }
 
     function setPlatformSellFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10, "Sell fee cannot exceed 10%");
+        require(percent <= 10000, "Sell fee cannot exceed 100%");
         PLATFORM_SELL_FEE_PERCENT = percent;
     }
 

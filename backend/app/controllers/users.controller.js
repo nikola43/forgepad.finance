@@ -541,6 +541,47 @@ module.exports = {
         }
     },
 
+    async uploadAvatar(req, res) {
+        try {
+            const { signature, msg } = req.body
+            if (!signature || !msg) {
+                return res.status(400).json({ error: 'Signature and message are required' });
+            }
+            const sig = util.fromRpcSig(signature);
+            const prefix = Buffer.from("\x19Ethereum Signed Message:\n");
+            const prefixedMsg = util.keccak256(
+                Buffer.concat([prefix, Buffer.from(String(msg.length)), Buffer.from(msg)])
+            );
+            const pubKey = util.ecrecover(prefixedMsg, sig.v, sig.r, sig.s);
+            const addrBuf = util.pubToAddress(pubKey);
+            const userAddress = util.toChecksumAddress(util.bufferToHex(addrBuf));
+
+            if (!req.file) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+
+            const useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true';
+            const avatarKey = useLocalStorage ? req.file.filename : req.file.key;
+
+            let user = await usersTable.findOne({ where: { address: userAddress } });
+            if (!user) {
+                user = await usersTable.create({
+                    address: userAddress,
+                    username: '',
+                    bio: '',
+                    avatar: avatarKey
+                });
+            } else {
+                user.avatar = avatarKey;
+                await user.save();
+            }
+            res.status(200).json({ avatar: avatarKey, user });
+        } catch (error) {
+            console.log(error)
+            res.status(500).json({ error: 'Error', message: error.message });
+        }
+    },
+
     async topHolders(req, res) {
         const { count } = req.params
         const { from = 0, to = Math.floor(Date.now() / 1000), index = 0, network } = req.query

@@ -9,12 +9,15 @@ const ComboBoxRoot = styled(Box)`
   & > label {
     padding: 8px 16px;
     height: 100%;
-    background: #232325;
-    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
     color: white;
     cursor: pointer;
+    transition: all 0.2s ease;
     &:hover {
-      opacity: 0.7;
+      border-color: rgba(255, 166, 0, 0.25);
+      background: rgba(255, 255, 255, 0.06);
     }
   }
   position: relative;
@@ -26,49 +29,52 @@ const ComboBoxRoot = styled(Box)`
   & .menu {
     position: absolute;
     top:calc(100% + 6px); right:0;
-    border-radius: 10px;
+    border-radius: 12px;
     min-width: calc(100% - 2px);
     box-sizing: border-box;
     z-index: 3;
   }
   & ul {
-    background: #232325;
-    border: 1px solid #FF9D00;
+    background: rgba(13, 13, 20, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     list-style: none;
-    padding: 0.4em 0;
+    padding: 4px;
     margin: 0;
-    border-radius: 4px;
+    border-radius: 12px;
     color: #222;
     font-family: Inter;
-    font-size: 14px;
+    font-size: 13px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
     li {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #ddd;
+      color: #94A3B8;
       cursor: pointer;
-      padding: 0.4em 1em;
+      padding: 8px 12px;
+      border-radius: 8px;
+      transition: all 0.15s ease;
       &.active {
         color: white;
-        font-weight: bold;
+        font-weight: 600;
       }
       &:hover {
-        color: black;
-        background: #ddd;
+        color: white;
+        background: rgba(255, 255, 255, 0.06);
       }
-      
     }
   }
   ${({ theme }) => theme.breakpoints.down("sm")} {
     & > label {
-      padding: 12px 16px;
+      padding: 10px 16px;
     }
   }
-    
+
   ${({ theme }) => theme.breakpoints.down(800)} {
     width: 100%;
     & > label {
-      border-radius: 4px;
+      border-radius: 10px;
     }
   }
 `

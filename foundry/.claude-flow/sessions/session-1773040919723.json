@@ -1,0 +1,16 @@
+{
+  "id": "session-1773040919723",
+  "startedAt": "2026-03-09T07:21:59.723Z",
+  "platform": "darwin",
+  "cwd": "/Users/nkt/dev/forgepad.finance/foundry",
+  "context": {},
+  "metrics": {
+    "edits": 18,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "restoredAt": "2026-03-09T07:21:59.742Z",
+  "endedAt": "2026-03-09T08:38:25.735Z",
+  "duration": 4586013
+}

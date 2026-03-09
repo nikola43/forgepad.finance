@@ -122,25 +122,34 @@ const Buttons = styled.div`
 const Button = styled.button`
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #FFA600;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #FFA600, #FFD700);
   border: none;
   outline: none;
-  border-radius: 8px;
-  color: black;
-  font-family: "Londrina Solid";
-  font-size: 24px;
+  border-radius: 10px;
+  color: #0a0a0f;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   justify-content: flex-start;
-  font-weight: 400;
-  
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(255, 166, 0, 0.25);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
   svg {
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     fill: currentColor;
   }
 `
@@ -160,20 +169,22 @@ const HowDialog = styled(Dialog)`
 `
 
 const CloseButton = styled.button`
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     display: flex;
     justify-content: center;
     align-items: center;
-    background: #232325;
-    border: none;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     outline: none;
     border-radius: 8px;
     color: white;
     cursor: pointer;
-    
+    transition: all 0.2s ease;
+
     &:hover {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 166, 0, 0.3);
     }
 `
 

@@ -1,28 +1,31 @@
 import { Avatar, Box, Typography } from "@mui/material";
 import { FILE_ENDPOINT } from "@/config";
-// import verifiedIcon from "@/assets/images/verified.png";
 import SecurityIcon from '@mui/icons-material/Security';
-import styled from "styled-components";
+import NextLink from "next/link";
 
-const Link = styled.div<{ to: string, target?: string }>``
+export function getProfilePic(user: any, address?: string) {
+    if (user?.avatar === "bondingCurv") return "/favicon.ico"
+    if (user?.twitter_profile_picture) return user.twitter_profile_picture
+    if (user?.avatar) return `${FILE_ENDPOINT}/${user.avatar}`
+    return `https://api.multiavatar.com/${parseInt((user?.address ?? address)?.slice(-6) ?? '0', 16)}.png`
+}
+
+function profileHref(user: any, address?: string, me?: boolean) {
+    const addr = me ? "me" : (user?.address ?? address)
+    if (!addr) return '#'
+    return addr === "me" ? `/profile?address=me` : `/profile?address=${addr}`
+}
 
 export function UserAvatar({ user, address, size = 24, mr = "0.5rem", me = false, showAdmin = false }: any) {
-    let profilePic = `https://api.multiavatar.com/${parseInt((user?.address ?? address)?.slice(-6) ?? '0', 16)}.png`
-    if (user?.avatar === "bondingCurv") {
-        profilePic = "/favicon.ico"
-    } else if (user?.twitter_profile_picture) {
-        profilePic = user.twitter_profile_picture
-    } else if (user?.avatar) {
-        profilePic = `${FILE_ENDPOINT}/${user.avatar}`
-    }
+    const profilePic = getProfilePic(user, address)
     return (
-        <Link to={`/profile/${me ? "me" : (user?.address ?? address)}`} style={{ textDecoration: 'none', position: 'relative' }}>
+        <NextLink href={profileHref(user, address, me)} style={{ textDecoration: 'none', position: 'relative', display: 'inline-flex' }}>
             <Avatar sx={{ width: size, height: size, mr }} src={profilePic} />
             {
                 showAdmin && !!user?.admin?.id &&
                 <SecurityIcon sx={{ position: 'absolute', right: -2, bottom: -2, height: size / 2, color: '#E12D85' }} />
             }
-        </Link>
+        </NextLink>
     )
 }
 
@@ -33,9 +36,9 @@ export function UserName({ user, address, fontSize = 14, fontFamily, color = "#D
     }
     return (
         <Box display="flex" alignItems="center" gap="4px">
-            <Link to={`/profile/${me ? "me" : (user?.address ?? address)}`} style={{ textDecoration: 'none' }}>
+            <NextLink href={profileHref(user, address, me)} style={{ textDecoration: 'none' }}>
                 <Typography color={color} noWrap fontFamily={fontFamily} fontSize={fontSize}>{prefix}{username}</Typography>
-            </Link>
+            </NextLink>
         </Box>
     )
 }

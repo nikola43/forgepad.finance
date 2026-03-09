@@ -1,0 +1,108 @@
+[
+  {
+    "timestamp": 1773045505755,
+    "nodes": 12,
+    "edges": 11,
+    "pageRankSum": 1,
+    "confidences": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5
+    ],
+    "accessCounts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "topPatterns": [
+      {
+        "id": "mem-MEMORY-status",
+        "summary": "Status",
+        "confidence": 0.5,
+        "pageRank": 0.14074983342401198,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-color-palette--dark-glass-morp",
+        "summary": "Color Palette (dark glass-morphism)",
+        "confidence": 0.5,
+        "pageRank": 0.13326313106650234,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-gradle",
+        "summary": "Gradle",
+        "confidence": 0.5,
+        "pageRank": 0.12445487785542604,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-openai-config",
+        "summary": "OpenAI Config",
+        "confidence": 0.5,
+        "pageRank": 0.11409203491742928,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-api-key",
+        "summary": "API Key",
+        "confidence": 0.5,
+        "pageRank": 0.10190038999939531,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-architecture",
+        "summary": "Architecture",
+        "confidence": 0.5,
+        "pageRank": 0.08755730879527994,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-user-preferences",
+        "summary": "User Preferences",
+        "confidence": 0.5,
+        "pageRank": 0.0706832281193158,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-tech-stack",
+        "summary": "Tech Stack",
+        "confidence": 0.5,
+        "pageRank": 0.0706832281193158,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-ruflo-configuration",
+        "summary": "Ruflo Configuration",
+        "confidence": 0.5,
+        "pageRank": 0.05083149506388197,
+        "accessCount": 0
+      },
+      {
+        "id": "mem-MEMORY-key-paths",
+        "summary": "Key Paths",
+        "confidence": 0.5,
+        "pageRank": 0.05083149506388197,
+        "accessCount": 0
+      }
+    ]
+  }
+]

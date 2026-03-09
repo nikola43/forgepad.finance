@@ -34,7 +34,42 @@ function MainLayout({ children }: { children: ReactNode }) {
                 isMobile &&
                 <MobileMenu open={isMenuOpen} onMenuOpen={(isOpen) => setMenuOpen(isOpen)} />
             }
-            <Toaster />
+            <Toaster
+                position="top-right"
+                toastOptions={{
+                    duration: 5000,
+                    style: {
+                        background: 'rgba(13, 13, 20, 0.95)',
+                        backdropFilter: 'blur(20px)',
+                        color: '#F8FAFC',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontFamily: "'Inter', sans-serif",
+                        padding: '12px 16px',
+                        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)',
+                        maxWidth: '420px',
+                    },
+                    success: {
+                        iconTheme: {
+                            primary: '#10B981',
+                            secondary: '#0a0a0f',
+                        },
+                        style: {
+                            borderColor: 'rgba(16, 185, 129, 0.2)',
+                        },
+                    },
+                    error: {
+                        iconTheme: {
+                            primary: '#EF4444',
+                            secondary: '#0a0a0f',
+                        },
+                        style: {
+                            borderColor: 'rgba(239, 68, 68, 0.2)',
+                        },
+                    },
+                }}
+            />
         </>
     );
 }

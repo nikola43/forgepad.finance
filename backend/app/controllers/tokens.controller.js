@@ -189,6 +189,25 @@ module.exports = {
             res.status(500).json({ error: 'Error', message: error.message });
         }
     },
+    async getKing(req, res) {
+        try {
+            const tokenTable = db.tokens;
+            const userTable = db.users;
+            tokenTable.hasOne(userTable, { sourceKey: 'creatorAddress', foreignKey: 'address' })
+            const king = await tokenTable.findOne({
+                include: [{ model: userTable }],
+                where: { category: 0 },
+                order: [['marketcap', 'DESC']],
+            });
+            if (!king) {
+                return res.status(404).json({ error: 'No king found' });
+            }
+            res.status(200).json(king);
+        } catch (error) {
+            console.error('Error in getKing:', error.message);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch king' });
+        }
+    },
     async getAllTokens(req, res) {
         try {
             const orderType = req.query.orderType || 'createdAt'

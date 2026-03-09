@@ -129,6 +129,26 @@ export function useTokens(filter: any) {
     }
 }
 
+export function useKing() {
+    const { data, mutate } = useSWR(
+        '/tokens/king',
+        async () => {
+            const { data } = await axios.get(`${API_ENDPOINT}/tokens/king`)
+            return data
+        }, {
+        refreshInterval: 10000,
+        keepPreviousData: true
+    })
+
+    useEffect(() => {
+        const onTrade = () => mutate()
+        socket.on('m', onTrade)
+        return () => { socket.off('m', onTrade) }
+    }, [mutate])
+
+    return { king: data ?? null }
+}
+
 export function useNewTrades() {
     const [latestTradeId, setLatestTradeId] = useState<string>()
 

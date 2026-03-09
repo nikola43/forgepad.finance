@@ -77,6 +77,7 @@ module.exports = app => {
 
   const router = require("express").Router();
 
+  router.get('/king', tokensController.getKing); // King of the Hill - highest market cap token
   router.get('/', tokensController.getAllTokens); // All tokens for dashboard
   router.post('/', tokensController.createToken);
   router.post('/move/:tokenAddress', tokensController.moveToken);

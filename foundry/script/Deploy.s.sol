@@ -65,9 +65,9 @@ contract DeployForgepad is Script {
         // 4. Configure fees
         forgepad.setPlatformBuyFeePercent(3);
         forgepad.setPlatformSellFeePercent(3);
-        forgepad.setMaxBuyPercent(300);
-        forgepad.setMaxSellPercent(300);
-        console.log("Fees configured: 3% buy/sell, 3% max buy/sell");
+        forgepad.setMaxBuyPercent(10000);
+        forgepad.setMaxSellPercent(10000);
+        console.log("Fees configured: 3% buy/sell, 100% max buy/sell");
 
         vm.stopBroadcast();
 

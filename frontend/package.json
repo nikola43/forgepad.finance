@@ -31,6 +31,7 @@
     "next": "15.3.8",
     "react": "19.0.0",
     "react-confetti": "^6.4.0",
+    "react-countup": "^6.5.3",
     "react-dom": "19.0.0",
     "react-hot-toast": "^2.5.2",
     "react-number-format": "^5.4.4",
