@@ -24,6 +24,8 @@ import { useAppKitAccount } from "@reown/appkit/react";
 import { ChainController } from "@reown/appkit-controllers";
 import toast from "react-hot-toast";
 import CircularProgress from "@mui/material/CircularProgress";
+import { TokenCardSkeleton, KingCardSkeleton } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 const CreateButton = styled(Link)`
     border-radius: 12px;
@@ -200,6 +202,31 @@ const CardGrid = styled(Box) <{ min: number, space: number }>`
     }
 `;
 
+const GraduatingSection = styled(Box)`
+    position: relative;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(255, 100, 0, 0.06) 0%, rgba(255, 166, 0, 0.04) 50%, rgba(255, 215, 0, 0.02) 100%);
+    border: 1px solid rgba(255, 100, 0, 0.12);
+    padding: 16px;
+    overflow: hidden;
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(ellipse at 50% 0%, rgba(255, 100, 0, 0.08) 0%, transparent 70%);
+        pointer-events: none;
+    }
+`;
+
+const SectionDivider = () => (
+    <Box sx={{
+        height: '1px',
+        background: 'linear-gradient(90deg, transparent, rgba(255,166,0,0.15), transparent)',
+        my: 3
+    }} />
+);
+
 export default function Home() {
     const [network, setNetwork] = useState('all');
     const [orderType, setOrderType] = useState('marketcap');
@@ -305,6 +332,16 @@ export default function Home() {
         pageNumber: pageTrendsNumber, pageSize: pageTrendSize
     })
 
+    const { tokens: graduatingTokens } = useTokens({
+        pageNumber: 1, pageSize: 6, orderType: 'progress', orderFlag: 'DESC'
+    })
+
+    const filteredGraduatingTokens = useMemo(() => {
+        return graduatingTokens.filter((token: any) =>
+            Number(token.progress ?? 0) > 70 && !token.launchedAt
+        )
+    }, [graduatingTokens])
+
     const totalPage = useMemo(() => {
         return Math.floor(count / pageSize) + (count % pageSize === 0 ? 0 : 1)
     }, [count, pageSize])
@@ -329,7 +366,21 @@ export default function Home() {
 
     return (
         <PageBox>
-            {king && (
+            {/* King of the Hill Section */}
+            {king === undefined ? (
+                <Box my={2}>
+                    <Box display="flex" gap="8px" p="0 4px" mb={1.5} alignItems="center">
+                        <KingCrown>
+                            <span className="crown">👑</span>
+                            <Typography fontSize={14} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em">
+                                King of the Hill
+                            </Typography>
+                        </KingCrown>
+                        <Typography fontSize={12} color="#64748B" ml="auto">Highest Market Cap</Typography>
+                    </Box>
+                    <KingCardSkeleton />
+                </Box>
+            ) : king && (
                 <Box my={2}>
                     <Box display="flex" gap="8px" p="0 4px" mb={1.5} alignItems="center">
                         <KingCrown>
@@ -441,6 +492,10 @@ export default function Home() {
                     </Box>
                 </Box>
             )}
+
+            <SectionDivider />
+
+            {/* Trending Section */}
             <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center">
                 <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px #10B981', animation: 'glow-pulse 2s ease-in-out infinite' }} />
                 <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">Trending</Typography>
@@ -453,45 +508,120 @@ export default function Home() {
                     </IconButton>
                 </Box>
             </Box>
-            <CardGrid min={180} space={12} ref={elementRef}>
-                {
-                    trends.slice(0, pageTrendSize).map((item: any) => (
-                        <TokenCard key={`trend-token-${item.tokenAddress}`} token={item} mode="trends" />
-                    ))
-                }
-            </CardGrid>
-            <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap="8px" my={2} alignItems="center">
-                <ComboBox label="Sort" border="1px solid #FF9D00" values={{
-                    bump: 'Trending',
-                    marketcap: 'Market cap',
-                    creationTime: 'Creation time',
-                    volume: 'Trading volume',
-                    // progress: 'Progress' 
-                }} value={orderType} onChange={setOrderType} />
-                <ComboBox label="Network" border="1px solid #FF9D00" values={{
-                    all: 'All',
-                    ...(
-                        chains?.reduce((networks, c) => ({
-                            ...networks, [c.network]: c.name
-                        }), {})
-                    )
-                }} value={network} onChange={setNetwork} />
+            {trends.length === 0 ? (
+                <CardGrid min={180} space={12} ref={elementRef} className="stagger-children">
+                    {Array.from({ length: pageTrendSize || 4 }).map((_, i) => (
+                        <TokenCardSkeleton key={`trend-skeleton-${i}`} mode="trends" />
+                    ))}
+                </CardGrid>
+            ) : (
+                <CardGrid min={180} space={12} ref={elementRef} className="stagger-children">
+                    {
+                        trends.slice(0, pageTrendSize).map((item: any) => (
+                            <TokenCard key={`trend-token-${item.tokenAddress}`} token={item} mode="trends" />
+                        ))
+                    }
+                </CardGrid>
+            )}
+
+            <SectionDivider />
+
+            {/* About to Graduate Section */}
+            {filteredGraduatingTokens.length > 0 && (
+                <>
+                    <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center">
+                        <Box sx={{ fontSize: 16, lineHeight: 1 }}>🔥</Box>
+                        <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
+                            About to Graduate
+                        </Typography>
+                        <Typography fontSize={11} color="#64748B" ml="auto">
+                            Progress &gt; 70%
+                        </Typography>
+                    </Box>
+                    <GraduatingSection>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                gap: '12px',
+                                overflowX: 'auto',
+                                pb: 1,
+                                '&::-webkit-scrollbar': { height: 4 },
+                                '&::-webkit-scrollbar-track': { background: 'transparent' },
+                                '&::-webkit-scrollbar-thumb': { background: 'rgba(255,166,0,0.2)', borderRadius: 2 },
+                            }}
+                        >
+                            {filteredGraduatingTokens.map((item: any) => (
+                                <Box key={`graduating-${item.tokenAddress}`} sx={{ minWidth: 180, flex: '0 0 auto' }} className="graduation-glow">
+                                    <TokenCard token={item} mode="trends" />
+                                </Box>
+                            ))}
+                        </Box>
+                    </GraduatingSection>
+
+                    <SectionDivider />
+                </>
+            )}
+
+            {/* All Tokens Section Header with Sort/Filter */}
+            <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center" flexWrap="wrap">
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#FFA600', boxShadow: '0 0 8px #FFA600' }} />
+                <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
+                    All Tokens
+                </Typography>
+                <Box display="flex" gap="8px" ml="auto" flexWrap="wrap">
+                    <ComboBox label="Sort" border="1px solid #FF9D00" values={{
+                        bump: 'Trending',
+                        marketcap: 'Market cap',
+                        creationTime: 'Creation time',
+                        volume: 'Trading volume',
+                        // progress: 'Progress'
+                    }} value={orderType} onChange={setOrderType} />
+                    <ComboBox label="Network" border="1px solid #FF9D00" values={{
+                        all: 'All',
+                        ...(
+                            chains?.reduce((networks, c) => ({
+                                ...networks, [c.network]: c.name
+                            }), {})
+                        )
+                    }} value={network} onChange={setNetwork} />
+                </Box>
             </Box>
+
+            {/* Token Grid */}
             {
                 tokens.length > 0 ?
-                    <CardGrid min={350} space={32} mb={4}>
+                    <CardGrid min={350} space={32} mb={4} className="stagger-children">
                         {
                             tokens.map((item: any) => (
                                 <TokenCard key={item.tokenAddress} token={item} mode="list" />
                             ))
                         }
                     </CardGrid> :
-                    <Typography textAlign='center' color="#aaa" my={4}>No token found</Typography>
+                    count === 0 && (searchWord || network !== 'all') ?
+                        <EmptyState
+                            icon="🔍"
+                            title="No tokens found"
+                            description="Try adjusting your filters or search terms"
+                        /> :
+                        tokens.length === 0 ?
+                            <CardGrid min={350} space={32} mb={4} className="stagger-children">
+                                {Array.from({ length: pageSize || 6 }).map((_, i) => (
+                                    <TokenCardSkeleton key={`token-skeleton-${i}`} mode="list" />
+                                ))}
+                            </CardGrid> :
+                            null
             }
+
+            {/* Pagination */}
             {
                 totalPage > 1 &&
-                <Box sx={{ display: 'flex' }} mb={5}>
-                    <Stack spacing={2} mx='auto'>
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    py: 4,
+                    mb: 4,
+                }}>
+                    <Stack spacing={2}>
                         <Pagination
                             variant="text"
                             shape="circular"

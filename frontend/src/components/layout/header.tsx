@@ -330,6 +330,16 @@ const TradeBox = styled(Box)`
     }
 `
 
+const badgePulse = keyframes`
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+`
+
+const BadgePulse = styled(Box)`
+    animation: ${badgePulse} 0.4s ease-out;
+`
+
 function NetworkLogo({ size = 24, network }: { size?: number, network?: CaipNetwork }) {
     const [logo, setLogo] = useState<string>()
     useEffect(() => {
@@ -362,7 +372,9 @@ export default function Header() {
     const [searchWord, setSearchWord] = useState('');
     const [width, setWidth] = useState(0)
     const [trades, setTrades] = useState<any[]>([])
+    const [newTradeCount, setNewTradeCount] = useState(0)
     const slider = useRef<HTMLElement>(null)
+    const searchRef = useRef<HTMLDivElement>(null)
 
     const { trades: newTrades } = useNewTrades()
 
@@ -387,7 +399,13 @@ export default function Header() {
 
     useEffect(() => {
         setTrades((trades) => newTrades?.length ? [...trades, ...newTrades] : trades)
+        if (newTrades?.length) setNewTradeCount(c => c + newTrades.length)
     }, [newTrades])
+
+    // Reset trade count on page navigation
+    useEffect(() => {
+        setNewTradeCount(0)
+    }, [pathname])
 
     useEffect(() => {
         // console.log("network", chainId, caipNetwork)
@@ -412,6 +430,21 @@ export default function Header() {
         return () => {
             clearInterval(timer)
         }
+    }, [])
+
+    const { tokens: searchResults } = useTokens({
+        searchWord: searchWord, pageNumber: 1, pageSize: 5
+    })
+
+    // Close search results on click outside
+    useEffect(() => {
+        const handleClickAway = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setSearchWord('')
+            }
+        }
+        document.addEventListener('mousedown', handleClickAway)
+        return () => document.removeEventListener('mousedown', handleClickAway)
     }, [])
 
     const handleSwitch = (network: any) => {
@@ -450,7 +483,7 @@ export default function Header() {
                                         <TokenLogo logo={trades[i]?.tokenImage} size={48} />
                                         <Box>
                                             <Typography color="white" fontSize={14} fontWeight={700}>{trades[i]?.tokenSymbol}</Typography>
-                                            <Typography color={trades[i]?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{trades[i]?.type}</Typography>
+                                            <Typography color={trades[i]?.type === "SELL" ? "#EF4444" : "#10B981"} fontSize={10} fontWeight={600}>{trades[i]?.type}</Typography>
                                             <Typography color="#AAA" fontSize={10}>{trades[i]?.tokenAddress?.slice(0, 6)}...{trades[i]?.tokenAddress?.slice(-4)}</Typography>
                                         </Box>
                                     </Box>
@@ -459,7 +492,7 @@ export default function Header() {
                         </ScrollBox>
                     }
                     </TradesBox>
-                    <Box px="8px" mt={2}>
+                    <Box px="8px" mt={2} sx={{ position: 'relative' }}>
                         <SearchToken
                             placeholder="Search token"
                             fullWidth
@@ -482,6 +515,44 @@ export default function Header() {
                                 }
                             }}
                         />
+                        {searchWord.length > 1 && (
+                            <Box sx={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 8,
+                                right: 8,
+                                mt: 1,
+                                background: 'rgba(13,13,20,0.98)',
+                                backdropFilter: 'blur(20px)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '12px',
+                                boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                                zIndex: 10,
+                                maxHeight: '400px',
+                                overflow: 'auto',
+                                p: 1,
+                            }}>
+                                {searchResults?.length > 0 ? searchResults.map((token: any) => (
+                                    <Box key={token.tokenAddress}
+                                        onClick={() => { router.push(`/token?network=${token.network}&address=${token.tokenAddress}`); setSearchWord('') }}
+                                        sx={{
+                                            display: 'flex', gap: 1.5, alignItems: 'center', p: 1.5, borderRadius: '8px',
+                                            cursor: 'pointer', transition: 'background 0.15s',
+                                            '&:hover': { background: 'rgba(255,255,255,0.06)' }
+                                        }}
+                                    >
+                                        <TokenLogo logo={token.tokenImage} size={36} style={{ borderRadius: '8px' }} />
+                                        <Box flex={1} minWidth={0}>
+                                            <Typography color="white" fontSize={13} fontWeight={600} noWrap>{token.tokenName}</Typography>
+                                            <Typography color="#64748B" fontSize={11}>{token.tokenSymbol} · MC: ${priceFormatter(token.marketcap, 2)}</Typography>
+                                        </Box>
+                                        <img src={`/networks/${token.network}.svg`} width={16} height={16} alt="" />
+                                    </Box>
+                                )) : (
+                                    <Typography color="#64748B" fontSize={13} p={2} textAlign="center">No results found</Typography>
+                                )}
+                            </Box>
+                        )}
                     </Box>
                 </>
             }
@@ -492,27 +563,68 @@ export default function Header() {
                 <Link href="/">
                     <img src="/images/logo.png" width={64} height={64} alt="logo" />
                 </Link>
-                <SearchToken
-                    placeholder="Search token"
-                    value={searchWord}
-                    onChange={(e) => setSearchWord(e.target.value)}
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ width: 18, height: 18 }} />
-                                </InputAdornment>
-                            ),
-                            endAdornment: (
-                                <InputAdornment style={{ cursor: "pointer", visibility: searchWord.length > 0 ? 'visible' : 'hidden' }} position="end" onClick={() => {
-                                    setSearchWord('')
-                                }}>
-                                    <CloseIcon sx={{ height: 18 }} />
-                                </InputAdornment>
-                            )
-                        }
-                    }}
-                />
+                <Box sx={{ position: 'relative', flex: 1 }} ref={searchRef}>
+                    <SearchToken
+                        placeholder="Search token"
+                        fullWidth
+                        value={searchWord}
+                        onChange={(e) => setSearchWord(e.target.value)}
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ width: 18, height: 18 }} />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: (
+                                    <InputAdornment style={{ cursor: "pointer", visibility: searchWord.length > 0 ? 'visible' : 'hidden' }} position="end" onClick={() => {
+                                        setSearchWord('')
+                                    }}>
+                                        <CloseIcon sx={{ height: 18 }} />
+                                    </InputAdornment>
+                                )
+                            }
+                        }}
+                    />
+                    {searchWord.length > 1 && (
+                        <Box sx={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            mt: 1,
+                            background: 'rgba(13,13,20,0.98)',
+                            backdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '12px',
+                            boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                            zIndex: 10,
+                            maxHeight: '400px',
+                            overflow: 'auto',
+                            p: 1,
+                        }}>
+                            {searchResults?.length > 0 ? searchResults.map((token: any) => (
+                                <Box key={token.tokenAddress}
+                                    onClick={() => { router.push(`/token?network=${token.network}&address=${token.tokenAddress}`); setSearchWord('') }}
+                                    sx={{
+                                        display: 'flex', gap: 1.5, alignItems: 'center', p: 1.5, borderRadius: '8px',
+                                        cursor: 'pointer', transition: 'background 0.15s',
+                                        '&:hover': { background: 'rgba(255,255,255,0.06)' }
+                                    }}
+                                >
+                                    <TokenLogo logo={token.tokenImage} size={36} style={{ borderRadius: '8px' }} />
+                                    <Box flex={1} minWidth={0}>
+                                        <Typography color="white" fontSize={13} fontWeight={600} noWrap>{token.tokenName}</Typography>
+                                        <Typography color="#64748B" fontSize={11}>{token.tokenSymbol} · MC: ${priceFormatter(token.marketcap, 2)}</Typography>
+                                    </Box>
+                                    <img src={`/networks/${token.network}.svg`} width={16} height={16} alt="" />
+                                </Box>
+                            )) : (
+                                <Typography color="#64748B" fontSize={13} p={2} textAlign="center">No results found</Typography>
+                            )}
+                        </Box>
+                    )}
+                </Box>
             </Box>
             <Box display="flex" justifyContent="center" alignItems="center" onClick={() => setModal("how")} style={{ cursor: "pointer" }}>
                 <img src="/images/forge0.png" width={82} height={82} alt="logo" style={{ top: "0px", position: "relative" }} />
@@ -591,7 +703,7 @@ export default function Header() {
                                     <TokenLogo logo={trades[i]?.tokenImage} size={48} />
                                     <Box>
                                         <Typography color="white" fontSize={14} fontWeight={700}>{trades[i]?.tokenSymbol}</Typography>
-                                        <Typography color={trades[i]?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{trades[i]?.type} {priceFormatter(trades[i]?.tokenAmount ?? 0, 2, true, true)}</Typography>
+                                        <Typography color={trades[i]?.type === "SELL" ? "#EF4444" : "#10B981"} fontSize={10} fontWeight={600}>{trades[i]?.type} {priceFormatter(trades[i]?.tokenAmount ?? 0, 2, true, true)}</Typography>
                                         <Typography color="#AAA" fontSize={10}>{trades[i]?.tokenAddress?.slice(0, 6)}...{trades[i]?.tokenAddress?.slice(-4)}</Typography>
                                     </Box>
                                 </Box>
@@ -599,9 +711,30 @@ export default function Header() {
                         }
                     </ScrollBox>
                 }
-                <Link href="/forge">
-                    <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" className="logo" />
-                </Link>
+                <Box sx={{ position: 'relative' }}>
+                    {newTradeCount > 0 && (
+                        <BadgePulse sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            background: 'linear-gradient(135deg, #FFA600, #FFD700)',
+                            color: '#0a0a0f',
+                            borderRadius: '100px',
+                            px: 1,
+                            py: 0.25,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            minWidth: 18,
+                            textAlign: 'center',
+                            zIndex: 4,
+                        }}>
+                            {newTradeCount > 99 ? '99+' : newTradeCount}
+                        </BadgePulse>
+                    )}
+                    <Link href="/forge">
+                        <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" className="logo" />
+                    </Link>
+                </Box>
                 {
                     trades?.length > 0 &&
                     <ScrollBox display="flex" count={count}>
@@ -611,7 +744,7 @@ export default function Header() {
                                     <TokenLogo logo={(trades[i+count] ?? trades[0])?.tokenImage} size={48} />
                                     <Box>
                                         <Typography color="white" fontSize={14} fontWeight={700}>{(trades[i+count] ?? trades[0])?.tokenSymbol}</Typography>
-                                        <Typography color={(trades[i+count] ?? trades[0])?.type === "SELL" ? "red" : "darkgreen"} fontSize={10}>{(trades[i+count] ?? trades[0])?.type} {priceFormatter((trades[i+count] ?? trades[0])?.tokenAmount ?? 0, 2, true, true)}</Typography>
+                                        <Typography color={(trades[i+count] ?? trades[0])?.type === "SELL" ? "#EF4444" : "#10B981"} fontSize={10} fontWeight={600}>{(trades[i+count] ?? trades[0])?.type} {priceFormatter((trades[i+count] ?? trades[0])?.tokenAmount ?? 0, 2, true, true)}</Typography>
                                         <Typography color="#AAA" fontSize={10}>{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(0, 6)}...{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(-4)}</Typography>
                                     </Box>
                                 </Box>

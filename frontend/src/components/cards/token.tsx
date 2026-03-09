@@ -16,6 +16,7 @@ import Image from "next/image";
 import { priceFormatter } from "@/utils/price";
 import { useRouter } from "next/navigation";
 import { useMainContext } from "@/context";
+import { TimeDiff } from "@/components/time";
 
 const StyledCard = styled(Box)`
   position: relative;
@@ -115,7 +116,7 @@ const PriceChange = styled(Typography)<{ negative?: "true", ends?: "true" }>`
   transition: all 0.2s ease;
 `
 
-function TokenCard({ token, mode, ...props }: any) {
+function TokenCard({ token, mode, trendIndex, ...props }: any) {
   const router = useRouter()
   // const { userInfo } = useUserInfo()
 
@@ -155,11 +156,27 @@ function TokenCard({ token, mode, ...props }: any) {
 
   if (mode === "trends") {
     return (
-      <StyledCard {...props} className="effect-button" p="16px" alignItems="stretch" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
+      <StyledCard {...props} className="effect-button card-enter" p="16px" alignItems="stretch" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
         <Box mx="auto" position="relative">
           <TokenLogo logo={token.tokenImage} size="150px" style={{ borderRadius: '8px' }} />
         </Box>
         <Image src={`/networks/${token.network}.svg`} width={24} height={24} alt="" style={{ position: "absolute", top: 8, right: 8 }} />
+        {/* Status badges */}
+        <Box position="absolute" top={8} right={40} display="flex" gap="4px" alignItems="center">
+          {token.launchedAt && <span className="badge-graduated">Graduated</span>}
+          {Number(token.progress ?? 0) > 70 && !token.launchedAt && <span className="badge-trending">🔥 Hot</span>}
+          {trendIndex != null && trendIndex <= 2 && (
+            <Typography fontSize={10} fontWeight={700} color="#FFD700" sx={{
+              background: 'rgba(255, 215, 0, 0.1)',
+              border: '1px solid rgba(255, 215, 0, 0.2)',
+              borderRadius: '100px',
+              px: 1,
+              py: 0.25,
+            }}>
+              #{trendIndex + 1} Trending
+            </Typography>
+          )}
+        </Box>
         <PriceChange negative={token.priceChange < 0 ? "true" : undefined} fontSize={10} left="-16px">
           {token.priceChange ? token.priceChange > 0 ? '+' : '-' : ''}{Math.abs(Number(token.priceChange ?? 0)).toFixed(2)}%
         </PriceChange>
@@ -170,6 +187,11 @@ function TokenCard({ token, mode, ...props }: any) {
           <Typography color="#B5B7AC" fontSize={12}>
             {token.tokenSymbol.length > 20 ? `${token.tokenSymbol.substring(0, 10)}...` : token.tokenSymbol}
           </Typography>
+          {token.tokenDescription && (
+            <Typography color="#64748B" fontSize={11} noWrap sx={{ maxWidth: '100%' }}>
+              {token.tokenDescription}
+            </Typography>
+          )}
           {/* <Box display="flex" gap="4px" alignItems="center">
             {!!token.telegramLink && <Link to={token.telegramLink} target="_blank" style={{ opacity: 0.5 }}><img src={TelegramIcon} width={16} height={16} alt="telegram" /></Link>}
             {!!token.twitterLink && <Link to={token.twitterLink} target="_blank" style={{ opacity: 0.5 }}><img src={TwitterIcon} width={16} height={16} alt="twitter" /></Link>}
@@ -191,13 +213,24 @@ function TokenCard({ token, mode, ...props }: any) {
               ${priceFormatter(token.marketcap, 2)}
             </Typography>
           </Box>
+          {token.holderCount && (
+            <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={0.5}>
+              <Typography color="#B5B7AC" fontSize={12}>Holders:</Typography>
+              <Typography color="#B5B7AC" fontSize={12}>{token.holderCount ?? '—'}</Typography>
+            </Box>
+          )}
         </Box>
       </StyledCard>
     )
   }
 
   return (
-    <StyledCard {...props} className="effect-button" p="8px 16px 8px 8px" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
+    <StyledCard {...props} className="effect-button card-enter" p="8px 16px 8px 8px" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
+      {/* Status badges */}
+      <Box position="absolute" top={8} right={8} display="flex" gap="4px" alignItems="center" zIndex={2}>
+        {token.launchedAt && <span className="badge-graduated">Graduated</span>}
+        {Number(token.progress ?? 0) > 70 && !token.launchedAt && <span className="badge-trending">🔥 Hot</span>}
+      </Box>
       <Box display="flex" gap="8px">
         <Box display="flex" flexDirection="column" alignItems="center" gap="8px">
           <TokenLogo logo={token.tokenImage} size="64px" style={{ margin: '4px', borderRadius: '8px' }} />
@@ -232,6 +265,9 @@ function TokenCard({ token, mode, ...props }: any) {
               </PriceChange>
             }
           </Box>
+          <Typography color="#64748B" fontSize={10} ml={1} mt={0.5}>
+            <TimeDiff time={new Date(token.createdAt)} postfix="ago" />
+          </Typography>
           <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={1} ml={1}>
             <Typography color="#B5B7AC" fontSize={12}>
               Created by:
@@ -248,19 +284,37 @@ function TokenCard({ token, mode, ...props }: any) {
               ${priceFormatter(token.marketcap, 2)}
             </Typography>
           </Box>
+          {token.holderCount && (
+            <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={0.5} ml={1}>
+              <Typography color="#B5B7AC" fontSize={12}>Holders:</Typography>
+              <Typography color="#B5B7AC" fontSize={12}>{token.holderCount ?? '—'}</Typography>
+            </Box>
+          )}
+          {token.volume && (
+            <Box display="flex" gap="8px" alignItems="center" justifyContent="space-between" mt={0.5} ml={1}>
+              <Typography color="#B5B7AC" fontSize={12}>Volume:</Typography>
+              <Typography color="#B5B7AC" fontSize={12}>${priceFormatter(token.volume, 2, true, true)}</Typography>
+            </Box>
+          )}
           {
             !token.launchedAt &&
-            <Progress value={Number(token.progress ?? 0)} />
+            <Box className={Number(token.progress ?? 0) > 85 ? 'graduation-glow' : ''} sx={{ borderRadius: '100px' }}>
+              <Progress value={Number(token.progress ?? 0)} />
+            </Box>
           }
         </Box>
       </Box>
-      {
-        token.launchedAt &&
-        <Box display="flex" gap="8px" alignItems="center" alignSelf="center">
-          <img width={20} height={20} alt="mc" src="/images/marketcap.png" />
-          <Typography color="#FBFF00" fontSize={11}>Bonding Complete and Listed on swap</Typography>
+      {token.launchedAt && (
+        <Box display="flex" gap="6px" alignItems="center" alignSelf="center" sx={{
+          background: 'rgba(139, 92, 246, 0.1)',
+          border: '1px solid rgba(139, 92, 246, 0.2)',
+          borderRadius: '100px',
+          px: 1.5,
+          py: 0.5,
+        }}>
+          <Typography fontSize={11} fontWeight={600} color="#8B5CF6">✨ Graduated to DEX</Typography>
         </Box>
-      }
+      )}
     </StyledCard>
   );
 }

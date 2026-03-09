@@ -24,8 +24,9 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
     // Determine if this is a Solana token
     const isSolanaToken = network === 'solana';
 
+    // Use stable primitives in SWR key (avoid provider objects which change reference)
     const { data: tokenInfo, mutate } = useSWR(
-        tokenAddress && network ? ['/info/token', tokenAddress, network, chains, address, pageNumber, pageSize, evmProvider, solProvider, connection] : undefined,
+        tokenAddress && network ? ['/info/token', tokenAddress, network, address, pageNumber, pageSize, !!evmProvider, !!solProvider, !!connection] : undefined,
         async () => {
 
             if (isSolanaToken) {
@@ -43,10 +44,11 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
                 const networks = ChainController.getCaipNetworks()
                 const tokenNetwork = networks?.find(net => net && (net.id === tokenChain?.chainId || net.chainNamespace === tokenChain?.chainId))
                 if (tokenChain && tokenNetwork) {
-                    if (tokenNetwork.chainNamespace === "eip155" && evmProvider) {
-                        const provider = new BrowserProvider(evmProvider, chainId)
-                        const tokenContract = new Contract(tokenAddress, erc20Abi, provider)
-                        const contract = new Contract(tokenChain.contractAddress, tokenChain.abi, provider)
+                    if (tokenNetwork.chainNamespace === "eip155") {
+                        // Use chain's configured RPC for reads (not wallet provider which may differ)
+                        const readProvider = new ethers.JsonRpcProvider(tokenChain.rpcUrl)
+                        const tokenContract = new Contract(tokenAddress, erc20Abi, readProvider)
+                        const contract = new Contract(tokenChain.contractAddress, tokenChain.abi, readProvider)
                         data.curveBalance = await tokenContract.balanceOf(tokenChain.contractAddress).catch(() => 0n)
                         if (address) {
                             data.balance = await tokenContract.balanceOf(address).catch(() => 0n)
@@ -72,7 +74,7 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
             }
             return data
         }, {
-        refreshInterval: 5000,
+        refreshInterval: 3000,
         keepPreviousData: true,
     }
     )
@@ -168,6 +170,14 @@ export function useNewTrades() {
         refreshInterval: 5000,
     }
     )
+
+    // Refresh trades on any socket trade event
+    useEffect(() => {
+        const onTrade = () => mutate()
+        socket.on('m', onTrade)
+        return () => { socket.off('m', onTrade) }
+    }, [mutate])
+
     return {
         trades: data,
         reload: mutate
@@ -226,16 +236,18 @@ export function useHandlers(network?: CaipNetwork) {
     }
     if (network.chainNamespace === "eip155" && evmProvider) {
         const provider = new BrowserProvider(evmProvider, network.id)
+        // Use chain's configured RPC for read-only calls (avoids wallet RPC mismatch with local fork)
+        const readProvider = new ethers.JsonRpcProvider(chain.rpcUrl)
+        const readContract = new Contract(chain.contractAddress, chain.abi, readProvider)
         return {
             createToken: async (token: { name: string, symbol: string, pool: number, amount?: string }, sig: any) => {
                 if (!address)
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
-                const initBuyAmount = Number(token.amount ?? '0')
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
-                const createFeeAmount = await contract.CREATE_TOKEN_FEE_AMOUNT();
-                const firstBuyFee = initBuyAmount > 0 ? await contract.getFirstBuyFee(ethers.ZeroAddress) : 0n
-                const balance = await signer.provider.getBalance(signer.address)
+                const createFeeAmount = await readContract.CREATE_TOKEN_FEE_AMOUNT();
+                const firstBuyFee = Number(token.amount ?? '0') > 0 ? await readContract.getFirstBuyFee(ethers.ZeroAddress) : 0n
+                const balance = await readProvider.getBalance(address)
                 const value = ethers.parseEther(token.amount ?? '0') + createFeeAmount + firstBuyFee
                 if (balance < value)
                     throw Error("Insufficient balance")
@@ -256,17 +268,17 @@ export function useHandlers(network?: CaipNetwork) {
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
-                const firstBuyFee = await contract.getFirstBuyFee(token)
-                const poolInfo = await contract.tokenPools(token).catch(() => undefined)
-                if (!poolInfo)
+                const firstBuyFee = await readContract.getFirstBuyFee(token)
+                const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
                     const amountInWithFee = amountInput * 97n / 100n
                     const estimateAmount = amountInWithFee * poolInfo.virtualTokenReserve / (poolInfo.virtualEthReserve + amountInWithFee)
                     const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
-                    const gas = await contract.swapExactETHForTokens.estimateGas(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee })
-                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee, gas })
+                    const gasLimit = await contract.swapExactETHForTokens.estimateGas(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee })
+                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee, gasLimit })
                 }
                 const amountOut = ethers.parseEther(amount ?? '0')
                 const amountInWei = amountOut * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve - amountOut) + 1n
@@ -279,22 +291,20 @@ export function useHandlers(network?: CaipNetwork) {
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
-                const poolInfo = await contract.tokenPools(token).catch(() => undefined)
-                if (!poolInfo)
+                const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
                 const amountInput = ethers.parseEther(amount ?? '0')
                 const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
                 const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
-                const gas = await contract.swapExactTokensForETH.estimateGas(token, amountInput, amountOutMin)
-                return await contract.swapExactTokensForETH(token, amountInput, amountOutMin, { gas })
+                const gasLimit = await contract.swapExactTokensForETH.estimateGas(token, amountInput, amountOutMin)
+                return await contract.swapExactTokensForETH(token, amountInput, amountOutMin, { gasLimit })
             },
             quoteBuy: async (token: string, amount: string, exactInput?: boolean) => {
-                const contract = new Contract(chain.contractAddress, chain.abi, provider)
-                const poolInfo = await contract.tokenPools(token).catch(() => undefined)
-                if (!poolInfo)
+                const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
-                const tokenContract = new Contract(token, erc20Abi, provider)
-                const balance = address ? await provider.getBalance(address) : 0n
+                const balance = address ? await readProvider.getBalance(address) : 0n
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
                     const amountInWithFee = amountInput * 97n / 100n
@@ -311,9 +321,8 @@ export function useHandlers(network?: CaipNetwork) {
                 return ethers.formatEther(estimateAmount)
             },
             quoteSell: async (token: string, amount: string) => {
-                const contract = new Contract(chain.contractAddress, chain.abi, provider)
-                const poolInfo = await contract.tokenPools(token).catch(() => undefined)
-                if (!poolInfo)
+                const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
                 const amountInput = ethers.parseEther(amount ?? '0')
                 const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n

@@ -49,7 +49,7 @@ const CHAINS = [
     // rpcUrl: 'https://bsc-rpc.publicnode.com',
     // rpcUrl: 'https://rpc.ankr.com/bsc/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593',
     explorerUrl: 'https://bscscan.com',
-    contractAddress: '0xBf840858c4B2b283B42683D45cd4b08a7d4e263A',
+    contractAddress: '0x17F38AB89496E10E34268bDc66ae48D50Fb4A227',
     abi: abiEthism.v1,
     virtualEthAmount: 6,
     virtualTokenAmount: 900000000,

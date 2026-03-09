@@ -95,6 +95,19 @@ const Progress = styled('div') <{ value: number }>`
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
+    ${({ value }) => value > 90 ? `
+        &::after {
+            animation: graduation-glow 1.5s ease-in-out infinite;
+        }
+        @keyframes graduation-glow {
+            0%, 100% {
+                box-shadow: 0 0 12px rgba(255, 166, 0, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 24px rgba(255, 215, 0, 0.8), 0 0 48px rgba(255, 166, 0, 0.4);
+            }
+        }
+    ` : ''}
     @media(max-width: 800px) {
         min-width: 200px;
     }
@@ -574,10 +587,32 @@ const SwapContent = ({
                 )}
                 {tradeType === "sell" && (
                     <>
-                        <SmallButton onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * 25n / 100n) : undefined)}>25%</SmallButton>
-                        <SmallButton onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * 50n / 100n) : undefined)}>50%</SmallButton>
-                        <SmallButton onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * 75n / 100n) : undefined)}>75%</SmallButton>
-                        <SmallButton onClick={() => setAmountIn(ethers.formatEther(tokenBalance))}>100%</SmallButton>
+                        {[25, 50, 75, 100].map(pct => (
+                            <Box
+                                key={pct}
+                                component="button"
+                                onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * BigInt(pct) / 100n) : undefined)}
+                                sx={{
+                                    background: 'rgba(255,255,255,0.04)',
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '100px',
+                                    px: 1.5,
+                                    py: 0.5,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: 'rgba(255,255,255,0.7)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                        background: 'rgba(239,68,68,0.1)',
+                                        borderColor: 'rgba(239,68,68,0.3)',
+                                        color: '#EF4444',
+                                    },
+                                }}
+                            >
+                                {pct}%
+                            </Box>
+                        ))}
                     </>
                 )}
             </Box>
@@ -607,6 +642,42 @@ const SwapContent = ({
                 You will receive ~{priceFormatter(estimateAmount)} {exactInput && tradeType === "buy" ? detailData.tokenSymbol.toUpperCase() : caipNetwork?.nativeCurrency.symbol}
             </SmallButton>
         )}
+        {!!estimateAmount && !!amountIn && (() => {
+            const inputVal = parseFloat(amountIn)
+            const outputVal = parseFloat(estimateAmount)
+            if (!inputVal || !outputVal || inputVal <= 0) return null
+            // Approximate price impact: for sell, compare ETH-out/token-in vs current price
+            // For buy, compare token-out/ETH-in vs current price
+            const currentPrice = parseFloat(detailData?.tokenPrice || '0')
+            if (!currentPrice) return null
+            let priceImpact = 0
+            if (tradeType === 'buy' && exactInput) {
+                const effectivePrice = inputVal / outputVal
+                priceImpact = Math.abs((effectivePrice - currentPrice) / currentPrice) * 100
+            } else if (tradeType === 'sell') {
+                const effectivePrice = outputVal / inputVal
+                priceImpact = Math.abs((currentPrice - effectivePrice) / currentPrice) * 100
+            }
+            if (priceImpact <= 5) return null
+            return (
+                <Box sx={{
+                    display: 'flex',
+                    gap: 1,
+                    alignItems: 'center',
+                    background: priceImpact > 15 ? 'rgba(239,68,68,0.08)' : 'rgba(255,166,0,0.08)',
+                    border: `1px solid ${priceImpact > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(255,166,0,0.15)'}`,
+                    borderRadius: '8px',
+                    p: '6px 10px',
+                    mt: 1,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                }}>
+                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#FFA600'} fontWeight={500}>
+                        {'\u26A0\uFE0F'} Price impact: ~{priceImpact.toFixed(1)}%
+                    </Typography>
+                </Box>
+            )
+        })()}
     </>
 }
 
@@ -680,6 +751,11 @@ export default function Token() {
         return networks.find(network => network.id === tokenChain?.chainId || network.chainNamespace === tokenChain?.chainId)
     }, [networks, tokenChain])
     const handlers = useHandlers(tokenNetwork)
+    const topHolderPercent = useMemo(() => {
+        if (!holders?.length || !tokenChain?.totalSupply) return 0
+        const sorted = [...holders].sort((a: any, b: any) => b.tokenAmount - a.tokenAmount)
+        return sorted[0].tokenAmount / tokenChain.totalSupply * 100
+    }, [holders, tokenChain])
     const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
     const chatMessagesRef = useRef<HTMLDivElement>(null)
 
@@ -926,25 +1002,32 @@ export default function Token() {
             if (!address || !handlers)
                 throw Error("Connect wallet");
             const _slippage = BigInt(Math.floor(slippage * 100));
+            let tx;
             if (tradeType === "buy") {
-                const tx = await handlers.buyToken(detailData.tokenAddress, amountIn ?? '0', _slippage, exactInput)
+                tx = await handlers.buyToken(detailData.tokenAddress, amountIn ?? '0', _slippage, exactInput)
                 showSuccessToast(tx.hash, 'buy')
             } else {
-                const tx = await handlers.sellToken(detailData.tokenAddress, amountIn ?? '0', _slippage)
+                tx = await handlers.sellToken(detailData.tokenAddress, amountIn ?? '0', _slippage)
                 showSuccessToast(tx.hash, 'sell')
             }
+            // Wait for tx to be mined so backend can process the event
+            if (tx?.wait) await tx.wait()
             setAmountIn(undefined)
             setIsLoading(false);
-            reloadTokenInfo()
+            // Small delay to let backend process the block event
+            setTimeout(() => reloadTokenInfo(), 1500)
         } catch (error: any) {
             setIsLoading(false);
-            console.log({
-                error
-            });
-            const messageError = error?.shortMessage || error?.data?.message;
-            toast.error(messageError);
+            console.error('Swap error:', error);
+            const msg = error?.shortMessage || error?.data?.message || error?.message || 'Transaction failed';
+            // Detect nonce issues (common after Anvil/node restart)
+            if (msg.toLowerCase().includes('nonce') || msg.toLowerCase().includes('replacement')) {
+                toast.error('Nonce mismatch — reset your wallet account (Settings > Advanced > Reset Account)');
+            } else {
+                toast.error(msg);
+            }
         }
-    }, [detailData, tokenContract, amountIn, address, slippage, launched, showSuccessToast, reloadTokenInfo, tradeType, exactInput, estimateAmount])
+    }, [detailData, amountIn, address, slippage, handlers, showSuccessToast, reloadTokenInfo, tradeType, exactInput])
 
     const parseLink = (domain: string, link?: string) => {
         if (!link)
@@ -1018,7 +1101,10 @@ export default function Token() {
                         <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="Arial" fontWeight="bold" color="white">{detailData?.tokenName}</Typography>
                         <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="Arial" fontWeight="bold" color="#AAA">({detailData?.tokenSymbol})</Typography>
                         <Typography fontSize={12} color="#AAA" ml={{ md: "1em", sm: "auto", xs: "auto" }}>{detailData?.tokenAddress?.slice(0, 6)}...{detailData?.tokenAddress?.slice(-4)}</Typography>
-                        <IconButton sx={{ width: 'fit-content' }} onClick={() => copy(detailData?.tokenAddress)}>
+                        <IconButton sx={{ width: 'fit-content' }} onClick={() => {
+                            copy(detailData?.tokenAddress)
+                            toast.success('Contract address copied!', { duration: 2000 })
+                        }}>
                             <CopyIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
                     </Box>
@@ -1053,7 +1139,7 @@ export default function Token() {
                                     </Box>
                                 </Box>
                                 <Box display="flex" gap="8px" alignItems="baseline">
-                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "lightgreen" : "darkorange"}>
+                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#FFA600"}>
                                         {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                                     </Typography>
                                     <Typography fontSize={12} color="white">Past 15m</Typography>
@@ -1089,6 +1175,9 @@ export default function Token() {
                                 <>
                                     <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} color="#DDD">Progress ({Math.min(99.99, Number(detailData?.progress ?? 0)).toFixed(2)}%)</Typography>
                                     <Progress value={Math.min(100, Number(detailData?.progress ?? 0))} />
+                                    <Typography fontSize={11} color="#64748B" mt={0.5} lineHeight={1.4} textAlign="right" maxWidth="400px">
+                                        When the market cap reaches the target, liquidity will be automatically added to the DEX and the token will be freely tradeable.
+                                    </Typography>
                                     <Box display="flex" alignItems="center" gap="8px">
                                         <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M5.05762 13.3333H11.7243" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
@@ -1140,7 +1229,7 @@ export default function Token() {
                             <Typography fontSize={12} color="rgba(255,255,255,0.6)">Market cap</Typography>
                         </Box>
                         <Box display="flex" gap="8px" alignItems="baseline">
-                            <Typography fontSize={14} color="lightgreen">
+                            <Typography fontSize={14} color={Number(detailData?.priceChange15m ?? 0) >= 0 ? "#10B981" : "#EF4444"}>
                                 {Number(detailData?.price ?? 0) >= Number(detailData?.price15m ?? 0) ? '+' : '-'}${priceFormatter(Number(detailData?.price15m ?? 0) - Number(detailData?.price15MinAgo ?? 0))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                             </Typography>
                             <Typography fontSize={12} color="white">Past 15m</Typography>
@@ -1226,7 +1315,7 @@ export default function Token() {
                                             tradeData?.map((trade: any) => (
                                                 <Fragment key={trade.txHash}>
                                                     <Divider />
-                                                    <TradeBox sx={{ py: 2, color: trade.type === "BUY" ? "lightgreen" : "#ef5350" }}>
+                                                    <TradeBox sx={{ py: 2, color: trade.type === "BUY" ? "#10B981" : "#EF4444" }}>
                                                         <Typography color="inherit" fontSize="small" display={{ sm: 'block', xs: 'none' }}>
                                                             {
                                                                 Date.now() - new Date(trade.date * 1000).getTime() < 3600000
@@ -1239,12 +1328,12 @@ export default function Token() {
                                                         {/* <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount * trade.tokenPrice, 2, true, true)}</Typography> */}
                                                         <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount, 4, true, true)}</Typography>
                                                         <Box display={{ sm: 'flex', xs: 'none' }} alignItems="center">
-                                                            <UserName user={trade.user} address={trade.swapperAddress} color={trade.type === "BUY" ? "lightgreen" : "#ef5350"} size={18} />
+                                                            <UserName user={trade.user} address={trade.swapperAddress} color={trade.type === "BUY" ? "#10B981" : "#EF4444"} size={18} />
                                                         </Box>
                                                         <Box display={{ sm: 'block', xs: 'none' }}>
                                                             <Link style={{ textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} href={`${tokenChain?.explorerUrl}/tx/${trade.txHash}`} target="_blank">
-                                                                <Typography color={trade.type === "BUY" ? "lightgreen" : "#ef5350"} fontSize="small">{trade.txHash.slice(0, 5)}...{trade.txHash.slice(-6)}</Typography>
-                                                                <LinkIcon sx={{ color: trade.type === "BUY" ? "lightgreen" : "#ef5350", fontSize: 14 }} />
+                                                                <Typography color={trade.type === "BUY" ? "#10B981" : "#EF4444"} fontSize="small">{trade.txHash.slice(0, 5)}...{trade.txHash.slice(-6)}</Typography>
+                                                                <LinkIcon sx={{ color: trade.type === "BUY" ? "#10B981" : "#EF4444", fontSize: 14 }} />
                                                             </Link>
                                                         </Box>
                                                     </TradeBox>
@@ -1383,6 +1472,22 @@ export default function Token() {
                                 mode === "holders" &&
                                 <HolderBox as="ol" mb="1.5em">
                                     <Box component="h3">Top Holders</Box>
+                                    {topHolderPercent > 50 && (
+                                        <Box sx={{
+                                            display: 'flex',
+                                            gap: 1,
+                                            alignItems: 'center',
+                                            background: 'rgba(239,68,68,0.08)',
+                                            border: '1px solid rgba(239,68,68,0.15)',
+                                            borderRadius: '8px',
+                                            p: '8px 12px',
+                                            mb: 1,
+                                        }}>
+                                            <Typography fontSize={12} color="#EF4444" fontWeight={500}>
+                                                {'\u26A0\uFE0F'} Top holder owns {topHolderPercent.toFixed(1)}% of supply
+                                            </Typography>
+                                        </Box>
+                                    )}
                                     <Box component="li">
                                         <div>1.</div>
                                         <Box display="flex" alignItems="center" flexGrow={1} minWidth={0}>
@@ -1446,6 +1551,22 @@ export default function Token() {
                             </SwapBox>
                             <HolderBox as="ol" mb="1.5em">
                                 <Box component="h3">Top Holders</Box>
+                                {topHolderPercent > 50 && (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        gap: 1,
+                                        alignItems: 'center',
+                                        background: 'rgba(239,68,68,0.08)',
+                                        border: '1px solid rgba(239,68,68,0.15)',
+                                        borderRadius: '8px',
+                                        p: '8px 12px',
+                                        mb: 1,
+                                    }}>
+                                        <Typography fontSize={12} color="#EF4444" fontWeight={500}>
+                                            {'\u26A0\uFE0F'} Top holder owns {topHolderPercent.toFixed(1)}% of supply
+                                        </Typography>
+                                    </Box>
+                                )}
                                 <Box component="li">
                                     <div>1.</div>
                                     <Box display="flex" alignItems="center" flexGrow={1} minWidth={0}>

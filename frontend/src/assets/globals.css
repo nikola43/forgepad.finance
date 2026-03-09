@@ -517,3 +517,187 @@ body::before {
   font-weight: 600 !important;
   letter-spacing: -0.01em !important;
 }
+
+/* Staggered fade-in for grid items */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+/* Stagger children animation */
+.stagger-children > * {
+  animation: fadeInUp 0.4s ease-out both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.04s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.06s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.08s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.12s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.14s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.16s; }
+.stagger-children > *:nth-child(9) { animation-delay: 0.18s; }
+.stagger-children > *:nth-child(10) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(11) { animation-delay: 0.22s; }
+.stagger-children > *:nth-child(12) { animation-delay: 0.24s; }
+.stagger-children > *:nth-child(13) { animation-delay: 0.26s; }
+.stagger-children > *:nth-child(14) { animation-delay: 0.28s; }
+.stagger-children > *:nth-child(15) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(n+16) { animation-delay: 0.32s; }
+
+/* Price flash animations */
+@keyframes flash-green {
+  0% { background-color: rgba(16, 185, 129, 0.2); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.2); }
+  100% { background-color: transparent; }
+}
+.flash-green { animation: flash-green 0.6s ease-out; }
+.flash-red { animation: flash-red 0.6s ease-out; }
+
+/* Scale in animation for modals/dropdowns */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out both;
+}
+
+/* Gradient text shimmer for headings */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-text-animated {
+  background: linear-gradient(135deg, #FFA600, #FFD700, #FFA600, #FFD700);
+  background-size: 300% 300%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 4s ease infinite;
+}
+
+/* Floating animation for decorative elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Smooth counter number transition */
+.number-transition {
+  transition: all 0.3s ease-out;
+  display: inline-block;
+}
+
+/* Card entrance for new tokens */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.card-enter {
+  animation: card-enter 0.35s var(--ease-out) both;
+}
+
+/* Bonding curve glow when near graduation */
+@keyframes graduation-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 166, 0, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(255, 166, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.2); }
+}
+.graduation-glow {
+  animation: graduation-glow 2s ease-in-out infinite;
+}
+
+/* Tooltip animation */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Badge pulse for new/trending */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.badge-new {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.badge-trending {
+  background: linear-gradient(135deg, #FFA600, #FFD700);
+  color: #0a0a0f;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.badge-graduated {
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Smooth section transitions */
+.section-enter {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+/* Responsive improvements */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

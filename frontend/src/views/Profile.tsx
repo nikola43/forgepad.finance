@@ -13,6 +13,7 @@ import CameraAltIcon from '@mui/icons-material/CameraAlt'
 import PersonAddIcon from '@mui/icons-material/PersonAdd'
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove'
 import FavoriteIcon from '@mui/icons-material/Favorite'
+import ShareIcon from '@mui/icons-material/Share'
 import { type Provider as EVMProvider, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react"
 import { BrowserProvider } from "ethers"
 import axios from "axios"
@@ -21,20 +22,12 @@ import toast from "react-hot-toast"
 import PageBox from "@/components/layout/pageBox"
 import { getProfilePic, UserAvatar, UserName } from "@/components/cards/user"
 import TokenLogo from "@/components/tokenLogo"
+import { ProfileSkeleton, ListSkeleton } from "@/components/Skeleton"
+import EmptyStateComponent from "@/components/EmptyState"
 import { useUserProfile } from "@/hooks/user"
 import { API_ENDPOINT } from "@/config"
 import { priceFormatter } from "@/utils/price"
 import Link from "next/link"
-
-const ProfileCard = styled(Box)`
-    border-radius: 20px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 166, 0, 0.03) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 32px;
-    ${({ theme }) => theme.breakpoints.down('sm')} {
-        padding: 20px;
-    }
-`
 
 const StatBox = styled(Box)<{ clickable?: number }>`
     text-align: center;
@@ -310,19 +303,36 @@ export default function Profile() {
         )
     }
 
-    if (!profile) {
+    if (!user && !profile) {
         return (
             <PageBox>
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-                    <CircularProgress sx={{ color: '#FFA600' }} />
-                </Box>
+                <ProfileSkeleton />
             </PageBox>
         )
     }
 
     return (
         <PageBox>
-            <ProfileCard>
+            <Box sx={{
+                background: 'linear-gradient(180deg, rgba(255,166,0,0.06) 0%, transparent 100%)',
+                borderRadius: '24px',
+                border: '1px solid rgba(255,166,0,0.08)',
+                p: { xs: 3, sm: 4 },
+                mb: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '300px',
+                    height: '300px',
+                    background: 'radial-gradient(circle, rgba(255,166,0,0.08) 0%, transparent 70%)',
+                    pointerEvents: 'none',
+                }
+            }}>
                 <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={3} alignItems={{ sm: 'flex-start' }}>
                     {/* Avatar */}
                     <AvatarWrapper onClick={isOwnProfile ? () => fileInputRef.current?.click() : undefined}>
@@ -422,6 +432,12 @@ export default function Profile() {
                                     <IconButton size="small" onClick={copyAddress} sx={{ color: '#64748B', p: 0.3 }}>
                                         {copied ? <CheckIcon sx={{ fontSize: 14, color: '#10B981' }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
                                     </IconButton>
+                                    <IconButton size="small" onClick={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/profile?address=${profileAddress}`)
+                                        toast.success('Profile link copied!')
+                                    }} sx={{ color: '#64748B', p: 0.3 }}>
+                                        <ShareIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
                                     {(user?.likes ?? 0) > 0 && (
                                         <Box display="flex" alignItems="center" gap={0.3} ml={1}>
                                             <FavoriteIcon sx={{ fontSize: 13, color: '#EF4444' }} />
@@ -441,32 +457,60 @@ export default function Profile() {
 
                 {/* Stats */}
                 <Box display="flex" gap={1.5} mt={3} flexWrap="wrap">
-                    <StatBox clickable={1} onClick={() => setTab(0)}>
+                    <StatBox className="animate-fade-in" clickable={1} onClick={() => setTab(0)} sx={{
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: 'rgba(255,166,0,0.3)',
+                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                        }
+                    }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile.tokens?.length ?? 0}
+                            {profile?.tokens?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Tokens</Typography>
                     </StatBox>
-                    <StatBox clickable={1} onClick={() => setTab(1)}>
+                    <StatBox className="animate-fade-in" clickable={1} onClick={() => setTab(1)} sx={{
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: 'rgba(255,166,0,0.3)',
+                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                        }
+                    }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile.helds?.length ?? 0}
+                            {profile?.helds?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Holdings</Typography>
                     </StatBox>
-                    <StatBox clickable={1} onClick={() => setTab(3)}>
+                    <StatBox className="animate-fade-in" clickable={1} onClick={() => setTab(3)} sx={{
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: 'rgba(255,166,0,0.3)',
+                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                        }
+                    }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile.followers?.length ?? 0}
+                            {profile?.followers?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Followers</Typography>
                     </StatBox>
-                    <StatBox clickable={1} onClick={() => setTab(4)}>
+                    <StatBox className="animate-fade-in" clickable={1} onClick={() => setTab(4)} sx={{
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: 'rgba(255,166,0,0.3)',
+                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                        }
+                    }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile.followees?.length ?? 0}
+                            {profile?.followees?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Following</Typography>
                     </StatBox>
                 </Box>
-            </ProfileCard>
+            </Box>
 
             {/* Tabs */}
             <Box mt={3}>
@@ -477,155 +521,161 @@ export default function Profile() {
                     scrollButtons="auto"
                     sx={{ '& .MuiTabs-indicator': { background: '#FFA600' }, minHeight: 40 }}
                 >
-                    <StyledTab label={`Created (${profile.tokens?.length ?? 0})`} />
-                    <StyledTab label={`Holdings (${profile.helds?.length ?? 0})`} />
-                    <StyledTab label={`Replies (${profile.replies?.length ?? 0})`} />
-                    <StyledTab label={`Followers (${profile.followers?.length ?? 0})`} />
-                    <StyledTab label={`Following (${profile.followees?.length ?? 0})`} />
+                    <StyledTab label={`Created (${profile?.tokens?.length ?? 0})`} />
+                    <StyledTab label={`Holdings (${profile?.helds?.length ?? 0})`} />
+                    <StyledTab label={`Replies (${profile?.replies?.length ?? 0})`} />
+                    <StyledTab label={`Followers (${profile?.followers?.length ?? 0})`} />
+                    <StyledTab label={`Following (${profile?.followees?.length ?? 0})`} />
                 </Tabs>
 
-                <Box mt={2} display="flex" flexDirection="column" gap={1}>
+                <Box key={tab} className="animate-fade-in" mt={2} display="flex" flexDirection="column" gap={1}>
                     {/* Created Tokens */}
                     {tab === 0 && (
-                        profile.tokens?.length > 0
-                            ? profile.tokens.map((token: any) => (
-                                <Link key={token.tokenAddress} href={`/token?network=${token.network}&address=${token.tokenAddress}`} style={{ textDecoration: 'none' }}>
-                                    <ItemCard>
-                                        <TokenLogo logo={token.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
-                                        <Box flex={1} minWidth={0}>
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                <Typography fontSize={14} fontWeight={600} color="white" noWrap>{token.tokenName}</Typography>
-                                                <Typography fontSize={12} color="#64748B">{token.tokenSymbol}</Typography>
-                                                <img src={`/networks/${token.network}.svg`} height={14} alt="" />
-                                            </Box>
-                                            <Box display="flex" alignItems="center" gap={2} mt={0.5}>
-                                                <Typography fontSize={12} color="#FFD700" fontWeight={600}>MC: ${priceFormatter(token.marketcap, 2)}</Typography>
-                                                {token.volume > 0 && (
-                                                    <Typography fontSize={11} color="#64748B">Vol: ${priceFormatter(token.volume, 2, true, true)}</Typography>
-                                                )}
-                                            </Box>
-                                            {!token.launchedAt && token.progress !== undefined && (
-                                                <Box mt={0.5}>
-                                                    <ProgressBar value={Number(token.progress ?? 0)} />
+                        !profile
+                            ? <ListSkeleton count={3} />
+                            : profile.tokens?.length > 0
+                                ? <Box className="stagger-children" display="flex" flexDirection="column" gap={1}>
+                                    {profile.tokens.map((token: any) => (
+                                        <Link key={token.tokenAddress} href={`/token?network=${token.network}&address=${token.tokenAddress}`} style={{ textDecoration: 'none' }}>
+                                            <ItemCard>
+                                                <TokenLogo logo={token.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
+                                                <Box flex={1} minWidth={0}>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Typography fontSize={14} fontWeight={600} color="white" noWrap>{token.tokenName}</Typography>
+                                                        <Typography fontSize={12} color="#64748B">{token.tokenSymbol}</Typography>
+                                                        <img src={`/networks/${token.network}.svg`} height={14} alt="" />
+                                                    </Box>
+                                                    <Box display="flex" alignItems="center" gap={2} mt={0.5}>
+                                                        <Typography fontSize={12} color="#FFD700" fontWeight={600}>MC: ${priceFormatter(token.marketcap, 2)}</Typography>
+                                                        {token.volume > 0 && (
+                                                            <Typography fontSize={11} color="#64748B">Vol: ${priceFormatter(token.volume, 2, true, true)}</Typography>
+                                                        )}
+                                                    </Box>
+                                                    {!token.launchedAt && token.progress !== undefined && (
+                                                        <Box mt={0.5}>
+                                                            <ProgressBar value={Number(token.progress ?? 0)} />
+                                                        </Box>
+                                                    )}
                                                 </Box>
-                                            )}
-                                        </Box>
-                                        {token.launchedAt ? (
-                                            <Box sx={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', px: 1, py: 0.3 }}>
-                                                <Typography fontSize={11} fontWeight={600} color="#10B981">Launched</Typography>
-                                            </Box>
-                                        ) : (
-                                            <Typography fontSize={11} color="#64748B">{Number(token.progress ?? 0).toFixed(1)}%</Typography>
-                                        )}
-                                    </ItemCard>
-                                </Link>
-                            ))
-                            : <EmptyState text="No tokens created yet" />
+                                                {token.launchedAt ? (
+                                                    <Box sx={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', px: 1, py: 0.3 }}>
+                                                        <Typography fontSize={11} fontWeight={600} color="#10B981">Launched</Typography>
+                                                    </Box>
+                                                ) : (
+                                                    <Typography fontSize={11} color="#64748B">{Number(token.progress ?? 0).toFixed(1)}%</Typography>
+                                                )}
+                                            </ItemCard>
+                                        </Link>
+                                    ))}
+                                </Box>
+                                : <EmptyStateComponent icon="🚀" title="No tokens created yet" description="Create your first token and start building your portfolio" />
                     )}
 
                     {/* Holdings */}
                     {tab === 1 && (
-                        profile.helds?.length > 0
-                            ? profile.helds.map((held: any) => (
-                                <Link key={held.id} href={`/token?network=${held.token?.network ?? 'bsc'}&address=${held.tokenAddress}`} style={{ textDecoration: 'none' }}>
-                                    <ItemCard>
-                                        <TokenLogo logo={held.token?.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
-                                        <Box flex={1} minWidth={0}>
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                <Typography fontSize={14} fontWeight={600} color="white" noWrap>
-                                                    {held.token?.tokenName ?? `${held.tokenAddress.slice(0, 6)}...${held.tokenAddress.slice(-4)}`}
-                                                </Typography>
-                                                <Typography fontSize={12} color="#64748B">{held.token?.tokenSymbol}</Typography>
-                                            </Box>
-                                            <Typography fontSize={12} color="#94A3B8" mt={0.3}>
-                                                {priceFormatter(held.tokenAmount, 2, true, true)} tokens
-                                            </Typography>
-                                        </Box>
-                                        {held.token?.marketcap > 0 && (
-                                            <Typography fontSize={12} color="#FFD700" fontWeight={600} flexShrink={0}>
-                                                ${priceFormatter(held.token.marketcap, 2)}
-                                            </Typography>
-                                        )}
-                                    </ItemCard>
-                                </Link>
-                            ))
-                            : <EmptyState text="No holdings" />
+                        !profile
+                            ? <ListSkeleton count={3} />
+                            : profile.helds?.length > 0
+                                ? <Box className="stagger-children" display="flex" flexDirection="column" gap={1}>
+                                    {profile.helds.map((held: any) => (
+                                        <Link key={held.id} href={`/token?network=${held.token?.network ?? 'bsc'}&address=${held.tokenAddress}`} style={{ textDecoration: 'none' }}>
+                                            <ItemCard>
+                                                <TokenLogo logo={held.token?.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
+                                                <Box flex={1} minWidth={0}>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Typography fontSize={14} fontWeight={600} color="white" noWrap>
+                                                            {held.token?.tokenName ?? `${held.tokenAddress.slice(0, 6)}...${held.tokenAddress.slice(-4)}`}
+                                                        </Typography>
+                                                        <Typography fontSize={12} color="#64748B">{held.token?.tokenSymbol}</Typography>
+                                                    </Box>
+                                                    <Typography fontSize={12} color="#94A3B8" mt={0.3}>
+                                                        {priceFormatter(held.tokenAmount, 2, true, true)} tokens
+                                                    </Typography>
+                                                </Box>
+                                                {held.token?.marketcap > 0 && (
+                                                    <Typography fontSize={12} color="#FFD700" fontWeight={600} flexShrink={0}>
+                                                        ${priceFormatter(held.token.marketcap, 2)}
+                                                    </Typography>
+                                                )}
+                                            </ItemCard>
+                                        </Link>
+                                    ))}
+                                </Box>
+                                : <EmptyStateComponent icon="💎" title="No holdings yet" description="Buy tokens to start building your collection" />
                     )}
 
                     {/* Replies */}
                     {tab === 2 && (
-                        profile.replies?.length > 0
-                            ? profile.replies.map((reply: any) => (
-                                <ItemCard key={reply.id}>
-                                    <Box flex={1} minWidth={0}>
-                                        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                                            <Typography fontSize={11} color="#FFA600" fontWeight={500}>
-                                                {reply.tokenAddress ? `${reply.tokenAddress.slice(0, 6)}...${reply.tokenAddress.slice(-4)}` : 'Token'}
-                                            </Typography>
-                                            <Typography fontSize={11} color="#475569">
-                                                {new Date(reply.date).toLocaleDateString()} {new Date(reply.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </Typography>
+                        !profile
+                            ? <ListSkeleton count={3} />
+                            : profile.replies?.length > 0
+                                ? profile.replies.map((reply: any) => (
+                                    <ItemCard key={reply.id}>
+                                        <Box flex={1} minWidth={0}>
+                                            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                                <Typography fontSize={11} color="#FFA600" fontWeight={500}>
+                                                    {reply.tokenAddress ? `${reply.tokenAddress.slice(0, 6)}...${reply.tokenAddress.slice(-4)}` : 'Token'}
+                                                </Typography>
+                                                <Typography fontSize={11} color="#475569">
+                                                    {new Date(reply.date).toLocaleDateString()} {new Date(reply.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Typography>
+                                            </Box>
+                                            <Typography fontSize={13} color="white" sx={{ wordBreak: 'break-word' }}>{reply.comment}</Typography>
                                         </Box>
-                                        <Typography fontSize={13} color="white" sx={{ wordBreak: 'break-word' }}>{reply.comment}</Typography>
-                                    </Box>
-                                </ItemCard>
-                            ))
-                            : <EmptyState text="No replies" />
+                                    </ItemCard>
+                                ))
+                                : <EmptyStateComponent icon="💬" title="No replies yet" description="Join the conversation on token pages" />
                     )}
 
                     {/* Followers */}
                     {tab === 3 && (
-                        profile.followers?.length > 0
-                            ? profile.followers.map((f: any) => (
-                                <Link key={f.followerId} href={`/profile?address=${f.followerId}`} style={{ textDecoration: 'none' }}>
-                                    <ItemCard>
-                                        <UserAvatar user={f.user} address={f.followerId} size={36} mr="0" />
-                                        <Box flex={1} minWidth={0}>
-                                            <UserName user={f.user} address={f.followerId} fontSize={14} color="white" />
-                                            <Typography fontSize={12} color="#64748B" fontFamily="monospace">
-                                                {f.followerId?.slice(0, 6)}...{f.followerId?.slice(-4)}
-                                            </Typography>
-                                        </Box>
-                                        {f.followee?.followers > 0 && (
-                                            <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
-                                        )}
-                                    </ItemCard>
-                                </Link>
-                            ))
-                            : <EmptyState text="No followers yet" />
+                        !profile
+                            ? <ListSkeleton count={3} />
+                            : profile.followers?.length > 0
+                                ? profile.followers.map((f: any) => (
+                                    <Link key={f.followerId} href={`/profile?address=${f.followerId}`} style={{ textDecoration: 'none' }}>
+                                        <ItemCard>
+                                            <UserAvatar user={f.user} address={f.followerId} size={36} mr="0" />
+                                            <Box flex={1} minWidth={0}>
+                                                <UserName user={f.user} address={f.followerId} fontSize={14} color="white" />
+                                                <Typography fontSize={12} color="#64748B" fontFamily="monospace">
+                                                    {f.followerId?.slice(0, 6)}...{f.followerId?.slice(-4)}
+                                                </Typography>
+                                            </Box>
+                                            {f.followee?.followers > 0 && (
+                                                <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
+                                            )}
+                                        </ItemCard>
+                                    </Link>
+                                ))
+                                : <EmptyStateComponent icon="👥" title="No followers yet" description="Share your profile to grow your audience" />
                     )}
 
                     {/* Following */}
                     {tab === 4 && (
-                        profile.followees?.length > 0
-                            ? profile.followees.map((f: any) => (
-                                <Link key={f.followeeId} href={`/profile?address=${f.followeeId}`} style={{ textDecoration: 'none' }}>
-                                    <ItemCard>
-                                        <UserAvatar user={f.user} address={f.followeeId} size={36} mr="0" />
-                                        <Box flex={1} minWidth={0}>
-                                            <UserName user={f.user} address={f.followeeId} fontSize={14} color="white" />
-                                            <Typography fontSize={12} color="#64748B" fontFamily="monospace">
-                                                {f.followeeId?.slice(0, 6)}...{f.followeeId?.slice(-4)}
-                                            </Typography>
-                                        </Box>
-                                        {f.followee?.followers > 0 && (
-                                            <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
-                                        )}
-                                    </ItemCard>
-                                </Link>
-                            ))
-                            : <EmptyState text="Not following anyone" />
+                        !profile
+                            ? <ListSkeleton count={3} />
+                            : profile.followees?.length > 0
+                                ? profile.followees.map((f: any) => (
+                                    <Link key={f.followeeId} href={`/profile?address=${f.followeeId}`} style={{ textDecoration: 'none' }}>
+                                        <ItemCard>
+                                            <UserAvatar user={f.user} address={f.followeeId} size={36} mr="0" />
+                                            <Box flex={1} minWidth={0}>
+                                                <UserName user={f.user} address={f.followeeId} fontSize={14} color="white" />
+                                                <Typography fontSize={12} color="#64748B" fontFamily="monospace">
+                                                    {f.followeeId?.slice(0, 6)}...{f.followeeId?.slice(-4)}
+                                                </Typography>
+                                            </Box>
+                                            {f.followee?.followers > 0 && (
+                                                <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
+                                            )}
+                                        </ItemCard>
+                                    </Link>
+                                ))
+                                : <EmptyStateComponent icon="🔍" title="Not following anyone" description="Discover and follow other traders" />
                     )}
                 </Box>
             </Box>
         </PageBox>
-    )
-}
-
-function EmptyState({ text }: { text: string }) {
-    return (
-        <Box py={6} textAlign="center">
-            <Typography color="#475569" fontSize={14}>{text}</Typography>
-        </Box>
     )
 }
