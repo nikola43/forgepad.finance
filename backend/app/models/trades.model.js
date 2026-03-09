@@ -51,6 +51,15 @@ module.exports = (sequelize, Sequelize) => {
       {
         unique: true,
         fields: ['txHash']
+      },
+      {
+        fields: ['tokenAddress']
+      },
+      {
+        fields: ['swapperAddress']
+      },
+      {
+        fields: ['date']
       }
     ]
   });

@@ -3,6 +3,10 @@ module.exports = (sequelize, Sequelize) => {
     address: {
       type: Sequelize.STRING(50)
     },
+    penalized: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false
+    },
   }, {
     timestamps: false,
     indexes: [

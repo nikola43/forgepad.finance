@@ -90,7 +90,7 @@ module.exports = {
             chainId: 0xa86a
         },
         sepolia: {
-            url: "https://sepolia.infura.io/v3/45eb256800c24b6c854fb8cd4c73b2c3",
+            url: process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
             accounts: [process.env.PRIVATE_KEY],
         },
         bsc_main: {
@@ -98,19 +98,11 @@ module.exports = {
             accounts: [process.env.PRIVATE_KEY],
         },
         eth_main: {
-            url: "https://eth.merkle.io",
+            url: process.env.ETH_RPC_URL || "https://eth.merkle.io",
             accounts: [process.env.PRIVATE_KEY],
-            // gas: 15000000,        // Much higher
-            // gasPrice: 2500000000, // 25 gwei (2 gwei is too low for mainnet)
-        },
-        eth_main: {
-            url: "https://eth.merkle.io",
-            accounts: [process.env.PRIVATE_KEY],
-            // gas: 15000000,        // Much higher
-            // gasPrice: 2500000000, // 25 gwei (2 gwei is too low for mainnet)
         },
         eth_mainnet: {
-            url: "https://rpc.ankr.com/eth/21abecc585cbd8eb9f1fb38ee79dff11d3b3d8dafbca2589236ea7dcc4d88593",
+            url: process.env.ETH_RPC_URL || "https://rpc.ankr.com/eth",
             accounts: [process.env.PRIVATE_KEY],
             // gas: 15000000,        // Much higher
             // gasPrice: 2500000000, // 25 gwei (2 gwei is too low for mainnet)
@@ -125,7 +117,7 @@ module.exports = {
         timeout: 1000000000,
     },
     etherscan: {
-        apiKey: "ZF8UZTCMKDNN555XW2CGBJ2HXWCVIRZFFG",
+        apiKey: process.env.ETHERSCAN_API_KEY || "",
         customChains: [
             {
                 network: "eth_mainnet",

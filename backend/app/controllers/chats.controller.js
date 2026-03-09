@@ -31,7 +31,18 @@ module.exports = {
     async replyByTokenAddress(req, res) {
         try {
             const { tokenAddress, replyAddress, comment, network, replyId, signature, msg } = req.body;
-            if (!signature) 
+
+            // Validate comment length and sanitize
+            if (!comment || typeof comment !== 'string') {
+                return res.status(400).json({ error: 'Comment is required' });
+            }
+            if (comment.length > 1000) {
+                return res.status(400).json({ error: 'Comment must be 1000 characters or fewer' });
+            }
+            // Strip HTML tags to prevent stored XSS
+            const sanitizedComment = comment.replace(/<[^>]*>/g, '');
+
+            if (!signature)
                 throw new Error("Need signature")
             const sig = util.fromRpcSig(signature);
             const prefix = Buffer.from("\x19Ethereum Signed Message:\n");
@@ -54,7 +65,7 @@ module.exports = {
             const newChatInfo = {
                 tokenAddress: tokenAddress,
                 replyAddress: replyAddress,
-                comment: comment,
+                comment: sanitizedComment,
                 network: network,
                 code: `${replyTo ? `${replyTo.code}#` : ''}${Math.floor(Date.now() / 1000)}`
             }

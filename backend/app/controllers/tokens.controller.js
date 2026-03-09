@@ -24,6 +24,20 @@ const CATEGORIES = {
     "NSFW": 1,
 }
 
+const VALID_NETWORKS = ['mainnet', 'base', 'bsc', 'solana'];
+const WALLET_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+
+// Validate URL to prevent stored XSS (only allow http/https protocols)
+function isValidUrl(str) {
+    if (!str || typeof str !== 'string') return true; // empty is ok (optional field)
+    try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 module.exports = {
     async createToken(req, res) {
         try {
@@ -31,17 +45,49 @@ module.exports = {
 
             // Input validation
             if (!body.creatorAddress) {
-                return res.status(400).json({ 
-                    error: 'Validation Error', 
-                    message: 'creatorAddress is required' 
+                return res.status(400).json({
+                    error: 'Validation Error',
+                    message: 'creatorAddress is required'
+                })
+            }
+
+            // Validate wallet address format
+            if (!WALLET_ADDRESS_REGEX.test(body.creatorAddress.trim())) {
+                return res.status(400).json({
+                    error: 'Validation Error',
+                    message: 'Invalid creatorAddress format'
                 })
             }
 
             if (!body.tokenName || !body.tokenSymbol) {
-                return res.status(400).json({ 
-                    error: 'Validation Error', 
-                    message: 'tokenName and tokenSymbol are required' 
+                return res.status(400).json({
+                    error: 'Validation Error',
+                    message: 'tokenName and tokenSymbol are required'
                 })
+            }
+
+            // Validate network against known networks
+            const network = body.network || 'bsc';
+            if (!VALID_NETWORKS.includes(network)) {
+                return res.status(400).json({
+                    error: 'Validation Error',
+                    message: `Invalid network. Must be one of: ${VALID_NETWORKS.join(', ')}`
+                })
+            }
+
+            // Validate URL fields to prevent stored XSS
+            const urlFields = {
+                telegramLink: body.telegramLink,
+                twitterLink: body.twitterLink,
+                webLink: body.webLink
+            };
+            for (const [field, value] of Object.entries(urlFields)) {
+                if (value && !isValidUrl(value)) {
+                    return res.status(400).json({
+                        error: 'Validation Error',
+                        message: `Invalid URL for ${field}. Only http and https URLs are allowed.`
+                    })
+                }
             }
 
             // Sanitize inputs
@@ -51,7 +97,7 @@ module.exports = {
                 tokenSymbol: body.tokenSymbol.trim().toUpperCase().substring(0, 10),
                 tokenDescription: body.tokenDescription ? body.tokenDescription.trim().substring(0, 500) : '',
                 creatorAddress: body.creatorAddress.trim(),
-                network: body.network || 'ethereum'
+                network: network
             }
 
             if (!sanitizedBody.tokenAddress) {
@@ -143,8 +189,6 @@ module.exports = {
     },
     async getAllTokens(req, res) {
         try {
-            // const { orderType = 'createdAt', orderFlag = 'DESC', searchWord, network, pageNumber = 1 } = req.body;
-            //const orderType = 'updatedAt';
             const orderType = req.query.orderType || 'createdAt'
             const orderFlag = req.query.orderFlag || 'DESC'
             const searchWord = req.query.searchWord
@@ -152,7 +196,7 @@ module.exports = {
             const includeNSFW = req.query.includeNSFW == 'true';
             const pageNumber = req.query.pageNumber || 1;
             const pageSize = Number(req.query.pageSize) || 30;
-            // Determine the sorting direction
+
             const where = {
                 ...(
                     !network || network === "all" ? {} : { network }
@@ -180,31 +224,10 @@ module.exports = {
             ]
             const offset = (pageNumber - 1) * pageSize;
 
-            // Recommened token for top show - highest marketcap
-            // kingTable.hasOne(tokenTable, { sourceKey: 'tokenAddress', foreignKey: 'tokenAddress' })
-            // tokenTable.hasMany(tradeTable, { sourceKey: 'tokenAddress', foreignKey: 'tokenAddress' })
-            // tokenTable.hasOne(userTable, { sourceKey: 'creatorAddress', foreignKey: 'address' })
-
-            // const king = await kingTable.findOne({
-            //     include: [{
-            //         model: tokenTable,
-            //         include: [{
-            //             model: userTable,
-            //         }],
-            //     }],
-            //     order: [['createdAt', 'DESC']]
-            // });
-
             const tokenCount = await tokenTable.count({
-                // include: [{
-                //     model: userTable,
-                // }],
                 where,
             });
             const tokenList = await tokenTable.findAll({
-                // include: [{
-                //     model: userTable,
-                // }],
                 attributes: orderType === 'trends' || orderType === 'bump' ? {
                     include: [
                         [Sequelize.literal('(EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM "updatedAt")) * 100 / 1800'), 'x']
@@ -218,8 +241,8 @@ module.exports = {
 
             res.status(200).json({ tokenList, tokenCount });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getAllTokens:', error.message);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch tokens' });
         }
     },
     async myTokens(req, res) {
@@ -244,23 +267,16 @@ module.exports = {
             const { network, tokenAddress } = req.params;
             const { pageNumber = 1, pageSize = 10 } = req.query;
 
-            // kingTable.hasOne(tokenTable, { sourceKey: 'tokenAddress', foreignKey: 'tokenAddress' })
-            // const king = await kingTable.findOne({
-            //     include: [{
-            //         model: tokenTable,
-            //     }],
-            //     order: [['createdAt', 'DESC']]
-            // });
-            // tokenTable.hasOne(userTable, { sourceKey: 'creatorAddress', foreignKey: 'address' })
             const tokenDetils = await tokenTable.findOne({
-                // include: [{
-                //     model: userTable,
-                // }],
                 where: {
                     tokenAddress,
                     network
                 }
             });
+
+            if (!tokenDetils) {
+                return res.status(404).json({ error: 'Not Found', message: 'Token not found' });
+            }
 
             const trade15m = await tradeTable.findOne({
                 attributes: [
@@ -281,15 +297,6 @@ module.exports = {
                 }
             })
 
-            // const tradeAll = await tradeTable.findOne({
-            //     attributes: [
-            //         [Sequelize.literal('SUM(IF(type="BUY", ethAmount, -ethAmount))'), 'liquidity'],
-            //         [Sequelize.literal('SUM(tokenAmount * tokenPrice * ethPrice)'), 'volume'],
-            //     ],
-            //     where: {
-            //         tokenAddress
-            //     }
-            // })
             const chain = CHAINS.find(chain => chain.network === network)
             const price15m = Number(tokenDetils.get('price')) - (trade15m ? Number(trade15m.get('tokenPrice')) : chain.virtualEthAmount / chain.virtualTokenAmount)
             tokenDetils.setDataValue('price15m', price15m.toFixed(12))
@@ -298,18 +305,14 @@ module.exports = {
                 tokenDetils.setDataValue('liquidity1d', trade1d.get('liquidity'))
             }
 
-            // holderTable.hasOne(userTable, { sourceKey: 'holderAddress', foreignKey: 'address' })
             const holdersDetails = await holderTable.findAll({
-                // include: [{
-                //     model: userTable
-                // }],
                 where: {
                     tokenAddress: tokenAddress,
                     tokenAmount: { [Sequelize.Op.gt]: 0 },
                     network: network
                 }
             });
-            // tradeTable.hasOne(userTable, { sourceKey: 'swapperAddress', foreignKey: 'address' })
+
             const tradesCount = await tradeTable.count({
                 where: {
                     tokenAddress: tokenAddress,
@@ -317,9 +320,6 @@ module.exports = {
                 }
             })
             const trades = await tradeTable.findAll({
-                // include: [{
-                //     model: userTable
-                // }],
                 where: {
                     tokenAddress: tokenAddress,
                     network: network
@@ -329,25 +329,10 @@ module.exports = {
                 limit: Number(pageSize)
             });
 
-            // chatTable.hasOne(userTable, { sourceKey: 'replyAddress', foreignKey: 'address' })
-            // const chatList = await chatTable.findAll({
-            //     include: [{
-            //         model: userTable
-            //     }],
-            //     where: {
-            //         tokenAddress: tokenAddress,
-            //         network: network
-            //     },
-            //     order: [
-            //         ['code', 'ASC'],
-            //         ['date', 'ASC']
-            //     ]
-            // });
-
             res.status(200).json({ tokenDetils, trades, tradesCount, holdersDetails });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getTokenDetails:', error.message);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch token details' });
         }
     },
     async uploadLogo(req, res) {
@@ -360,7 +345,7 @@ module.exports = {
             }
 
             // multer-s3 automatically uploads to S3 and adds file info to req.file
-            console.log('File uploaded successfully to S3:', req.file);
+            console.log('File uploaded successfully to S3:', req.file.key);
 
             // Generate the correct Supabase public URL
             const publicUrl = getSupabasePublicUrl(req.file.key);

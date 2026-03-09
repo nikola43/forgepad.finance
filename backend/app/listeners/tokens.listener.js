@@ -6,13 +6,26 @@ const requestTable = db.requests;
 const tradeTable = db.trades;
 const holderTable = db.holders;
 const indexTable = db.indexing;
-// const kingsTable = db.kings;
 const { Sequelize } = require('sequelize');
 const WEBSOCKET_MSGTypes = require('../config/websocket.config');
 const http = require('http');
 const { Connection, PublicKey } = require('@solana/web3.js');
-// const { fetchCandles } = require('../middleware/candles');
-// const genRanHex = size => [...Array(size)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+
+const MAX_RETRIES = 50;
+const BLOCK_CHUNK_DELAY_MS = 100;
+const retryCounters = {};
+
+function logError(chain, message, error) {
+    console.error(`[${new Date().toISOString()}][${chain.network}] ${message}`, error ? error.message || error : '')
+}
+
+function logInfo(chain, ...args) {
+    console.log(`[${new Date().toISOString()}][${chain.network}]`, ...args)
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 function f(x) {
     return 1 / (1 + 0.0000001 * x * x + 0.000006 * x * x * x + 0.00000006 * x * x * x * x)
@@ -86,7 +99,7 @@ async function handleTokenCreation(tx, signature, io, chain) {
             console.log(`[${chain.network}] Token created: ${requestBody.tokenSymbol} at ${tokenAddressString}`)
         }
     } catch (error) {
-        console.error(`[${chain.network}] Error handling token creation:`, error)
+        logError(chain, 'Error handling token creation:', error)
     }
 }
 
@@ -252,7 +265,7 @@ async function handleSwapEvent(tx, signature, io, chain) {
         console.log(`[${chain.network}] ${swapperAddress.slice(0, 6)} ${swapType.toLowerCase()} ${token.tokenSymbol} (vol: $${volume.toFixed(2)})`)
 
     } catch (error) {
-        console.error(`[${chain.network}] Error handling swap event:`, error)
+        logError(chain, 'Error handling swap event:', error)
     }
 }
 
@@ -321,15 +334,28 @@ function subscribe(io, chain) {
 
                 console.log(`🔔 Subscribing to ${chain.contractAddress} on ${chain.network} (subscription: ${subscriptionId})`)
 
-                // Handle connection errors
+                // Handle connection errors with max retries
                 connection._rpcWebSocket.on('error', (error) => {
-                    console.error(`[${chain.network}] WebSocket error:`, error)
-                    setTimeout(() => subscribe(io, chain), 10000)
+                    logError(chain, 'WebSocket error:', error)
+                    const key = `solana-${chain.network}`
+                    retryCounters[key] = (retryCounters[key] || 0) + 1
+                    if (retryCounters[key] <= MAX_RETRIES) {
+                        logInfo(chain, `Reconnecting (attempt ${retryCounters[key]}/${MAX_RETRIES})...`)
+                        setTimeout(() => subscribe(io, chain), 10000)
+                    } else {
+                        logError(chain, `Max retries (${MAX_RETRIES}) reached. Giving up on WebSocket reconnection.`)
+                    }
                 })
 
                 connection._rpcWebSocket.on('close', () => {
-                    console.log(`[${chain.network}] WebSocket closed, reconnecting...`)
-                    setTimeout(() => subscribe(io, chain), 5000)
+                    const key = `solana-${chain.network}`
+                    retryCounters[key] = (retryCounters[key] || 0) + 1
+                    if (retryCounters[key] <= MAX_RETRIES) {
+                        logInfo(chain, `WebSocket closed, reconnecting (attempt ${retryCounters[key]}/${MAX_RETRIES})...`)
+                        setTimeout(() => subscribe(io, chain), 5000)
+                    } else {
+                        logError(chain, `Max retries (${MAX_RETRIES}) reached. Giving up on WebSocket reconnection.`)
+                    }
                 })
             } else {            
                 const provider = chain.rpcUrl.startsWith('wss://')
@@ -366,7 +392,7 @@ function subscribe(io, chain) {
                     }).then(logs =>
                         logs.map(log => ({ ...log, ...contract.interface.parseLog(log) }))
                     ).catch(ex => {
-                        console.log(ex.message)
+                        logError(chain, 'Error fetching logs:', ex)
                     })
 
                     if (logs && logs.length) {
@@ -451,15 +477,12 @@ function subscribe(io, chain) {
                             raw: true
                         })
                         const trades = []
-                        // const referrals = []
                         for (const log of logs) {
                             const token = tokens.find(t => t.tokenAddress == log.args.token)
                             if (!token)
                                 continue
-                            //     const now = new Date(fromBlock==toBlock ? Date.now() : (await provider.getBlock(log.blockNumber)).timestamp * 1000)
                             if (log.name === 'BuyTokens') {
                                 const swapperAddress = log.args.user
-                                // const price = log.args.tokenPrice * log.args.ethPriceUSD / (10n ** 18n)
                                 token.ethPrice = ethers.formatEther(log.args.ethPriceUSD)
                                 token.marketcap = ethers.formatEther(log.args.marketCap)
                                 token.price = ethers.formatEther(log.args.tokenPrice)
@@ -500,13 +523,8 @@ function subscribe(io, chain) {
                                     tokenPrice: token.price,
                                     date: log.args.date
                                 })
-                                // if (referrals[swapperAddress])
-                                //     referrals[swapperAddress] += ethers.formatUnits(log.args.tokenAmount * price, 36)
-                                // else
-                                //     referrals[swapperAddress] = ethers.formatUnits(log.args.tokenAmount * price, 36)
                             } else if (log.name === 'SellTokens') {
                                 const swapperAddress = log.args.user
-                                // const price = log.args.tokenPrice * log.args.ethPriceUSD / (10n ** 18n)
                                 token.ethPrice = ethers.formatEther(log.args.ethPriceUSD)
                                 token.marketcap = ethers.formatEther(log.args.marketCap)
                                 token.price = ethers.formatEther(log.args.tokenPrice)
@@ -539,7 +557,6 @@ function subscribe(io, chain) {
                                 })
                             } else if (log.name === 'TokenLaunched') {
                                 token.launchedAt = new Date(Number(log.args.date) * 1000)
-                                // const routers = ['9INCH', '9mm', 'PulseX']
                                 token.pairAddress = log.args.pair;
                             }
                         }
@@ -547,42 +564,15 @@ function subscribe(io, chain) {
                             await tokenTable.bulkCreate(tokens, {
                                 updateOnDuplicate: ['price', 'ethPrice', 'virtualEthAmount', 'virtualTokenAmount', 'marketcap', 'launchedAt', 'pairAddress', 'volume', 'score']
                             })
-                            // const king = await kingsTable.findOne({
-                            //     order: [['createdAt', 'DESC']]
-                            // })
-                            // const newKing = await tokenTable.findOne({
-                            //     where: {
-                            //         launchedAt: null,
-                            //         marketcap: {
-                            //             [Sequelize.Op.gt]: 0
-                            //         }
-                            //     },
-                            //     order: [['marketcap', 'DESC']]
-                            // })
-                            // if (newKing && (!king || newKing.tokenAddress != king.tokenAddress)) {
-                            //     await kingsTable.create({
-                            //         tokenAddress: newKing.tokenAddress
-                            //     })
-                            // }
                         }
                         if (holders.length)
                             await holderTable.bulkCreate(holders, {
                                 updateOnDuplicate: ['tokenAmount']
                             })
                         if (trades.length) {
-                            // console.log('trades', trades)
                             await tradeTable.bulkCreate(trades, {
                                 ignoreDuplicates: true
                             })
-                            // await db.sequelize.query(`
-                            //     UPDATE trades a
-                            //         LEFT JOIN referrals b ON a.swapperAddress = b.referrer
-                            //         LEFT JOIN referral_infos c ON c.address = b.referee
-                            //     SET c.earnings = c.earnings + a.ethAmount * a.ethPrice
-                            //     WHERE a.txHash IN (?)
-                            // `, {
-                            //     replacements: trades.filter(t => t.type=='BUY').map(t => t.txHash)
-                            // })
                             response.push(
                                 ...trades.map(trade => ({
                                     type: WEBSOCKET_MSGTypes.swap,
@@ -590,24 +580,7 @@ function subscribe(io, chain) {
                                 }))
                             )
                             io.emit('m', trades.map(t => `${t.tokenAddress}~${t.date}~${t.tokenPrice}~${Number(t.tokenPrice * t.ethPrice * t.tokenAmount).toFixed(2)}`).join('\n'))
-                            // io.emit('trade', JSON.stringify(trades.map(t => ({
-                            //     network: t.network,
-                            //     tokenAddress: t.tokenAddress,
-                            //     tokenImage: t.tokenImage,
-                            //     tokenSymbol: t.tokenSymbol,
-                            //     swapperAddress: t.swapperAddress,
-                            //     tokenPrice: t.tokenPrice,
-                            //     tokenAmount: t.tokenAmount,
-                            //     ethAmount: t.ethAmount,
-                            //     type: t.type,
-                            //     date: t.date.toString(),
-                            // }))))
                         }
-                        // if (response.length)
-                        //     io.emit('message', JSON.stringify({
-                        //         type: WEBSOCKET_MSGTypes.batch,
-                        //         // data: response
-                        //     }))
                     }
                 }
 
@@ -628,6 +601,8 @@ function subscribe(io, chain) {
                                     network: chain.chainId,
                                     block: Math.min(toBlock, blockNumber + 50000)
                                 })
+                                // Small delay between chunks to avoid RPC rate limits
+                                await sleep(BLOCK_CHUNK_DELAY_MS)
                             }
                             break
                         }
@@ -654,32 +629,22 @@ function subscribe(io, chain) {
 
                 if (provider.websocket) {
                     provider.websocket.on('close', () => {
-                        console.log('⚠️ reconnecting')
-                        setTimeout(() => subscribe(io), 10000)
+                        logInfo(chain, 'WebSocket closed, reconnecting...')
+                        setTimeout(() => subscribe(io, chain), 10000)
                     })
                 }
             }
         } catch (e) {
-            console.error(e)
+            logError(chain, 'Listener error:', e)
             setTimeout(() => subscribe(io, chain), 10000)
         }
     })
-    clientRequest.on('error', () => {
-        console.log('⚠️ reconnecting')
+    clientRequest.on('error', (err) => {
+        logError(chain, 'HTTP connection error, reconnecting...', err)
         setTimeout(() => subscribe(io, chain), 10000)
     })
 }
 
 module.exports = io => {
-    // setInterval(() => {
-    //     Object.keys(io.channels).forEach(tokenAddress => {
-    //         fetchCandles(tokenAddress, undefined, undefined, 1, false, 1).then(candles => {
-    //             if (candles?.length && lastBar[tokenAddress]?.time != candles[0].time && lastBar[tokenAddress]?.volume != candles[0].volume) {
-    //                 io.emit('m', `${tokenAddress}~${candles[0].time}~${candles[0].close}~${candles[0].volume}`)
-    //                 lastBar[tokenAddress] = candles[0]
-    //             }
-    //         }).catch(err => { console.error('Error fetching candles:', err)})
-    //     })
-    // }, 1000)
     CHAINS.forEach(chain => subscribe(io, chain))
 }

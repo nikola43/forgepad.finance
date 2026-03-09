@@ -60,6 +60,9 @@ contract ForgepadLiquidityManager is
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Authorized callers mapping
+    mapping(address => bool) public authorizedCallers;
+
     /// @notice Uniswap V2 Router interface
     IUniswapV2Router02 public routerV2;
 
@@ -83,7 +86,7 @@ contract ForgepadLiquidityManager is
     address public marginRecipient;
 
     uint16 ethAmountPercentToLP = 10000; // 100%
-    uint16 tokenAmountPercentToLP = 5000; //50%
+    uint16 tokenAmountPercentToLP = 10000; //100%
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -169,6 +172,11 @@ contract ForgepadLiquidityManager is
      */
     modifier notZeroAddress(address addr) {
         if (addr == address(0)) revert ZeroAddress();
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(authorizedCallers[msg.sender] || msg.sender == owner(), "Unauthorized");
         _;
     }
 
@@ -296,6 +304,7 @@ contract ForgepadLiquidityManager is
         payable
         nonReentrant
         whenNotPaused
+        onlyAuthorized
         validAmounts(tokenAmount, ethAmount)
         notZeroAddress(token)
         notZeroAddress(recipient)
@@ -314,15 +323,20 @@ contract ForgepadLiquidityManager is
         uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
             10000; // Calculate token amount to LP
 
-        // Add liquidity
+        // Add liquidity with 2% slippage tolerance
+        uint256 tokenMin = (tokenAmountToLP * 98) / 100;
+        uint256 ethMin = (ethAmountToLP * 98) / 100;
         routerV2.addLiquidityETH{value: ethAmountToLP}(
             token,
             tokenAmountToLP,
-            0, // Accept any amount of tokens
-            0, // Accept any amount of ETH
+            tokenMin,
+            ethMin,
             recipient,
             block.timestamp + DEADLINE_BUFFER
         );
+
+        // Reset approval after router call
+        IERC20(token).approve(address(routerV2), 0);
 
         // Get pair address
         pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
@@ -332,8 +346,8 @@ contract ForgepadLiquidityManager is
 
         emit LiquidityAddedV2(
             token,
-            tokenAmount,
-            ethAmount,
+            tokenAmountToLP,
+            ethAmountToLP,
             pairAddress,
             recipient
         );
@@ -362,6 +376,7 @@ contract ForgepadLiquidityManager is
         payable
         nonReentrant
         whenNotPaused
+        onlyAuthorized
         validAmounts(tokenAmount, ethAmount)
         notZeroAddress(token)
         notZeroAddress(recipient)
@@ -410,15 +425,20 @@ contract ForgepadLiquidityManager is
         // Approve router to spend tokens
         IERC20(token).approve(address(routerV2), tokenAmountToLP);
 
-        // Add liquidity
+        // Add liquidity with 2% slippage tolerance
+        uint256 tokenMin = (tokenAmountToLP * 98) / 100;
+        uint256 ethMin = (ethAmountToLP * 98) / 100;
         routerV2.addLiquidityETH{value: ethAmountToLP}(
             token,
             tokenAmountToLP,
-            0, // Accept any amount of tokens
-            0, // Accept any amount of ETH
+            tokenMin,
+            ethMin,
             recipient,
             block.timestamp + DEADLINE_BUFFER
         );
+
+        // Reset approval after router call
+        IERC20(token).approve(address(routerV2), 0);
 
         // Get pair address
         pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
@@ -472,6 +492,12 @@ contract ForgepadLiquidityManager is
     )
         external
         payable
+        nonReentrant
+        whenNotPaused
+        onlyAuthorized
+        validAmounts(tokenAmount, ethAmount)
+        notZeroAddress(token)
+        notZeroAddress(recipient)
         returns (
             uint256 tokenId,
             uint128 liquidity,
@@ -494,8 +520,8 @@ contract ForgepadLiquidityManager is
 
         if (token0Address > token1Address) {
             (token0Address, token1Address) = (token1Address, token0Address);
-            amount0Desired = ethAmount;
-            amount1Desired = tokenAmount;
+            amount0Desired = ethAmountToLP;
+            amount1Desired = tokenAmountToLP;
         }
 
         uint160 sqrtPriceX96 = calculateSqrtPriceX96(
@@ -575,6 +601,7 @@ contract ForgepadLiquidityManager is
         payable
         nonReentrant
         whenNotPaused
+        onlyAuthorized
         validAmounts(tokenAmount, ethAmount)
         notZeroAddress(token)
         notZeroAddress(recipient)
@@ -597,8 +624,8 @@ contract ForgepadLiquidityManager is
 
         if (token0Address > token1Address) {
             (token0Address, token1Address) = (token1Address, token0Address);
-            amount0Desired = ethAmount;
-            amount1Desired = tokenAmount;
+            amount0Desired = ethAmountToLP;
+            amount1Desired = tokenAmountToLP;
         }
 
         PoolKey memory poolKey = PoolKey({
@@ -944,10 +971,22 @@ contract ForgepadLiquidityManager is
     }
 
     function setEthAmountPercentToLP(uint16 _ethAmountPercentToLP) external onlyOwner {
+        require(_ethAmountPercentToLP > 0 && _ethAmountPercentToLP <= 10000, "Invalid percent");
         ethAmountPercentToLP = _ethAmountPercentToLP;
-    }   
+    }
 
     function setTokenAmountPercentToLP(uint16 _tokenAmountPercentToLP) external onlyOwner {
+        require(_tokenAmountPercentToLP > 0 && _tokenAmountPercentToLP <= 10000, "Invalid percent");
         tokenAmountPercentToLP = _tokenAmountPercentToLP;
+    }
+
+    function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+        require(caller != address(0), "Zero address");
+        authorizedCallers[caller] = authorized;
+    }
+
+    function setMarginRecipient(address _marginRecipient) external onlyOwner {
+        require(_marginRecipient != address(0), "Zero address");
+        marginRecipient = _marginRecipient;
     }
 }

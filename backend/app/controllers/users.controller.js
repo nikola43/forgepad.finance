@@ -1,13 +1,8 @@
-//const { btoa } = require("buffer");
-//const bcrypt = require('bcrypt');
 const Sequelize = require("sequelize");
-//const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const util = require('ethereumjs-util')
 dotenv.config();
 const { Buffer } = require('buffer');
-//const axios = require("axios");
-// const { twitterAuthClient, twitterClient, twitterState } = require('../config/twitter.config')
 
 const db = require("../models/index");
 const usersTable = db.users;
@@ -20,10 +15,24 @@ const followeesTable = db.followees;
 const referralInfoTable = db.referralInfo;
 const referralsTable = db.referrals;
 const adminTable = db.admins;
+
+// Wallet address validation
+const WALLET_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+function isValidAddress(address) {
+    return typeof address === 'string' && WALLET_ADDRESS_REGEX.test(address);
+}
+
+// Simple in-memory rate limiter for addLike
+const likeCooldowns = new Map();
+const LIKE_COOLDOWN_MS = 60 * 1000; // 1 minute cooldown per address
+
 module.exports = {
     async getUserInfo(req, res) {
         try {
             const { userAddress } = req.query;
+            if (!isValidAddress(userAddress)) {
+                return res.status(400).json({ error: 'Invalid wallet address format' });
+            }
             usersTable.hasOne(adminTable, { sourceKey: 'address', foreignKey: 'address' })
             const user = await usersTable.findOne({
                 include: [{
@@ -140,23 +149,22 @@ module.exports = {
             });
 
             if (!user) {
-                // create user
-                usersTable.create({
+                // create user if they don't exist yet
+                const newUser = await usersTable.create({
                     address: userAddress,
                     username,
                     bio,
                     avatar
                 });
-                res.status(200).json(user);
+                return res.status(200).json(newUser);
             }
 
-            // check is has been elapsed 1 day since last update
+            // check if 1 day has elapsed since last update
             const now = new Date();
             const lastUpdate = new Date(user.updatedAt);
-            const diff = now - lastUpdate;
+            const diff = now.getTime() - lastUpdate.getTime();
             if (diff < 86400000) {
-                res.status(403).json({ error: 'You can only update your profile once a day' });
-                return;
+                return res.status(403).json({ error: 'You can only update your profile once a day' });
             }
 
             user.username = username;
@@ -171,7 +179,18 @@ module.exports = {
     },
     async addLike(req, res) {
         try {
-            const { userAddress } = req.query.userAddress;
+            const userAddress = req.query.userAddress;
+            if (!isValidAddress(userAddress)) {
+                return res.status(400).json({ error: 'Invalid wallet address format' });
+            }
+
+            // Rate limit: one like per address per minute
+            const now = Date.now();
+            const lastLike = likeCooldowns.get(userAddress);
+            if (lastLike && (now - lastLike) < LIKE_COOLDOWN_MS) {
+                return res.status(429).json({ error: 'Too many requests. Please wait before liking again.' });
+            }
+
             const user = await usersTable.findOne({
                 where: {
                     address: userAddress
@@ -185,6 +204,7 @@ module.exports = {
 
             user.likes += 1;
             await user.save();
+            likeCooldowns.set(userAddress, now);
             res.status(200).json(user);
         } catch (error) {
             res.status(500).json({ error: 'Error', message: error });
@@ -193,6 +213,9 @@ module.exports = {
     async getUserProfile(req, res) {
         try {
             const { address: userAddress } = req.params;
+            if (!isValidAddress(userAddress)) {
+                return res.status(400).json({ error: 'Invalid wallet address format' });
+            }
             chatsTable.hasOne(usersTable, { sourceKey: 'replyAddress', foreignKey: 'address' })
             const replies = await chatsTable.findAll({
                 include: [{
@@ -326,56 +349,16 @@ module.exports = {
     },
     async getRanking(req, res) {
         try {
-            // const users = await usersTable.findAll({
-            //     attributes: ['username', 'address', [Sequelize.literal('CAST(RAND() * 10000000 AS UNSIGNED)'), 'ranking']],
-            //     order: [
-            //         [Sequelize.literal('ranking'), 'DESC']
-            //     ],
-            // });
-            // const users = await db.sequelize.query(`
-            //     SELECT users.username, users.avatar, t.address, SUM(t.points) AS ranking
-            //     FROM (
-            //         SELECT b.referee AS address, a.ethPrice * a.ethAmount AS points
-            //         FROM trades AS a
-            //             LEFT JOIN referrals AS b ON a.swapperAddress = b.referrer
-            //         WHERE a.type = 'BUY' AND DATE(a.date) <= b.createdAt
-            //         UNION ALL
-            //         SELECT swapperAddress AS address, ethPrice * ethAmount AS points
-            //         FROM trades
-            //         WHERE type = 'BUY'
-            //     ) AS t
-            //         LEFT JOIN users ON t.address=users.address
-            //     GROUP BY t.address
-            //     ORDER BY ranking DESC
-            // `, {
-            //     type: Sequelize.QueryTypes.SELECT,
-            // });
+            // Fetch penalized addresses from the admins table (addresses flagged for score reduction)
+            const penalizedAdmins = await adminTable.findAll({
+                attributes: ['address'],
+                where: {
+                    penalized: true
+                },
+                raw: true
+            }).catch(() => []);
+            const penalizedAddresses = penalizedAdmins.map(a => a.address);
 
-
-            const exploiters = [
-                "0xEDD6174EC64de887807d1769f56351D0d1621B8d",
-                "0xC9F149F221A347426BEE95a6640a73D8387c258C"
-            ]
-
-            // const users = await db.sequelize.query(`
-            //     SELECT users.username, users.avatar, t.address, SUM(t.points) AS ranking
-            //     FROM (
-            //         SELECT b.referee AS address, a.ethPrice * a.ethAmount AS points
-            //         FROM trades AS a
-            //             INNER JOIN referrals AS b ON a.swapperAddress = b.referrer
-            //         WHERE a.type = 'BUY' AND a.createdAt >= b.createdAt
-            //         UNION ALL
-            //         SELECT a.swapperAddress AS address, (a.ethPrice * a.ethAmount) * IF(b.id IS NULL, 10, 11) AS points
-            //         FROM trades AS a
-            //             LEFT JOIN referrals AS b ON a.swapperAddress = b.referrer AND a.createdAt >= b.createdAt
-            //         WHERE a.type = 'BUY'
-            //     ) AS t
-            //         INNER JOIN users ON t.address=users.address
-            //     GROUP BY t.address
-            //     ORDER BY ranking DESC
-            // `, {
-            //     type: Sequelize.QueryTypes.SELECT,
-            // });
             let users = await db.sequelize.query(`
                 SELECT users.username, users.avatar, t.address, SUM(t.points) AS ranking
                 FROM (
@@ -406,15 +389,9 @@ module.exports = {
                 type: Sequelize.QueryTypes.SELECT,
             });
 
-            // divide by 10 for exploiters
-            // for (let i = 0; i < users.length; i++) {
-            //     users[i].rank = i;
-            //     if (exploiters.includes(users[i].address)) {
-            //         users[i].ranking /= 10;
-            //     }
-            // }
+            // Penalize flagged addresses by reducing their ranking score
             users.forEach(user => {
-                if (exploiters.includes(user.address)) {
+                if (penalizedAddresses.includes(user.address)) {
                     user.ranking /= 10;
                 }
             });
@@ -429,11 +406,10 @@ module.exports = {
             // remove users with negative ranking
             users = users.filter(user => user.ranking > 0);
 
-            // console.log(users)
             res.status(200).json(users);
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getRanking:', error.message);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch rankings' });
         }
     },
     async getBalance(req, res) {
@@ -455,6 +431,9 @@ module.exports = {
     async getFollowings(req, res) {
         try {
             const { address: userAddress } = req.params;
+            if (!isValidAddress(userAddress)) {
+                return res.status(400).json({ error: 'Invalid wallet address format' });
+            }
             followersTable.hasOne(followeesTable, { sourceKey: 'followeeId', foreignKey: 'id' })
             followersTable.hasOne(usersTable, { sourceKey: 'followeeId', foreignKey: 'address' })
             const followees = await followersTable.findAll({
@@ -541,15 +520,6 @@ module.exports = {
             res.status(500).json({ error: 'Error', message: error });
         }
     },
-    // async loginWithTwitter(req, res) {
-    //     const authUrl = twitterAuthClient.generateAuthURL({
-    //         state: req.params.address,
-    //         code_challenge_method: "s256",
-    //     });
-    //     console.log(authUrl);
-    //     res.redirect(authUrl);
-    // },
-
     async addRefferal(req, res) {
         const { refCode, address } = req.params;
 
@@ -575,9 +545,21 @@ module.exports = {
         const { count } = req.params
         const { from = 0, to = Math.floor(Date.now() / 1000), index = 0, network } = req.query
 
+        // Validate numeric inputs
+        const safeCount = Math.min(Math.max(parseInt(count) || 10, 1), 50);
+        const safeFrom = parseInt(from) || 0;
+        const safeTo = parseInt(to) || Math.floor(Date.now() / 1000);
+        const safeIndex = parseInt(index) || 0;
+
+        // Validate network if provided (only allow known values)
+        const VALID_NETWORKS = ['mainnet', 'base', 'bsc', 'solana'];
+        if (network && !VALID_NETWORKS.includes(network)) {
+            return res.status(400).json({ error: 'Invalid network parameter' });
+        }
+
         const holders = await tradesTable.findAll({
             where: {
-                date: { [Sequelize.Op.gte]: from, [Sequelize.Op.lt]: to },
+                date: { [Sequelize.Op.gte]: safeFrom, [Sequelize.Op.lt]: safeTo },
                 ...( network ? { network } : undefined )
             },
             attributes: [
@@ -595,9 +577,9 @@ module.exports = {
 
         const totalVolume = holders.reduce((sum, holder) => sum + Number(holder.get('volume')), 0)
 
-        res.json({ 
+        res.json({
             bytes: `${
-                holders.slice(Number(index) * Number(count), Number(index) * Number(count) + Number(count)).map(h => 
+                holders.slice(safeIndex * safeCount, safeIndex * safeCount + safeCount).map(h =>
                     `${h.get('address').slice(2)}${BigInt(Math.floor(Number(h.get('volume')) * 0x100000000 / totalVolume)).toString(16).padStart(8, '0')}`
                 ).join('')}`
         })

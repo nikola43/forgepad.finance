@@ -130,6 +130,15 @@ module.exports = (sequelize, Sequelize) => {
       {
         unique: true,
         fields: ['tokenAddress']
+      },
+      {
+        fields: ['network']
+      },
+      {
+        fields: ['creatorAddress']
+      },
+      {
+        fields: ['score']
       }
     ]
   });

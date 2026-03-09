@@ -109,23 +109,8 @@ contract EthismFeeDistributor is
         lastDistributionTime = block.timestamp;
     }
 
-    // Router address - Hardcoded for Sepolia
-    // Check to get the router address for your supported network https://docs.chain.link/chainlink-functions/supported-networks
-    address router = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
-
-    // JavaScript source code
-    // Fetch character name from the Star Wars API.
-    // Documentation: https://swapi.info/people
-    string source =
-        "const characterId = args[0];"
-        "const apiResponse = await Functions.makeHttpRequest({"
-        "url: `https://swapi.info/api/people/${characterId}/`"
-        "});"
-        "if (apiResponse.error) {"
-        "throw Error('Request failed');"
-        "}"
-        "const { data } = apiResponse;"
-        "return Functions.encodeString(data.name);";
+    // Chainlink Functions source code (to be configured per deployment)
+    string public source;
 
     /**
      * @dev Allows users to deposit ETH into the contract
@@ -162,8 +147,11 @@ contract EthismFeeDistributor is
     /**
      * @dev Register a user for distributions
      */
+    uint256 public constant MAX_REGISTERED_USERS = 200;
+
     function registerUser() external {
         require(!isRegistered[msg.sender], "User already registered");
+        require(registeredUsers.length < MAX_REGISTERED_USERS, "Max users reached");
 
         registeredUsers.push(msg.sender);
         isRegistered[msg.sender] = true;
@@ -240,9 +228,8 @@ contract EthismFeeDistributor is
 
         distributionInProgress = true;
         _performRegularDistribution();
-        distributionInProgress = false;
         lastDistributionTime = block.timestamp;
-        this.requestRandomWords(true);
+        _requestRandomWordsInternal(true);
     }
 
     /**
@@ -256,20 +243,56 @@ contract EthismFeeDistributor is
             registeredUsers.length;
 
         if (amountPerUser > 0) {
+            uint256 actualDistributed = 0;
             for (uint256 i = 0; i < registeredUsers.length; i++) {
                 (bool success, ) = payable(registeredUsers[i]).call{
                     value: amountPerUser
                 }("");
-                require(success, "Transfer failed");
+                if (success) {
+                    actualDistributed += amountPerUser;
+                }
+                // Skip failed transfers instead of reverting (prevents single user DoS)
             }
 
-            totalDistributed += regularDistributionAmount;
+            totalDistributed += actualDistributed;
             emit RegularDistribution(
                 regularDistributionAmount,
                 registeredUsers.length,
                 amountPerUser
             );
         }
+    }
+
+    /**
+     * @dev Internal function to request VRF random words (callable by performUpkeep)
+     */
+    function _requestRandomWordsInternal(
+        bool enableNativePayment
+    ) internal returns (uint256 requestId) {
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: numWords,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({
+                        nativePayment: enableNativePayment
+                    })
+                )
+            })
+        );
+        s_requests[requestId] = RequestStatus({
+            randomWords: new uint256[](0),
+            exists: true,
+            fulfilled: false
+        });
+        requestIds.push(requestId);
+        lastRequestId = requestId;
+        pendingVRFRequest = requestId;
+        emit RequestSent(requestId, numWords);
+        return requestId;
     }
 
     // Assumes the subscription is funded sufficiently.
@@ -315,21 +338,24 @@ contract EthismFeeDistributor is
         // require(requestId == pendingVRFRequest, "Invalid request ID");
         require(distributionInProgress, "No distribution in progress");
 
-        // Select random winner
-        uint256 winnerIndex = _randomWords[0] % registeredUsers.length;
-        address winner = registeredUsers[winnerIndex];
+        // Select random winner (guard against empty array)
+        if (registeredUsers.length > 0) {
+            uint256 winnerIndex = _randomWords[0] % registeredUsers.length;
+            address winner = registeredUsers[winnerIndex];
 
-        // Send bonus amount (remaining balance should be ~10% of original)
-        uint256 bonusAmount = address(this).balance;
-        if (bonusAmount > 0) {
-            (bool success, ) = payable(winner).call{value: bonusAmount}("");
-            require(success, "Transfer failed");
-            totalDistributed += bonusAmount;
-            emit BonusDistribution(winner, bonusAmount);
+            // Send bonus amount (remaining balance should be ~10% of original)
+            uint256 bonusAmount = address(this).balance;
+            if (bonusAmount > 0) {
+                (bool success, ) = payable(winner).call{value: bonusAmount}("");
+                if (success) {
+                    totalDistributed += bonusAmount;
+                    emit BonusDistribution(winner, bonusAmount);
+                }
+                // Don't revert on failure — prevents permanently stuck distributionInProgress
+            }
         }
 
-        // Complete distribution
-        lastDistributionTime = block.timestamp;
+        // Always complete distribution (even if bonus transfer fails)
         distributionInProgress = false;
         distributionCount++;
         pendingVRFRequest = 0;
@@ -451,7 +477,7 @@ contract EthismFeeDistributor is
 
         distributionInProgress = true;
         _performRegularDistribution();
-        this.requestRandomWords(true);
+        _requestRandomWordsInternal(true);
     }
 
     /**
@@ -459,7 +485,14 @@ contract EthismFeeDistributor is
      */
     function emergencyWithdraw() external onlyOwner {
         require(!distributionInProgress, "Cannot withdraw during distribution");
-        payable(owner()).transfer(address(this).balance);
+        (bool success, ) = payable(owner()).call{value: address(this).balance}("");
+        require(success, "Withdrawal failed");
+    }
+
+    function resetStuckDistribution() external onlyOwner {
+        require(distributionInProgress, "No distribution in progress");
+        distributionInProgress = false;
+        pendingVRFRequest = 0;
     }
 
     /**
@@ -497,8 +530,8 @@ contract EthismFeeDistributor is
         gasLimit = _gasLimit;
     }
 
-    function setRouter(address _router) external onlyOwner {
-        router = _router;
+    function setSource(string calldata _source) external onlyOwner {
+        source = _source;
     }
 
     function setDonID(bytes32 _donID) external onlyOwner {

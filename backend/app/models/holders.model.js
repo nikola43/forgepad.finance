@@ -26,6 +26,12 @@ module.exports = (sequelize, Sequelize) => {
       {
         unique: true,
         fields: ['tokenAddress', 'holderAddress']
+      },
+      {
+        fields: ['tokenAddress']
+      },
+      {
+        fields: ['holderAddress']
       }
     ]
   }

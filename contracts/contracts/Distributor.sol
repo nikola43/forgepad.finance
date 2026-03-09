@@ -303,7 +303,7 @@ contract Distributor is
     mapping(uint256 => uint256) private apiRequests;
     
     uint256 public percentForDistribute = 9000; // 90%
-    uint256 public percentForFund = 500; // 90%
+    uint256 public percentForFund = 500; // 5%
     uint256 private ratioAPI = 5000;
     uint256 private ratioVRF = 1000;
 
@@ -490,8 +490,10 @@ contract Distributor is
                     uint256 amountForDistribute = (balance * percentForDistribute) / 10000;
                     for (uint256 i = 0; i < _holders.length; i++) {
                         uint256 _amount = amountForDistribute * uint256(_shares[i]) / (uint256(type(uint32).max) + 1);
-                        transfer(_holders[i], _amount);
-                        balance -= _amount;
+                        if (transfer(_holders[i], _amount)) {
+                            balance -= _amount;
+                        }
+                        // Skip failed transfers instead of corrupting balance
                     }
                     address winner = _holders[round.random % _holders.length];
                     transfer(winner, balance);
@@ -532,7 +534,7 @@ contract Distributor is
         round.random = _random;
     }
 
-    function transfer(address _to, uint256 _amount) public returns (bool) {
+    function transfer(address _to, uint256 _amount) internal returns (bool) {
         if (_amount == 0) return false;
         (bool success, ) = payable(_to).call{value: _amount}("");
         return success;
@@ -543,10 +545,12 @@ contract Distributor is
     }
 
     function updatePercentForDistribute(uint256 _percent) public onlyOwner {
+        require(_percent <= 10000, "Cannot exceed 100%");
         percentForDistribute = _percent;
     }
 
     function updatePercentForFund(uint256 _percent) public onlyOwner {
+        require(_percent <= 10000, "Cannot exceed 100%");
         percentForFund = _percent;
     }
 
