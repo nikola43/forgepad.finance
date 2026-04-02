@@ -6,9 +6,8 @@ use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Integer};
 use diesel_async::RunQueryDsl;
 use k256::ecdsa::{SigningKey, VerifyingKey};
-use rand::rngs::OsRng;
+use k256::elliptic_curve::rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use sha3::{Digest, Keccak256};
 use std::sync::Arc;
 
 use crate::errors::{AppError, AppResult};
@@ -16,7 +15,6 @@ use crate::middleware::auth::recover_address;
 use crate::models::*;
 use crate::schema::*;
 use crate::AppState;
-use anyhow;
 
 // ---------------------------------------------------------------------------
 // Query / body types
@@ -48,6 +46,7 @@ pub struct CreateTokenBody {
     pub token_name: String,
     pub token_symbol: String,
     pub token_description: Option<String>,
+    pub token_image: Option<String>,
     pub network: String,
     pub telegram_link: Option<String>,
     pub twitter_link: Option<String>,
@@ -77,9 +76,10 @@ pub struct ListTokensResponse {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TokenDetailResponse {
-    pub token: TokenResponse,
+    pub token_details: TokenResponse,
     pub trades: Vec<TradeResponse>,
-    pub holders: Vec<HolderResponse>,
+    pub trades_count: i64,
+    pub holders_details: Vec<HolderResponse>,
     pub fifteen_min_price: Option<String>,
     pub one_day_liquidity: Option<String>,
 }
@@ -433,7 +433,7 @@ pub async fn get_token_details(
         .ok_or_else(|| AppError::NotFound("Token not found".to_string()))?;
 
     let chain = find_chain(&state, &token.network).unwrap_or_else(|_| state.chains[0].clone());
-    let token_resp = TokenResponse::from_token_and_creator(&token, &creator.address, &chain);
+    let mut token_resp = TokenResponse::from_token_and_creator(&token, &creator.address, &chain);
 
     // Recent trades (paginated) with swapper info
     let trade_rows: Vec<(Trade, User)> = trades::table
@@ -455,8 +455,8 @@ pub async fn get_token_details(
             token_image: token.image.clone(),
             swapper_address: swapper.address.clone(),
             type_: match trade.trade_type {
-                TradeType::Buy => "buy".to_string(),
-                TradeType::Sell => "sell".to_string(),
+                TradeType::Buy => "BUY".to_string(),
+                TradeType::Sell => "SELL".to_string(),
             },
             eth_amount: trade.eth_amount.to_string(),
             token_amount: trade.token_amount.to_string(),
@@ -517,10 +517,26 @@ pub async fn get_token_details(
 
     let one_day_liquidity = one_day_liq.map(|v| v.to_string());
 
+    let trades_count = trade_responses.len() as i64;
+
+    // Set 15-min price fields on the token response
+    if let Some(ref p15) = fifteen_min_price {
+        if let Ok(p15_f) = p15.parse::<f64>() {
+            let current_price: f64 = token.price.to_string().parse().unwrap_or(0.0);
+            token_resp.price_15m = Some(p15_f);
+            token_resp.price_change_15m = if p15_f > 0.0 {
+                Some(((current_price - p15_f) / p15_f) * 100.0)
+            } else {
+                Some(0.0)
+            };
+        }
+    }
+
     Ok(Json(TokenDetailResponse {
-        token: token_resp,
+        token_details: token_resp,
         trades: trade_responses,
-        holders: holder_responses,
+        trades_count,
+        holders_details: holder_responses,
         fifteen_min_price,
         one_day_liquidity,
     }))
@@ -562,6 +578,7 @@ pub async fn create_token(
                 "tokenName": body.token_name,
                 "tokenSymbol": body.token_symbol,
                 "tokenDescription": body.token_description,
+                "tokenImage": body.token_image,
                 "network": body.network,
                 "telegramLink": body.telegram_link,
                 "twitterLink": body.twitter_link,
@@ -574,20 +591,13 @@ pub async fn create_token(
                 body: request_body,
             };
 
-            diesel::insert_into(token_creation_requests::table)
+            let inserted_id: i32 = diesel::insert_into(token_creation_requests::table)
                 .values(&new_req)
-                .execute(&mut conn)
+                .returning(token_creation_requests::id)
+                .get_result(&mut conn)
                 .await?;
 
-            let msg = format!("create:{}", address_hex);
-            let msg_hash = Keccak256::digest(msg.as_bytes());
-            let (signature, _recovery_id) = signing_key.sign_prehash_recoverable(msg_hash.as_ref())
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to sign: {}", e)))?;
-
-            let sig_bytes = signature.to_bytes();
-            let sig_hex = format!("0x{}", hex::encode(sig_bytes));
-
-            Ok(Json(serde_json::json!({ "success": true, "sig": sig_hex })))
+            Ok(Json(serde_json::json!({ "success": true, "sig": inserted_id })))
         }
         Some(token_addr) => {
             validate_eth_address(token_addr)?;

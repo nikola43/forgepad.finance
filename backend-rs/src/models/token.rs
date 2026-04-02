@@ -41,7 +41,7 @@ pub struct Token {
 }
 
 /// Insertable struct for creating new tokens.
-#[derive(Debug, Clone, Insertable, Deserialize)]
+#[derive(Debug, Clone, Insertable, Deserialize, AsChangeset)]
 #[diesel(table_name = tokens)]
 pub struct NewToken {
     pub token_address: String,
@@ -88,7 +88,7 @@ pub struct TokenResponse {
     pub virtual_eth_amount: String,
     pub virtual_token_amount: String,
     pub pair_address: Option<String>,
-    pub pool_type: PoolType,
+    pub pool_type: i32,
     pub category: TokenCategory,
     pub replies: i32,
     pub web_link: Option<String>,
@@ -97,9 +97,14 @@ pub struct TokenResponse {
     pub launched_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub creation_time: DateTime<Utc>,
     pub liquidity: Option<String>,
     pub progress: Option<f64>,
     pub price_change: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub price_15m: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub price_change_15m: Option<f64>,
 }
 
 impl TokenResponse {
@@ -121,10 +126,9 @@ impl TokenResponse {
         // liquidity = virtual_eth_amount * eth_price
         let liquidity = virtual_eth_f * eth_price_f;
 
-        // progress = min(100, (marketcap / (target_market_cap * eth_price)) * 100)
-        let target_usd = chain.target_market_cap * eth_price_f;
-        let progress = if target_usd > 0.0 {
-            (marketcap_f / target_usd * 100.0).min(100.0)
+        // progress = min(100, (marketcap_usd / target_market_cap_usd) * 100)
+        let progress = if chain.target_market_cap > 0.0 {
+            (marketcap_f / chain.target_market_cap * 100.0).min(100.0)
         } else {
             0.0
         };
@@ -161,7 +165,11 @@ impl TokenResponse {
             virtual_eth_amount: token.virtual_eth_amount.to_string(),
             virtual_token_amount: token.virtual_token_amount.to_string(),
             pair_address: token.pair_address.clone(),
-            pool_type: token.pool_type,
+            pool_type: match token.pool_type {
+                PoolType::V2 => 1,
+                PoolType::V3 => 2,
+                PoolType::V4 => 3,
+            },
             category: token.category,
             replies: token.reply_count,
             web_link: token.web_link.clone(),
@@ -170,9 +178,12 @@ impl TokenResponse {
             launched_at: token.launched_at,
             created_at: token.created_at,
             updated_at: token.updated_at,
+            creation_time: token.created_at,
             liquidity: Some(liquidity.to_string()),
             progress: Some(progress),
             price_change: Some(price_change),
+            price_15m: None,
+            price_change_15m: None,
         }
     }
 }

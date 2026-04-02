@@ -34,10 +34,10 @@ import { WagmiProvider } from "wagmi";
 // In dev mode, override to use local Ethereum fork
 const ethNetwork = isDevEnv
   ? defineChain({
-      id: 1,
-      caipNetworkId: "eip155:1",
+      id: 31337,
+      caipNetworkId: "eip155:31337",
       chainNamespace: "eip155",
-      name: "Ethereum (Local)",
+      name: "Localhost",
       nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
       rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
       blockExplorers: {

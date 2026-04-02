@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use alloy::primitives::{Address, Bytes, U256, keccak256};
+use alloy::primitives::{keccak256, Address, Bytes, U256};
+use alloy::providers::{Provider, ProviderBuilder, WsConnect};
 use alloy::rpc::types::{Filter, Log};
-use alloy::providers::{Provider, ProviderBuilder};
 use futures::StreamExt;
 
 use bigdecimal::BigDecimal;
@@ -15,11 +15,8 @@ use crate::config::chains::ChainConfig;
 use crate::models::enums::TradeType;
 use crate::models::indexing::{IndexingState, NewIndexingState};
 use crate::models::request::TokenCreationRequest;
-use crate::schema::{
-    holders, indexing_state, token_creation_requests, tokens, trades, users,
-};
+use crate::schema::{holders, indexing_state, token_creation_requests, tokens, trades, users};
 use crate::{AppState, WsEvent};
-
 
 /// Score decay function matching the Node.js implementation:
 /// f(x) = 1 / (1 + 0.0000001*x^2 + 0.000006*x^3 + 0.00000006*x^4)
@@ -72,32 +69,47 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         }
     };
 
-    tracing::info!(
-        "Chain {} last indexed block: {}",
-        chain.network,
-        last_block
-    );
+    tracing::info!("Chain {} last indexed block: {}", chain.network, last_block);
 
     let contract_address: Address = chain
         .contract_address
         .parse()
         .expect("Invalid contract address");
 
-    let provider = ProviderBuilder::new()
-        .on_builtin(chain.rpc_url.as_str())
+    // For WebSocket provider
+    let ws_url = chain.ws_url.as_ref().expect("ws_url is required");
+    let ws = WsConnect::new(ws_url.as_str());
+    let ws_provider = ProviderBuilder::new()
+        .connect_ws(ws)
         .await
-        .expect("Failed to create provider");
+        .expect("Failed to create WS provider");
 
-    let abi_functions: Vec<alloy::json_abi::Function> = serde_json::from_value(chain.abi.clone())
-        .expect("Failed to parse ABI");
+    // let abi_functions: Vec<alloy::json_abi::Function> =
+    //     serde_json::from_value(chain.abi.clone()).expect("Failed to parse ABI");
 
-    let mut current_block = match provider.get_block_number().await {
+    let current_block = match ws_provider.get_block_number().await {
         Ok(b) => b,
         Err(e) => {
             tracing::error!("Failed to get current block: {e}");
             return;
         }
     };
+
+    // Handle chain reset or large gap: skip to current block
+    // This handles Anvil restarts (last > current) and forked chains with huge gaps
+    let gap = if last_block > current_block {
+        last_block - current_block
+    } else {
+        current_block - last_block
+    };
+    if last_block > current_block || gap > 100_000 {
+        tracing::warn!(
+            "Chain {} last indexed block ({}) vs current block ({}), gap={}, skipping to current",
+            chain.network, last_block, current_block, gap
+        );
+        last_block = current_block;
+        let _ = update_last_block(&state, &chain.network, current_block as i64).await;
+    }
 
     const CHUNK_SIZE: u64 = 50_000;
 
@@ -110,7 +122,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
             .from_block(alloy::rpc::types::BlockNumberOrTag::Number(last_block))
             .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
 
-        match provider.get_logs(&filter).await {
+        match ws_provider.get_logs(&filter).await {
             Ok(logs) => {
                 for log in logs {
                     if let Err(e) = process_log(&state, &chain, &log).await {
@@ -127,20 +139,24 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         let _ = update_last_block(&state, &chain.network, last_block as i64).await;
     }
 
-    tracing::info!("Caught up to block {}, now subscribing to new blocks", current_block);
+    tracing::info!(
+        "Caught up to block {}, now subscribing to new blocks",
+        current_block
+    );
 
     let state_clone = state.clone();
     let chain_clone = chain.clone();
-    let abi_clone = abi_functions.clone();
 
     tokio::spawn(async move {
-        let stream = provider.subscribe_blocks().await
+        let stream = ws_provider
+            .subscribe_blocks()
+            .await
             .expect("Failed to subscribe to blocks");
-        
+
         let mut stream = stream.into_stream();
 
         while let Some(block) = stream.next().await {
-            let block_num = block.header.number;
+            let block_num = block.number;
             tracing::debug!("New block: {}", block_num);
 
             let filter = Filter::new()
@@ -148,7 +164,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
                 .from_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num))
                 .to_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num));
 
-            if let Ok(logs) = provider.get_logs(&filter).await {
+            if let Ok(logs) = ws_provider.get_logs(&filter).await {
                 for log in logs {
                     if let Err(e) = process_log(&state_clone, &chain_clone, &log).await {
                         tracing::error!("Error processing log: {e}");
@@ -161,11 +177,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     });
 }
 
-async fn process_log(
-    state: &AppState,
-    chain: &ChainConfig,
-    log: &Log,
-) -> anyhow::Result<()> {
+async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow::Result<()> {
     if log.topics().is_empty() {
         return Ok(());
     }
@@ -173,9 +185,9 @@ async fn process_log(
     let topic = &log.topics()[0];
     let data = log.data().clone();
 
-    let token_created_sig = keccak256(b"TokenCreated(address,address,uint256,uint256)");
-    let buy_tokens_sig = keccak256(b"BuyTokens(address,address,uint256,uint256)");
-    let sell_tokens_sig = keccak256(b"SellTokens(address,address,uint256,uint256)");
+    let token_created_sig = keccak256(b"TokenCreated(address,uint256,uint256,uint32,uint256)");
+    let buy_tokens_sig = keccak256(b"BuyTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
+    let sell_tokens_sig = keccak256(b"SellTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
 
     if *topic == token_created_sig {
         process_token_created_log(state, chain, &data.data).await?;
@@ -193,15 +205,16 @@ async fn process_token_created_log(
     chain: &ChainConfig,
     data: &Bytes,
 ) -> anyhow::Result<()> {
-    if data.len() < 128 {
+    // TokenCreated(address token, uint256 tokenPrice, uint256 ethPriceUSD, uint32 sig, uint256 date)
+    // data layout: [0..32] address, [32..64] tokenPrice, [64..96] ethPriceUSD, [96..128] sig, [128..160] date
+    if data.len() < 160 {
         anyhow::bail!("Invalid TokenCreated data length");
     }
 
-    let request_id = u64::try_from(U256::from_be_slice(&data[0..32])).unwrap_or(0) as i32;
-    let token_address_bytes = &data[32..52];
-    let token_address = format!("0{}", hex::encode(token_address_bytes));
-    let token_price = u64::try_from(U256::from_be_slice(&data[52..84])).unwrap_or(0) as f64 / 1e18;
-    let timestamp = u64::try_from(U256::from_be_slice(&data[84..116])).unwrap_or(0) as i64;
+    let token_address = format!("0x{}", hex::encode(&data[12..32]));
+    let token_price = u64::try_from(U256::from_be_slice(&data[32..64])).unwrap_or(0) as f64 / 1e18;
+    let request_id = u64::try_from(U256::from_be_slice(&data[96..128])).unwrap_or(0) as i32;
+    let timestamp = u64::try_from(U256::from_be_slice(&data[128..160])).unwrap_or(0) as i64;
 
     let eth_price = fetch_eth_price(chain).await.unwrap_or(3000.0);
 
@@ -226,21 +239,30 @@ async fn process_swap_log(
     data: &Bytes,
     is_buy: bool,
 ) -> anyhow::Result<()> {
-    if data.len() < 128 {
+    // BuyTokens/SellTokens(address user, address token, uint256 ethAmount, uint256 tokenAmount,
+    //                       uint256 tokenPrice, uint256 ethPriceUSD, uint256 marketCap, uint256 date)
+    // data layout: [0..32] user, [32..64] token, [64..96] ethAmount, [96..128] tokenAmount,
+    //              [128..160] tokenPrice, [160..192] ethPriceUSD, [192..224] marketCap, [224..256] date
+    if data.len() < 256 {
         anyhow::bail!("Invalid swap data length");
     }
 
-    let swapper_bytes = &data[0..32];
-    let swapper_address = format!("0{}", hex::encode(swapper_bytes));
-    let token_address_bytes = &data[32..64];
-    let token_address = format!("0{}", hex::encode(token_address_bytes));
-    let eth_amount = u64::try_from(U256::from_be_slice(&data[64..96])).unwrap_or(0) as f64 / 1e18;
-    let token_amount = u64::try_from(U256::from_be_slice(&data[96..128])).unwrap_or(0) as f64 / 1e18;
+    let swapper_address = format!("0x{}", hex::encode(&data[12..32]));
+    let token_address = format!("0x{}", hex::encode(&data[44..64]));
+    let eth_amount = U256::from_be_slice(&data[64..96]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
+    let token_amount = U256::from_be_slice(&data[96..128]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
 
-    let timestamp = chrono::Utc::now().timestamp();
+    let timestamp = u64::try_from(U256::from_be_slice(&data[224..256])).unwrap_or(0) as i64;
+    if timestamp == 0 {
+        return Ok(()); // skip invalid events
+    }
 
     let eth_price = fetch_eth_price(chain).await.unwrap_or(3000.0);
-    let token_price = if token_amount > 0.0 { eth_amount / token_amount } else { 0.0 };
+    let token_price = if token_amount > 0.0 {
+        eth_amount / token_amount
+    } else {
+        0.0
+    };
 
     process_swap(
         state,
@@ -311,16 +333,25 @@ pub async fn process_token_created(
         .await?;
 
     let initial_price = chain.virtual_eth_amount / chain.virtual_token_amount;
-    let marketcap = initial_price * chain.total_supply;
+    let marketcap = initial_price * chain.total_supply * eth_price_usd;
 
     // Create token record
     let new_token = crate::models::token::NewToken {
         token_address: token_address.to_string(),
         name: body["tokenName"].as_str().unwrap_or("").to_string(),
         symbol: body["tokenSymbol"].as_str().unwrap_or("").to_string(),
-        description: body.get("tokenDescription").and_then(|v| v.as_str()).map(String::from),
-        image: body.get("tokenImage").and_then(|v| v.as_str()).map(String::from),
-        banner: body.get("tokenBanner").and_then(|v| v.as_str()).map(String::from),
+        description: body
+            .get("tokenDescription")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        image: body
+            .get("tokenImage")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        banner: body
+            .get("tokenBanner")
+            .and_then(|v| v.as_str())
+            .map(String::from),
         creator_id: creator.id,
         network: chain.network.clone(),
         marketcap: BigDecimal::from_str(&marketcap.to_string()).unwrap_or_default(),
@@ -335,13 +366,25 @@ pub async fn process_token_created(
         pair_address: None,
         pool_type: crate::models::enums::PoolType::V2,
         category: crate::models::enums::TokenCategory::Normal,
-        web_link: body.get("webLink").and_then(|v| v.as_str()).map(String::from),
-        telegram_link: body.get("telegramLink").and_then(|v| v.as_str()).map(String::from),
-        twitter_link: body.get("twitterLink").and_then(|v| v.as_str()).map(String::from),
+        web_link: body
+            .get("webLink")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        telegram_link: body
+            .get("telegramLink")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        twitter_link: body
+            .get("twitterLink")
+            .and_then(|v| v.as_str())
+            .map(String::from),
     };
 
     diesel::insert_into(tokens::table)
         .values(&new_token)
+        .on_conflict(tokens::token_address)
+        .do_update()
+        .set(&new_token)
         .execute(&mut conn)
         .await?;
 
@@ -413,11 +456,7 @@ pub async fn process_swap(
     };
 
     // Calculate new virtual reserves
-    let old_veth: f64 = token
-        .virtual_eth_amount
-        .to_string()
-        .parse()
-        .unwrap_or(0.0);
+    let old_veth: f64 = token.virtual_eth_amount.to_string().parse().unwrap_or(0.0);
     let old_vtoken: f64 = token
         .virtual_token_amount
         .to_string()
@@ -437,15 +476,11 @@ pub async fn process_swap(
     } else {
         0.0
     };
-    let new_marketcap = new_price * chain.total_supply;
+    let new_marketcap = new_price * chain.total_supply * eth_price_usd;
 
     // Score decay calculation
     let old_score: f64 = token.score.to_string().parse().unwrap_or(0.0);
-    let time_diff = timestamp as f64
-        - token
-            .updated_at
-            .timestamp_millis() as f64
-            / 1000.0;
+    let time_diff = timestamp as f64 - token.updated_at.timestamp_millis() as f64 / 1000.0;
     let volume_usd = token_amount * token_price * eth_price_usd;
     let new_score = score_decay(time_diff) * old_score + volume_usd;
 
@@ -464,9 +499,9 @@ pub async fn process_swap(
             tokens::eth_price
                 .eq(BigDecimal::from_str(&eth_price_usd.to_string()).unwrap_or_default()),
             tokens::score.eq(BigDecimal::from_str(&new_score.to_string()).unwrap_or_default()),
-            tokens::volume.eq(
-                BigDecimal::from_str(&(old_volume + volume_usd).to_string()).unwrap_or_default(),
-            ),
+            tokens::volume
+                .eq(BigDecimal::from_str(&(old_volume + volume_usd).to_string())
+                    .unwrap_or_default()),
         ))
         .execute(&mut conn)
         .await?;
@@ -569,11 +604,7 @@ pub async fn process_token_launched(
 }
 
 /// Update the last indexed block for a chain.
-pub async fn update_last_block(
-    state: &AppState,
-    network: &str,
-    block: i64,
-) -> anyhow::Result<()> {
+pub async fn update_last_block(state: &AppState, network: &str, block: i64) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
     diesel::update(indexing_state::table.filter(indexing_state::network.eq(network)))

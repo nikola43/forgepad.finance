@@ -14,7 +14,12 @@ tower-http = { version = "0.6", features = ["cors", "trace", "limit", "fs"] }
 tokio = { version = "1", features = ["full"] }
 
 # Database ORM
-diesel = { version = "2.3.7", features = ["postgres", "numeric", "chrono", "serde_json"] }
+diesel = { version = "2.3.7", features = [
+    "postgres",
+    "numeric",
+    "chrono",
+    "serde_json",
+] }
 diesel-async = { version = "0.8.0", features = ["postgres", "deadpool"] }
 deadpool = "0.13.0"
 
@@ -22,7 +27,15 @@ deadpool = "0.13.0"
 redis = { version = "1.1.0", features = ["tokio-comp", "connection-manager"] }
 
 # EVM / Blockchain
-alloy = { version = "1", features = ["full", "node-bindings", "reqwest"] }
+alloy = { version = "1.8.3", features = [
+    "full",
+    "node-bindings",
+    "reqwest",
+    "providers",
+    "rpc-types",
+    "transport-http",
+] }
+alloy-provider = { version = "1.8.3", features = ["ws", "reqwest"] }
 
 # Serialization
 serde = { version = "1.0.228", features = ["derive"] }
@@ -61,4 +74,4 @@ uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.13.2", features = ["json"] }
 regex-lite = "0.1.9"
 futures = "0.3.32"
-rand = "0.10.0"
+rand = { version = "0.10.0" }

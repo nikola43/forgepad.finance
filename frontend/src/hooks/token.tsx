@@ -225,14 +225,32 @@ export function useHandlers(network?: CaipNetwork) {
                 const signer = new JsonRpcSigner(provider, address as string)
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
                 const createFeeAmount = await readContract.CREATE_TOKEN_FEE_AMOUNT();
-                const firstBuyFee = Number(token.amount ?? '0') > 0 ? await readContract.getFirstBuyFee(ethers.ZeroAddress) : 0n
+                const buyAmt = token.amount && token.amount.trim() !== '' ? token.amount : '0'
+                const firstBuyFee = Number(buyAmt) > 0 ? await readContract.getFirstBuyFee(ethers.ZeroAddress) : 0n
                 const balance = await readProvider.getBalance(address)
-                const value = ethers.parseEther(token.amount ?? '0') + createFeeAmount + firstBuyFee
+                const value = ethers.parseEther(buyAmt) + createFeeAmount + firstBuyFee
+                console.log('[value] buyAmt:', buyAmt, 'createFeeAmount:', createFeeAmount.toString(), 'firstBuyFee:', firstBuyFee.toString())
+                console.log('[createToken] params:', {
+                    name: token.name,
+                    symbol: token.symbol,
+                    buyAmount: ethers.parseEther(buyAmt).toString(),
+                    minAmountOut: '0',
+                    sig,
+                    poolType: token.pool,
+                    value: value.toString(),
+                    balance: balance.toString(),
+                    createFeeAmount: createFeeAmount.toString(),
+                    firstBuyFee: firstBuyFee.toString(),
+                    buyAmt,
+                    contractAddress: chain.contractAddress,
+                    sender: address,
+                })
                 if (balance < value)
                     throw Error("Insufficient balance")
                 const tx = await contract.createToken(
-                    token.name, token.symbol, ethers.parseEther(token.amount ?? '0'), 0n, sig, token.pool, { value }
+                    token.name, token.symbol, ethers.parseEther(buyAmt), 0n, sig, token.pool, { value }
                 )
+                console.log('[createToken] tx hash:', tx.hash)
                 return tx
             },
             approve: async (token: string) => {
@@ -689,7 +707,7 @@ async function fetchSolanaTokenInfo(connection: Connection, address: string, tok
         throw new Error('Solana token not found');
     }
 
-    const tokenDetils = transformJupiterTokenData(jupiterTokenResponse);
+    const tokenDetails = transformJupiterTokenData(jupiterTokenResponse);
 
     // Fetch holders data
     const jupiterHoldersResponse = await JupiterClient.getTokenHolders(tokenAddress);
@@ -722,14 +740,14 @@ async function fetchSolanaTokenInfo(connection: Connection, address: string, tok
     // console.log(tokenAccounts)
 
     return {
-        tokenDetils,
+        tokenDetails,
         trades,
         tradesCount,
         holdersDetails,
         poolInfo,
         balance: 0n, // User balance - would need Solana wallet connection
         allowance: 0n, // Token allowance - not applicable for Solana
-        curveBalance: BigInt(Math.floor((tokenDetils.totalSupply - tokenDetils.circSupply) * Math.pow(10, pool.baseAsset.decimals || 6))),
+        curveBalance: BigInt(Math.floor((tokenDetails.totalSupply - tokenDetails.circSupply) * Math.pow(10, pool.baseAsset.decimals || 6))),
         tokenContract: null, // No contract for Solana tokens
         isSolana: true
     };

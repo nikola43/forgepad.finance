@@ -288,9 +288,9 @@ export default function Create() {
     setIsMounted(true);
 
     // Listen for deployed event from backend
-    const handleDeployed = (data: string) => {
+    const handleDeployed = (data: any) => {
       try {
-        const deployedData = JSON.parse(data);
+        const deployedData = typeof data === 'string' ? JSON.parse(data) : data;
         console.log('Token deployed:', deployedData);
 
         // Update created token data with the actual token address
@@ -331,7 +331,7 @@ export default function Create() {
   const [twitterLink, setTwitterLink] = React.useState("");
   const [webLink, setWebLink] = React.useState("");
   // const [initLiquidityAmount, setInitLiquidityAmount] = React.useState("")
-  const [initBuyAmount, setInitBuyAmount] = React.useState<string>();
+  const [initBuyAmount, setInitBuyAmount] = React.useState<string>("0");
   const [avatar, setAvatar] = React.useState<any>();
   // const [banner, setBanner] = React.useState<any>()
   const [more, setMore] = React.useState(false);
@@ -475,10 +475,26 @@ export default function Create() {
         metadata.mintAddress = mint.publicKey.toBase58();
       }
 
+      console.log('[deployToken] metadata:', metadata)
+      console.log('[deployToken] initBuyAmount:', initBuyAmount)
+      console.log('[deployToken] poolType:', poolType)
+      console.log('[deployToken] coinName:', coinName)
+      console.log('[deployToken] coinTicker:', coinTicker)
+      console.log('[deployToken] chain:', chain)
+      console.log('[deployToken] address:', address)
+
       const {
         data: { success, sig },
       } = await axios.post(`${API_ENDPOINT}/tokens`, metadata);
+      console.log('[deployToken] API response:', { success, sig })
       if (!success) throw Error("API error");
+      console.log('[deployToken] calling createToken with:', {
+        name: coinName,
+        symbol: coinTicker,
+        pool: poolType,
+        amount: initBuyAmount,
+        sig,
+      })
       await handlers.createToken(
         {
           name: coinName,

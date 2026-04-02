@@ -739,7 +739,7 @@ export default function Token() {
     const poolInfo = useMemo(() => tokenInfo?.poolInfo, [tokenInfo])
     const {
         tokenContract,
-        tokenDetils: detailData,
+        tokenDetails: detailData,
         trades: tradeData,
         tradesCount,
         holdersDetails: holders

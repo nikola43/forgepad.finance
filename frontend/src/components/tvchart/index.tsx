@@ -148,7 +148,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
         },
         resolveSymbol: (symbolName: string, onSymbolResolvedCallback: any, onResolveErrorCallback: any, extension: any) => {
             axios.get(`${API_ENDPOINT}/tokens/${network}/${token}`)
-                .then(async function ({ data: { tokenDetils: tokenDetails } }) {
+                .then(async function ({ data: { tokenDetails: tokenDetails } }) {
                     // console.log(extension)
                     const symbolInfo = {
                         address: tokenDetails.tokenAddress,

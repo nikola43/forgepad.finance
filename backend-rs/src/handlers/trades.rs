@@ -42,8 +42,9 @@ pub struct ChartDataQuery {
     pub interval: String,
     pub from: i64,
     pub to: i64,
-    pub first: Option<bool>,
+    pub first: Option<i32>,
     pub dex: Option<String>,
+    pub count_back: Option<i64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -270,8 +271,9 @@ pub async fn get_chart_data(
     let final_bucket = (params.to / resolution) * resolution;
     let mut trade_idx: usize = 0;
 
+    const MAX_CANDLES: usize = 2000;
     let mut current = bucket_start;
-    while current <= final_bucket {
+    while current <= final_bucket && candles.len() < MAX_CANDLES {
         let bucket_end = current + resolution;
 
         // Collect trades in this bucket
@@ -351,12 +353,27 @@ fn parse_resolution(interval: &str) -> Result<i64, AppError> {
         return Err(AppError::BadRequest("Empty interval".to_string()));
     }
 
+    // Handle TradingView-style resolutions: "1", "5", "15", "60", "D", "W", "M"
+    // as well as explicit formats: "5m", "1h", "1d", "1w"
+    match interval.to_uppercase().as_str() {
+        "D" | "1D" => return Ok(86400),
+        "W" | "1W" => return Ok(604800),
+        "M" | "1M" => return Ok(2592000),
+        _ => {}
+    }
+
+    // Try parsing as pure number (TradingView minutes)
+    if let Ok(minutes) = interval.parse::<i64>() {
+        return Ok(minutes * 60);
+    }
+
+    // Try parsing as "5m", "1h", "1d", "1w" format
     let (num_str, unit) = interval.split_at(interval.len() - 1);
     let num: i64 = num_str
         .parse()
-        .map_err(|_| AppError::BadRequest(format!("Invalid interval number: {num_str}")))?;
+        .map_err(|_| AppError::BadRequest(format!("Invalid interval: {interval}")))?;
 
-    let multiplier: i64 = match unit {
+    let multiplier: i64 = match unit.to_lowercase().as_str() {
         "m" => 60,
         "h" => 3600,
         "d" => 86400,

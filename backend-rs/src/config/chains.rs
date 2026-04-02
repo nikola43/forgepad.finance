@@ -31,18 +31,22 @@ pub fn default_chains() -> Vec<ChainConfig> {
     vec![ChainConfig {
         name: "Ethereum".to_string(),
         network: "mainnet".to_string(),
-        chain_id: 1,
+        chain_id: std::env::var("CHAIN_ID")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1),
         currency: "ETH".to_string(),
         rpc_url: std::env::var("ETH_RPC_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string()),
-        ws_url: std::env::var("ETH_WS_URL").ok(),
+        ws_url: Some(std::env::var("ETH_WS_URL")
+            .unwrap_or_else(|_| "ws://127.0.0.1:8545".to_string())),
         explorer_url: "https://etherscan.io".to_string(),
         contract_address: "0xe0105941Ee10cF0d3200845bE1FDb206BE64685D".to_string(),
         abi,
-        virtual_eth_amount: 6.0,
-        virtual_token_amount: 900_000_000.0,
+        virtual_eth_amount: 4.0,
+        virtual_token_amount: 1_073_000_000.0,
         total_supply: 1_000_000_000.0,
-        target_market_cap: 60_000.0,
+        target_market_cap: 69_000.0,
         pools: vec!["uniswap:v2".to_string()],
     }]
 }

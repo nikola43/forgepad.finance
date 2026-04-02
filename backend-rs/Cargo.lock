@@ -2293,6 +2293,7 @@ name = "forgepad-backend"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "alloy-provider",
  "anyhow",
  "axum",
  "axum-extra",
