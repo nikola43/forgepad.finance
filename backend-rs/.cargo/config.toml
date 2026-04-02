@@ -1,0 +1,5 @@
+[env]
+PQ_LIB_DIR = "/opt/homebrew/opt/libpq/lib"
+
+[build]
+rustflags = ["-L", "/opt/homebrew/opt/libpq/lib"]

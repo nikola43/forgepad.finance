@@ -31,20 +31,20 @@ import {
 import { projectId, isDevEnv } from "@/config";
 import { WagmiProvider } from "wagmi";
 
-// In dev mode, override BSC to use local Anvil fork
-const bscNetwork = isDevEnv
+// In dev mode, override to use local Ethereum fork
+const ethNetwork = isDevEnv
   ? defineChain({
-      id: 56,
-      caipNetworkId: "eip155:56",
+      id: 1,
+      caipNetworkId: "eip155:1",
       chainNamespace: "eip155",
-      name: "BSC (Local)",
-      nativeCurrency: { decimals: 18, name: "BNB", symbol: "BNB" },
+      name: "Ethereum (Local)",
+      nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
       rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
       blockExplorers: {
-        default: { name: "BscScan", url: "https://bscscan.com" },
+        default: { name: "Etherscan", url: "https://etherscan.io" },
       },
     })
-  : bsc;
+  : mainnet;
 
 const theme = createTheme({
   palette: {
@@ -102,7 +102,7 @@ interface MainContextProps {
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [bscNetwork],
+  networks: [ethNetwork],
   // networks: [localhost, mainnet, base, bsc, solana]
 });
 const ethersAdapter = new EthersAdapter();
@@ -110,7 +110,7 @@ const solanaAdapter = new SolanaAdapter();
 const appKit = createAppKit({
   adapters: [wagmiAdapter, solanaAdapter],
   projectId,
-  networks: [bscNetwork],
+  networks: [ethNetwork],
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
   themeMode: "dark",

@@ -8,61 +8,66 @@ import "../src/ForgepadLiquidityManager.sol";
 import "../src/MockPriceFeed.sol";
 
 contract DeployForgepad is Script {
-    // BSC PancakeSwap addresses
-    address constant PANCAKE_V2_ROUTER = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
-    address constant UNISWAP_V3_POSITION_MANAGER = 0x46A15B0b27311cedF172AB29E4f4766fbE7F4364;
-    address constant UNISWAP_V4_POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
-    address constant UNISWAP_UNIVERSAL_ROUTER = 0xd9C500DfF816a1Da21A48A732d3498Bf09dc9AEB;
-    address constant UNISWAP_V4_POSITION_MANAGER = 0x7C5f5A4bBd8fD63184577525326123B519429bDc;
-    address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    // Uniswap V2 Router on Ethereum
+    address constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    // Uniswap V3 Position Manager on Ethereum
+    address constant V3_POS_MGR = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
+    // Uniswap V4 Pool Manager on Ethereum
+    address constant V4_POOL_MGR = 0x000000000004444c5dc75cB358380D2e3dE08A90;
+    // Universal Router for V4
+    address constant UNIVERSAL_ROUTER = 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af;
+    // V4 Position Manager
+    address constant V4_POS_MGR = 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e;
+    // Permit2
+    address constant PERMIT2_ADDR = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-    uint256 constant TARGET_MARKET_CAP = 60000;
-    uint256 constant TOTAL_SUPPLY = 10 ** 9;
+    // Chainlink ETH/USD on Ethereum
+    address constant DATA_FEED = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+
+    address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
+    address constant DIST_ADDR = 0xF2917a81fF74406fbCf01c507057e101Db8f2F12;
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
+        uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0));
+        if (deployerPrivateKey == 0) {
+            console.log("ERROR: Set PRIVATE_KEY env var");
+            return;
+        }
         address deployer = vm.addr(deployerPrivateKey);
 
         console.log("Deploying with account:", deployer);
-        console.log("Account balance:", deployer.balance / 1e18, "BNB");
+        console.log("Account balance:", deployer.balance / 1e18, "ETH");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 0. Deploy MockPriceFeed (BNB ~$620, 8 decimals like Chainlink)
-        MockPriceFeed mockFeed = new MockPriceFeed(62000000000, 8);
+        MockPriceFeed mockFeed = new MockPriceFeed(204000000000, 8);
         console.log("MockPriceFeed:", address(mockFeed));
 
-        // 1. Deploy ForgepadLiquidityManager
         ForgepadLiquidityManager liquidityManager = new ForgepadLiquidityManager(
-            PANCAKE_V2_ROUTER,
-            UNISWAP_V3_POSITION_MANAGER,
-            UNISWAP_V4_POOL_MANAGER,
-            UNISWAP_UNIVERSAL_ROUTER,
-            UNISWAP_V4_POSITION_MANAGER,
-            PERMIT2,
-            deployer,   // marginRecipient
-            deployer,   // burnAddress
-            10000,      // tokenAmountPercentToLP (100%)
-            5000        // ethAmountPercentToLP (50%)
+            UNISWAP_V2_ROUTER,
+            V3_POS_MGR,
+            V4_POOL_MGR,
+            UNIVERSAL_ROUTER,
+            V4_POS_MGR,
+            PERMIT2_ADDR,
+            deployer,
+            deployer,
+            10000,
+            10000
         );
         console.log("ForgepadLiquidityManager:", address(liquidityManager));
 
-        // 2. Deploy Forgepad with mock price feed
         Forgepad forgepad = new Forgepad(
             address(mockFeed),
             address(liquidityManager),
-            deployer,              // feeWallet
-            deployer,              // distributor
-            TARGET_MARKET_CAP,
-            TOTAL_SUPPLY
+            FEE_WALLET,
+            DIST_ADDR
         );
         console.log("Forgepad:", address(forgepad));
 
-        // 3. Authorize Forgepad on LiquidityManager
         liquidityManager.setAuthorizedCaller(address(forgepad), true);
         console.log("Forgepad authorized as LiquidityManager caller");
 
-        // 4. Configure fees
         forgepad.setPlatformBuyFeePercent(3);
         forgepad.setPlatformSellFeePercent(3);
         forgepad.setMaxBuyPercent(10000);

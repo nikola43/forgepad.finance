@@ -231,7 +231,7 @@ export function useHandlers(network?: CaipNetwork) {
                 if (balance < value)
                     throw Error("Insufficient balance")
                 const tx = await contract.createToken(
-                    token.name, token.symbol, ethers.parseEther(token.amount ?? '0'), sig, token.pool, { value }
+                    token.name, token.symbol, ethers.parseEther(token.amount ?? '0'), 0n, sig, token.pool, { value }
                 )
                 return tx
             },

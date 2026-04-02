@@ -1,0 +1,19 @@
+[print_schema]
+file = "src/schema.rs"
+filter = { only_tables = [
+    "users",
+    "tokens",
+    "trades",
+    "chats",
+    "holders",
+    "follows",
+    "referrals",
+    "referral_info",
+    "token_creation_requests",
+    "kings",
+    "admins",
+    "indexing_state",
+] }
+
+[migrations_directory]
+dir = "migrations"
