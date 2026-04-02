@@ -14,17 +14,38 @@ frontend/.next/
 frontend/out/
 .next/
 out/
+*.tsbuildinfo
 
-# Backend
+# Backend Node
 backend/uploads/*
 backend/out/
+
+# Backend Rust
+backend-rs/target/
+backend-rs/uploads/*
+*.zip
+**/*.zip
 
 # Foundry
 foundry/cache/
 foundry/out/
+foundry/broadcast/
+foundry/bin/
 
 # Logs
 *.log
 
 # OS files
 .DS_Store
+**/.DS_Store
+
+# Agent/IDE directories
+.claude/
+.claude-flow/
+.hive-mind/
+.omc/
+.swarm/
+.cursor/
+.vscode/
+.mcp.json
+claude-flow.config.json

@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"grep -E \\\"^\\\\s+function \\\" /Users/nkt/dev/forgepad.finance/foundry/src/Forgepad.sol | head -50\"}",
-  "error": "Exit code 255\nUnknown option: 5\nUnknown option: 0\nUsage: head [-options] <url>...\n    -m <method>   use method for the request (default is 'HEAD')\n    -f            make request even if head believes method is illegal\n    -b <base>     Use the specified URL as base\n    -t <timeout>  Set timeout value\n    -i <time>     Set the If-Modified-Since header on the request\n    -c <conttype> use this content-type for POST, PUT, CHECKIN\n    -a            Use text mode for content I/O\n    -p <proxyurl> use...",
-  "timestamp": "2026-04-02T03:42:46.850Z",
-  "retry_count": 3
-}
