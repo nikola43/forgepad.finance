@@ -1,14 +1,12 @@
 {
-  "id": "session-1773079276307",
-  "startedAt": "2026-03-09T18:01:16.307Z",
-  "platform": "darwin",
-  "cwd": "/Users/nkt/dev/forgepad.finance/backend",
-  "context": {},
-  "metrics": {
-    "edits": 0,
-    "commands": 0,
-    "tasks": 0,
-    "errors": 0
+  "context": {
+    "lastMatchedPatterns": [
+      "mem-MEMORY-openai-config",
+      "mem-MEMORY-architecture",
+      "mem-MEMORY-status",
+      "mem-MEMORY-color-palette--dark-glass-morp",
+      "mem-MEMORY-user-preferences"
+    ]
   },
-  "restoredAt": "2026-03-09T18:01:16.324Z"
+  "updatedAt": "2026-03-09T18:37:53.501Z"
 }

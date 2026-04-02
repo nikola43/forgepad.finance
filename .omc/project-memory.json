@@ -1,0 +1,274 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775098632590,
+  "projectRoot": "/Users/nkt/dev/forgepad.finance",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "backend": {
+      "path": "backend",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1775098632561,
+      "keyFiles": [
+        "SUPABASE_STORAGE_SETUP.md",
+        "eslint.config.mjs",
+        "fix-trades-table.sql",
+        "index.js",
+        "package-lock.json"
+      ]
+    },
+    "foundry": {
+      "path": "foundry",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775098632564,
+      "keyFiles": [
+        "README.md",
+        "foundry.toml",
+        "remappings.txt"
+      ]
+    },
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1775098632567,
+      "keyFiles": [
+        "env.example",
+        "next-env.d.ts",
+        "next.config.ts",
+        "package-lock.json",
+        "package.json"
+      ]
+    },
+    "mbc": {
+      "path": "mbc",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775098632570,
+      "keyFiles": [
+        "package.json",
+        "tsconfig.json"
+      ]
+    },
+    "backend/app": {
+      "path": "backend/app",
+      "purpose": "Application code",
+      "fileCount": 0,
+      "lastAccessed": 1775098632573,
+      "keyFiles": []
+    },
+    "backend/node_modules": {
+      "path": "backend/node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775098632577,
+      "keyFiles": []
+    },
+    "foundry/lib": {
+      "path": "foundry/lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1775098632578,
+      "keyFiles": []
+    },
+    "foundry/out": {
+      "path": "foundry/out",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1775098632579,
+      "keyFiles": []
+    },
+    "foundry/src": {
+      "path": "foundry/src",
+      "purpose": "Source code",
+      "fileCount": 12,
+      "lastAccessed": 1775098632580,
+      "keyFiles": [
+        "Distributor.sol",
+        "EthismFeeDistributor.sol",
+        "FakeRouter.sol"
+      ]
+    },
+    "frontend/node_modules": {
+      "path": "frontend/node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775098632582,
+      "keyFiles": []
+    },
+    "frontend/out": {
+      "path": "frontend/out",
+      "purpose": "Build output",
+      "fileCount": 10,
+      "lastAccessed": 1775098632583,
+      "keyFiles": [
+        "404.html",
+        "favicon.ico",
+        "forge.html"
+      ]
+    },
+    "mbc/src": {
+      "path": "mbc/src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1775098632584,
+      "keyFiles": [
+        "index copy.ts",
+        "index.ts",
+        "index.ts.bk"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "backend/app/config/web3.config.js",
+      "accessCount": 3,
+      "lastAccessed": 1775098905413,
+      "type": "file"
+    },
+    {
+      "path": "foundry/foundry.toml",
+      "accessCount": 2,
+      "lastAccessed": 1775098814287,
+      "type": "file"
+    },
+    {
+      "path": "foundry/script/Deploy.s.sol",
+      "accessCount": 2,
+      "lastAccessed": 1775098814735,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/config/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775098815575,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1775098851338,
+      "type": "directory"
+    },
+    {
+      "path": "backend/app/config/db.config.js",
+      "accessCount": 2,
+      "lastAccessed": 1775098854533,
+      "type": "file"
+    },
+    {
+      "path": "backend/index.js",
+      "accessCount": 2,
+      "lastAccessed": 1775098854856,
+      "type": "file"
+    },
+    {
+      "path": "backend/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1775098735154,
+      "type": "file"
+    },
+    {
+      "path": "frontend/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1775098737625,
+      "type": "file"
+    },
+    {
+      "path": "frontend/next.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775098737787,
+      "type": "file"
+    },
+    {
+      "path": "foundry/remappings.txt",
+      "accessCount": 1,
+      "lastAccessed": 1775098742149,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/Token.sol",
+      "accessCount": 1,
+      "lastAccessed": 1775098745272,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/ForgepadLiquidityManager.sol",
+      "accessCount": 1,
+      "lastAccessed": 1775098745981,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/Forgepad.sol",
+      "accessCount": 1,
+      "lastAccessed": 1775098749413,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/context/index.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775098758027,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/config/storage.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1775098758577,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/routes/tokens.routes.js",
+      "accessCount": 1,
+      "lastAccessed": 1775098762262,
+      "type": "file"
+    },
+    {
+      "path": "foundry/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1775098765897,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1775098766072,
+      "type": "file"
+    },
+    {
+      "path": "backend/.env copy",
+      "accessCount": 1,
+      "lastAccessed": 1775098854247,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
