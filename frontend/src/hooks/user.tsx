@@ -21,7 +21,6 @@ export function useUserInfo() {
             : new ethers.BrowserProvider((window as any).ethereum)
           const balanceWei = await provider.getBalance(address)
           const balanceInEther = ethers.formatEther(balanceWei)
-          console.log('Balance:', balanceInEther, 'BNB')
           return {
             balance: Number(balanceInEther)
           } as any

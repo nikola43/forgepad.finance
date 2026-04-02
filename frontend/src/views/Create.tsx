@@ -354,9 +354,11 @@ export default function Create() {
 
   const tokenAmountOut = useMemo(() => {
     if (chain && initBuyAmount) {
+      // Apply 3% platform buy fee to match contract's getAmountOut
+      const amountInWithFee = Number(initBuyAmount) * 0.97;
       return (
-        (Number(initBuyAmount) * Number(chain.virtualTokenAmount)) /
-        (Number(chain.virtualEthAmount) + Number(initBuyAmount))
+        (amountInWithFee * Number(chain.virtualTokenAmount)) /
+        (Number(chain.virtualEthAmount) + amountInWithFee)
       );
     }
     return 0;

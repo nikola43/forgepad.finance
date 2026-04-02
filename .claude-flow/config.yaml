@@ -1,11 +1,12 @@
 # RuFlo V3 Runtime Configuration
-# Generated: 2026-03-09T03:02:44.423Z
+# Generated: 2026-04-02T03:14:20.321Z
 
 version: "3.0.0"
+v3Mode: true
 
 swarm:
   topology: hierarchical-mesh
-  maxAgents: 15
+  maxAgents: 50
   autoScale: true
   coordinationStrategy: consensus
 

@@ -150,15 +150,147 @@
   },
   "hotPaths": [
     {
+      "path": "foundry/src/Forgepad.sol",
+      "accessCount": 77,
+      "lastAccessed": 1775101375270,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/controllers/users.controller.js",
+      "accessCount": 28,
+      "lastAccessed": 1775100193155,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 18,
+      "lastAccessed": 1775101355421,
+      "type": "directory"
+    },
+    {
+      "path": "backend/app/controllers/tokens.controller.js",
+      "accessCount": 12,
+      "lastAccessed": 1775100204482,
+      "type": "file"
+    },
+    {
       "path": "backend/app/config/web3.config.js",
-      "accessCount": 3,
-      "lastAccessed": 1775098905413,
+      "accessCount": 10,
+      "lastAccessed": 1775100123897,
+      "type": "file"
+    },
+    {
+      "path": "backend/index.js",
+      "accessCount": 10,
+      "lastAccessed": 1775100124340,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/hooks/token.tsx",
+      "accessCount": 9,
+      "lastAccessed": 1775100313586,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/controllers/trades.controller.js",
+      "accessCount": 8,
+      "lastAccessed": 1775100110986,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/config/index.ts",
+      "accessCount": 8,
+      "lastAccessed": 1775100308704,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/Token.sol",
+      "accessCount": 8,
+      "lastAccessed": 1775101360503,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/listeners/tokens.listener.js",
+      "accessCount": 7,
+      "lastAccessed": 1775100304864,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/config/db.config.js",
+      "accessCount": 5,
+      "lastAccessed": 1775099945712,
+      "type": "file"
+    },
+    {
+      "path": "backend",
+      "accessCount": 5,
+      "lastAccessed": 1775100044259,
+      "type": "directory"
+    },
+    {
+      "path": "foundry/src/ForgepadLiquidityManager.sol",
+      "accessCount": 5,
+      "lastAccessed": 1775100082026,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/context/index.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1775100161398,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/controllers/chats.controller.js",
+      "accessCount": 5,
+      "lastAccessed": 1775100179768,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/hooks/user.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1775100315438,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/IForgepadLiquidityManager.sol",
+      "accessCount": 5,
+      "lastAccessed": 1775101360640,
+      "type": "file"
+    },
+    {
+      "path": "backend/package.json",
+      "accessCount": 4,
+      "lastAccessed": 1775100099455,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/utils/socket.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775100162735,
       "type": "file"
     },
     {
       "path": "foundry/foundry.toml",
-      "accessCount": 2,
-      "lastAccessed": 1775098814287,
+      "accessCount": 4,
+      "lastAccessed": 1775101351549,
+      "type": "file"
+    },
+    {
+      "path": "frontend/package.json",
+      "accessCount": 3,
+      "lastAccessed": 1775099921087,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/utils/price.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775100070619,
+      "type": "file"
+    },
+    {
+      "path": ".mcp.json",
+      "accessCount": 3,
+      "lastAccessed": 1775100137810,
       "type": "file"
     },
     {
@@ -168,87 +300,51 @@
       "type": "file"
     },
     {
-      "path": "frontend/src/config/index.ts",
+      "path": "backend/app/routes/tokens.routes.js",
       "accessCount": 2,
-      "lastAccessed": 1775098815575,
+      "lastAccessed": 1775099750449,
       "type": "file"
     },
     {
-      "path": "",
+      "path": "backend/app/models/index.js",
       "accessCount": 2,
-      "lastAccessed": 1775098851338,
-      "type": "directory"
-    },
-    {
-      "path": "backend/app/config/db.config.js",
-      "accessCount": 2,
-      "lastAccessed": 1775098854533,
-      "type": "file"
-    },
-    {
-      "path": "backend/index.js",
-      "accessCount": 2,
-      "lastAccessed": 1775098854856,
-      "type": "file"
-    },
-    {
-      "path": "backend/package.json",
-      "accessCount": 1,
-      "lastAccessed": 1775098735154,
-      "type": "file"
-    },
-    {
-      "path": "frontend/package.json",
-      "accessCount": 1,
-      "lastAccessed": 1775098737625,
+      "lastAccessed": 1775099753486,
       "type": "file"
     },
     {
       "path": "frontend/next.config.ts",
-      "accessCount": 1,
-      "lastAccessed": 1775098737787,
+      "accessCount": 2,
+      "lastAccessed": 1775099756057,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/tokens.model.js",
+      "accessCount": 2,
+      "lastAccessed": 1775099760134,
+      "type": "file"
+    },
+    {
+      "path": "backend/.env copy",
+      "accessCount": 2,
+      "lastAccessed": 1775099774565,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/views/Home.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775100050744,
       "type": "file"
     },
     {
       "path": "foundry/remappings.txt",
-      "accessCount": 1,
-      "lastAccessed": 1775098742149,
-      "type": "file"
-    },
-    {
-      "path": "foundry/src/Token.sol",
-      "accessCount": 1,
-      "lastAccessed": 1775098745272,
-      "type": "file"
-    },
-    {
-      "path": "foundry/src/ForgepadLiquidityManager.sol",
-      "accessCount": 1,
-      "lastAccessed": 1775098745981,
-      "type": "file"
-    },
-    {
-      "path": "foundry/src/Forgepad.sol",
-      "accessCount": 1,
-      "lastAccessed": 1775098749413,
-      "type": "file"
-    },
-    {
-      "path": "frontend/src/context/index.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775098758027,
+      "accessCount": 2,
+      "lastAccessed": 1775101351612,
       "type": "file"
     },
     {
       "path": "backend/app/config/storage.config.js",
       "accessCount": 1,
       "lastAccessed": 1775098758577,
-      "type": "file"
-    },
-    {
-      "path": "backend/app/routes/tokens.routes.js",
-      "accessCount": 1,
-      "lastAccessed": 1775098762262,
       "type": "file"
     },
     {
@@ -264,9 +360,93 @@
       "type": "file"
     },
     {
-      "path": "backend/.env copy",
+      "path": "foundry/src/Distributor.sol",
       "accessCount": 1,
-      "lastAccessed": 1775098854247,
+      "lastAccessed": 1775099724612,
+      "type": "file"
+    },
+    {
+      "path": "foundry/src/EthismFeeDistributor.sol",
+      "accessCount": 1,
+      "lastAccessed": 1775099725075,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/routes/trades.routes.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099750886,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/routes/users.routes.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099751331,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/routes/chats.routes.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099751774,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/middleware/index.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099752673,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/middleware/candles.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099753113,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/trades.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099760468,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/holders.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099760894,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/users.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099761345,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/chats.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099761792,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/admins.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099762264,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/referrals.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099762683,
+      "type": "file"
+    },
+    {
+      "path": "backend/app/models/referral_info.model.js",
+      "accessCount": 1,
+      "lastAccessed": 1775099763122,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/hooks/useWindowSize.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775099765945,
       "type": "file"
     }
   ],

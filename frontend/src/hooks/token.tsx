@@ -192,16 +192,6 @@ export function useHandlers(network?: CaipNetwork) {
     const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
     const { walletProvider: solProvider } = useAppKitProvider<SOLProvider>("solana")
 
-    console.log("useHandlers debug:", {
-        hasNetwork: !!network,
-        networkId: network?.id,
-        networkName: network?.name,
-        chainNamespace: network?.chainNamespace,
-        hasChains: !!chains,
-        chainsCount: chains?.length,
-        chainIds: chains?.map(c => ({ network: c.network, chainId: c.chainId }))
-    })
-
     if (!network || !chains)
         return undefined
 
@@ -220,18 +210,7 @@ export function useHandlers(network?: CaipNetwork) {
         return false
     })
 
-    console.log("Chain match result:", {
-        foundChain: !!chain,
-        chainNetwork: chain?.network,
-        chainId: chain?.chainId,
-        networkId: network.id,
-        hasEvmProvider: !!evmProvider,
-        hasSolProvider: !!solProvider,
-        chainNamespace: network.chainNamespace
-    })
-
     if (!chain) {
-        console.error("No matching chain found for network:", network)
         return undefined
     }
     if (network.chainNamespace === "eip155" && evmProvider) {

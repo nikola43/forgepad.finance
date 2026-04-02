@@ -67,7 +67,8 @@ module.exports = {
             res.status(200).json({ trades, tokens });
         } catch (error) {
             console.log(error);
-            res.status(500).json({ error: 'Get latest events error:', message: error });
+            console.error('Get latest events error:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch latest events' });
         }
     },
     
@@ -75,7 +76,13 @@ module.exports = {
         try {
             const { tokenAddress, interval, from, to, first, dex } = req.query;
 
-            const launched = false;
+            const token = await tokenTable.findOne({
+                where: {
+                    tokenAddress
+                }
+            });
+
+            const launched = token?.launchedAt != null;
 
             if (launched) {
                 const RESOLUTIONS = {
@@ -92,11 +99,6 @@ module.exports = {
                     return res.status(200).json();
                 })
             } else {
-                const token = await tokenTable.findOne({
-                    where: {
-                        tokenAddress
-                    }
-                })
 
                 if (!token) {
                     return res.status(404).json({ error: 'Token not found' });

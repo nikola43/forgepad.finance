@@ -1,5 +1,5 @@
 # RuFlo V3 - Complete Capabilities Reference
-> Generated: 2026-03-09T03:02:44.423Z
+> Generated: 2026-04-02T03:14:20.321Z
 > Full documentation: https://github.com/ruvnet/claude-flow
 
 ## 📋 Table of Contents
@@ -349,8 +349,8 @@ npx @claude-flow/cli@latest hive-mind consensus --propose "task"
 
 ### MCP Server Setup
 ```bash
-# Add Claude Flow MCP
-claude mcp add claude-flow -- npx -y @claude-flow/cli@latest
+# Add Ruflo MCP
+claude mcp add ruflo -- npx -y ruflo@latest
 
 # Optional servers
 claude mcp add ruv-swarm -- npx -y ruv-swarm mcp start
@@ -364,24 +364,24 @@ claude mcp add flow-nexus -- npx -y flow-nexus@latest mcp start
 ### Essential Commands
 ```bash
 # Setup
-npx @claude-flow/cli@latest init --wizard
-npx @claude-flow/cli@latest daemon start
-npx @claude-flow/cli@latest doctor --fix
+npx ruflo@latest init --wizard
+npx ruflo@latest daemon start
+npx ruflo@latest doctor --fix
 
 # Swarm
-npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8
-npx @claude-flow/cli@latest swarm status
+npx ruflo@latest swarm init --topology hierarchical --max-agents 8
+npx ruflo@latest swarm status
 
 # Agents
-npx @claude-flow/cli@latest agent spawn -t coder
-npx @claude-flow/cli@latest agent list
+npx ruflo@latest agent spawn -t coder
+npx ruflo@latest agent list
 
 # Memory
-npx @claude-flow/cli@latest memory search --query "patterns"
+npx ruflo@latest memory search --query "patterns"
 
 # Hooks
-npx @claude-flow/cli@latest hooks pre-task --description "task"
-npx @claude-flow/cli@latest hooks worker dispatch --trigger optimize
+npx ruflo@latest hooks pre-task --description "task"
+npx ruflo@latest hooks worker dispatch --trigger optimize
 ```
 
 ### File Structure

@@ -1,0 +1,7 @@
+{"t":0,"agent":"a8f1829","agent_type":"security-analyst","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a414de0","agent_type":"solana-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a3ae311","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ad43a37","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ad43a37","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":55674}
+{"t":0,"agent":"a414de0","agent_type":"solana-expert","event":"agent_stop","success":true,"duration_ms":156433}
+{"t":0,"agent":"a3ae311","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":152758}

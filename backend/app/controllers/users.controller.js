@@ -50,8 +50,8 @@ module.exports = {
 
             res.status(200).json(user);
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getUser:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch user' });
         }
     },
     async createUser(req, res) {
@@ -126,7 +126,8 @@ module.exports = {
 
             res.status(200).json(user);
         } catch (error) {
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in createUser:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to create user' });
         }
     },
     async updateUsername(req, res) {
@@ -173,8 +174,8 @@ module.exports = {
             await user.save();
             res.status(200).json(user);
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in updateUsername:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to update username' });
         }
     },
     async addLike(req, res) {
@@ -207,7 +208,8 @@ module.exports = {
             likeCooldowns.set(userAddress, now);
             res.status(200).json(user);
         } catch (error) {
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in addLike:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to add like' });
         }
     },
     async getUserProfile(req, res) {
@@ -343,8 +345,8 @@ module.exports = {
                 helds, replies, tokens, followers, followees, referrals, points: points?.[0], referredUsername
             });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getUserProfile:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch user profile' });
         }
     },
     async getRanking(req, res) {
@@ -359,6 +361,8 @@ module.exports = {
             }).catch(() => []);
             const penalizedAddresses = penalizedAdmins.map(a => a.address);
 
+            // WARNING: Raw SQL query - do not interpolate user input into this string.
+            // All values are hardcoded constants. If adding dynamic filters, use bound parameters.
             let users = await db.sequelize.query(`
                 SELECT users.username, users.avatar, t.address, SUM(t.points) AS ranking
                 FROM (
@@ -424,8 +428,8 @@ module.exports = {
             })
             res.status(200).json(data);
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getFollowers:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch followers' });
         }
     },
     async getFollowings(req, res) {
@@ -454,8 +458,8 @@ module.exports = {
 
             res.status(200).json(followees);
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in getFollowings:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch followings' });
         }
     },
     async followUser(req, res) {
@@ -482,8 +486,8 @@ module.exports = {
                 success: true
             });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in followUser:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to follow user' });
         }
     },
     async unfollowUser(req, res) {
@@ -516,8 +520,8 @@ module.exports = {
                 success: true
             });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in unfollowUser:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to unfollow user' });
         }
     },
     async addRefferal(req, res) {
@@ -577,8 +581,8 @@ module.exports = {
             }
             res.status(200).json({ avatar: avatarKey, user });
         } catch (error) {
-            console.log(error)
-            res.status(500).json({ error: 'Error', message: error.message });
+            console.error('Error in uploadAvatar:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to upload avatar' });
         }
     },
 

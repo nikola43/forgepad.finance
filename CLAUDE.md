@@ -1,130 +1,188 @@
-# CLAUDE.md
+# Claude Code Configuration - RuFlo V3
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Behavioral Rules (Always Enforced)
 
-## Project Overview
+- Do what has been asked; nothing more, nothing less
+- NEVER create files unless they're absolutely necessary for achieving your goal
+- ALWAYS prefer editing an existing file to creating a new one
+- NEVER proactively create documentation files (*.md) or README files unless explicitly requested
+- NEVER save working files, text/mds, or tests to the root folder
+- Never continuously check status after spawning a swarm — wait for results
+- ALWAYS read a file before editing it
+- NEVER commit secrets, credentials, or .env files
 
-Forgepad.finance is a multi-chain token launchpad with dynamic bonding curves. Currently active on BSC (Ethereum, Base, and Solana are configured but commented out). The platform enables token creation, bonding curve trading, and automated liquidity provision.
+## File Organization
 
-## Repository Structure
+- NEVER save to root folder — use the directories below
+- Use `/src` for source code files
+- Use `/tests` for test files
+- Use `/docs` for documentation and markdown files
+- Use `/config` for configuration files
+- Use `/scripts` for utility scripts
+- Use `/examples` for example code
 
-Four independent packages (not a monorepo — each has its own package.json and dependencies):
+## Project Architecture
 
-- **frontend/** — Next.js 15 (React 19) with static export, MUI 7, Wagmi/Viem for EVM, Reown AppKit for wallet connectivity
-- **backend/** — Express.js API with Socket.io, Sequelize ORM on Supabase PostgreSQL, Web3.js/Ethers.js for chain interactions
-- **contracts/** — Hardhat smart contracts (Solidity 0.8.26–0.8.28), factory pattern with bonding curves, Uniswap/PancakeSwap integration
-- **mbc/** — Meteora Dynamic Bonding Curve integration for Solana (TypeScript)
+- Follow Domain-Driven Design with bounded contexts
+- Keep files under 500 lines
+- Use typed interfaces for all public APIs
+- Prefer TDD London School (mock-first) for new code
+- Use event sourcing for state changes
+- Ensure input validation at system boundaries
 
-## Commands
+### Project Config
 
-### Frontend (from `frontend/`)
+- **Topology**: hierarchical-mesh
+- **Max Agents**: 15
+- **Memory**: hybrid
+- **HNSW**: Enabled
+- **Neural**: Enabled
+
+## Build & Test
+
 ```bash
-npm run dev        # Next.js dev server
-npm run build      # Production build (static export)
-npm run build:cf   # Cloudflare-optimized build
-npm run lint       # ESLint
+# Build
+npm run build
+
+# Test
+npm test
+
+# Lint
+npm run lint
 ```
 
-### Backend (from `backend/`)
+- ALWAYS run tests after making code changes
+- ALWAYS verify build succeeds before committing
+
+## Security Rules
+
+- NEVER hardcode API keys, secrets, or credentials in source files
+- NEVER commit .env files or any file containing secrets
+- Always validate user input at system boundaries
+- Always sanitize file paths to prevent directory traversal
+- Run `npx @claude-flow/cli@latest security scan` after security-related changes
+
+## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
+
+- All operations MUST be concurrent/parallel in a single message
+- Use Claude Code's Task tool for spawning agents, not just MCP
+- ALWAYS batch ALL todos in ONE TodoWrite call (5-10+ minimum)
+- ALWAYS spawn ALL agents in ONE message with full instructions via Task tool
+- ALWAYS batch ALL file reads/writes/edits in ONE message
+- ALWAYS batch ALL Bash commands in ONE message
+
+## Swarm Orchestration
+
+- MUST initialize the swarm using CLI tools when starting complex tasks
+- MUST spawn concurrent agents using Claude Code's Task tool
+- Never use CLI tools alone for execution — Task tool agents do the actual work
+- MUST call CLI tools AND Task tool in ONE message for complex work
+
+### 3-Tier Model Routing (ADR-026)
+
+| Tier | Handler | Latency | Cost | Use Cases |
+|------|---------|---------|------|-----------|
+| **1** | Agent Booster (WASM) | <1ms | $0 | Simple transforms (var→const, add types) — Skip LLM |
+| **2** | Haiku | ~500ms | $0.0002 | Simple tasks, low complexity (<30%) |
+| **3** | Sonnet/Opus | 2-5s | $0.003-0.015 | Complex reasoning, architecture, security (>30%) |
+
+- Always check for `[AGENT_BOOSTER_AVAILABLE]` or `[TASK_MODEL_RECOMMENDATION]` before spawning agents
+- Use Edit tool directly when `[AGENT_BOOSTER_AVAILABLE]`
+
+## Swarm Configuration & Anti-Drift
+
+- ALWAYS use hierarchical topology for coding swarms
+- Keep maxAgents at 6-8 for tight coordination
+- Use specialized strategy for clear role boundaries
+- Use `raft` consensus for hive-mind (leader maintains authoritative state)
+- Run frequent checkpoints via `post-task` hooks
+- Keep shared memory namespace for all agents
+
 ```bash
-npm start          # node-dev index.js (auto-reload dev server, port 5000 default)
+npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8 --strategy specialized
 ```
 
-### Contracts (from `contracts/`)
+## Swarm Execution Rules
+
+- ALWAYS use `run_in_background: true` for all agent Task calls
+- ALWAYS put ALL agent Task calls in ONE message for parallel execution
+- After spawning, STOP — do NOT add more tool calls or check status
+- Never poll TaskOutput or check swarm status — trust agents to return
+- When agent results arrive, review ALL results before proceeding
+
+## V3 CLI Commands
+
+### Core Commands
+
+| Command | Subcommands | Description |
+|---------|-------------|-------------|
+| `init` | 4 | Project initialization |
+| `agent` | 8 | Agent lifecycle management |
+| `swarm` | 6 | Multi-agent swarm coordination |
+| `memory` | 11 | AgentDB memory with HNSW search |
+| `task` | 6 | Task creation and lifecycle |
+| `session` | 7 | Session state management |
+| `hooks` | 17 | Self-learning hooks + 12 workers |
+| `hive-mind` | 6 | Byzantine fault-tolerant consensus |
+
+### Quick CLI Examples
+
 ```bash
-npm run compile    # Hardhat compile
-npm test           # Hardhat tests (Mocha/Chai/Waffle)
-npm run localtest  # Tests on localhost network
-npm run deploy     # Deploy contracts
-npm run verify     # Etherscan verification
-npm run rpc        # Start Ganache local fork
+npx @claude-flow/cli@latest init --wizard
+npx @claude-flow/cli@latest agent spawn -t coder --name my-coder
+npx @claude-flow/cli@latest swarm init --v3-mode
+npx @claude-flow/cli@latest memory search --query "authentication patterns"
+npx @claude-flow/cli@latest doctor --fix
 ```
 
-### MBC (from `mbc/`)
+## Available Agents (60+ Types)
+
+### Core Development
+`coder`, `reviewer`, `tester`, `planner`, `researcher`
+
+### Specialized
+`security-architect`, `security-auditor`, `memory-specialist`, `performance-engineer`
+
+### Swarm Coordination
+`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`
+
+### GitHub & Repository
+`pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`
+
+### SPARC Methodology
+`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`
+
+## Memory Commands Reference
+
 ```bash
-npm run build      # TypeScript compilation
-npm run dev        # ts-node development
+# Store (REQUIRED: --key, --value; OPTIONAL: --namespace, --ttl, --tags)
+npx @claude-flow/cli@latest memory store --key "pattern-auth" --value "JWT with refresh" --namespace patterns
+
+# Search (REQUIRED: --query; OPTIONAL: --namespace, --limit, --threshold)
+npx @claude-flow/cli@latest memory search --query "authentication patterns"
+
+# List (OPTIONAL: --namespace, --limit)
+npx @claude-flow/cli@latest memory list --namespace patterns --limit 10
+
+# Retrieve (REQUIRED: --key; OPTIONAL: --namespace)
+npx @claude-flow/cli@latest memory retrieve --key "pattern-auth" --namespace patterns
 ```
 
-## Architecture Details
+## Quick Setup
 
-### Frontend
-- **App Router** with three pages: `/` (home/listing), `/forge` (token creation), `/token` (token detail with chart)
-- **Wallet integration**: Reown AppKit wrapping Wagmi — configured in `src/context/`
-- **Config**: `src/config/index.ts` controls API endpoint and environment switching (`isDevEnv` flag)
-- **Data fetching**: SWR + TanStack React Query; custom hooks in `src/hooks/` (token.tsx, user.tsx)
-- **Static export**: `output: 'export'` in next.config.ts — no server-side rendering
-- **Webpack**: chunk splitting at 200KB max, cache disabled, externals for pino-pretty/lokijs/encoding
-
-### Backend
-- **MVC pattern**: `app/controllers/`, `app/models/`, `app/routes/`
-- **Database**: Supabase PostgreSQL via Sequelize, connection URL parsed from `SUPABASE_URL` env var
-- **Models**: tokens, trades, holders, chats, users, followers, followees, requests, indexing, referrals, referral_info, kings, admins
-- **Real-time**: Socket.io attached to HTTP server for WebSocket events
-- **Chain listeners**: `app/listeners/tokens.listener.js` watches blockchain events and emits via Socket.io
-- **Chain config**: `app/config/web3.config.js` defines supported chains with contract addresses, ABIs, bonding curve parameters (virtualEthAmount, virtualTokenAmount, totalSupply, targetMarketCap)
-- **File storage**: Supabase S3 for token logos
-
-### Smart Contracts
-- **Forgepad.sol** — Main factory: creates tokens, manages bonding curves, handles buy/sell
-- **Token.sol** — ERC20 token template deployed by factory
-- **ForgepadLiquidityManager.sol** — Automated LP creation when market cap target is reached
-- **Distributor.sol / EthismFeeDistributor.sol** — Fee distribution
-- **Hardhat config**: BSC fork for local testing (chainId 56, block 68218718), Solidity optimizer with viaIR enabled
-- **Networks**: BSC (primary), Ethereum, Base, Arbitrum, Avalanche, PulseChain, Sepolia
-
-### Bonding Curve Mechanics
-Each chain config defines: `virtualEthAmount`, `virtualTokenAmount`, `totalSupply`, `targetMarketCap`. When market cap target is hit, liquidity is automatically provided to the configured DEX pool (e.g., `pancakeswap:v2` on BSC).
-
-## Environment Variables
-
-### Backend (.env)
-- `SUPABASE_URL` — PostgreSQL connection string (parsed for host/user/password/port/db)
-- `SUPABASE_S3_URL`, `SUPABASE_S3_API_KEY`, `SUPABASE_S3_SECRET` — File storage
-- `JWT_SECRET_KEY` — Auth tokens
-- `PORT` — Server port (default 5000)
-
-### Frontend (.env.local)
-- `NEXT_PUBLIC_PROJECT_ID` — Reown AppKit project ID
-
-### Contracts (.env)
-- `PRIVATE_KEY` — Deployer wallet
-- Etherscan/BSCScan API keys for verification
-
-### MBC (.env)
-- `SOLANA_RPC_URL`, `SOLANA_PRIVATE_KEY`, `SOLANA_QUOTE_MINT`
-
-## Ruflo (Agent Orchestration)
-
-Ruflo v3.5.14 is configured for multi-agent orchestration via MCP (`.mcp.json`). Use specialized agents for parallel work across the four packages.
-
-**Key agents for this project:**
-- `coder` — Implementation across frontend/backend/contracts
-- `tester` — Run and validate contract tests (`contracts/npm test`)
-- `reviewer` — Code review before merging
-- `system-architect` — Cross-package architecture decisions
-- `sparc-coder` — TDD workflow for new features
-
-**Swarm commands:**
 ```bash
-ruflo swarm init --topology hierarchical   # Start a coordinated swarm
-ruflo memory search -q "query"             # Search project memory
-ruflo memory stats                         # View memory usage
+claude mcp add claude-flow -- npx -y @claude-flow/cli@latest
+npx @claude-flow/cli@latest daemon start
+npx @claude-flow/cli@latest doctor --fix
 ```
 
-**Configuration files:**
-- `.mcp.json` — MCP server config (ruflo)
-- `.claude/settings.json` — Hooks (pre/post edit, bash, session)
-- `.claude/agents/` — 99 agent definitions across 24 categories
-- `.claude/skills/` — 30 skills (SPARC, swarm, GitHub, etc.)
-- `.claude-flow/config.yaml` — Runtime config
-- `.swarm/memory.db` — Persistent vector memory with HNSW indexing
+## Claude Code vs CLI Tools
 
-## Key Patterns
+- Claude Code's Task tool handles ALL execution: agents, file ops, code generation, git
+- CLI tools handle coordination via Bash: swarm init, memory, hooks, routing
+- NEVER use CLI tools as a substitute for Task tool agents
 
-- Currently only BSC chain is active in production (other chains are commented out in `web3.config.js`)
-- Frontend uses `isDevEnv` flag in `src/config/index.ts` to switch between localhost:5001 and api.forgepad.finance
-- Contract ABIs live in `backend/app/listeners/` as JSON files (EthismV1.json, MeteoraDBC.json)
-- The Hardhat test suite forks BSC mainnet — tests require network access
-- No Docker setup — each component runs independently
-- No CI/CD pipeline configured
+## Support
+
+- Documentation: https://github.com/ruvnet/claude-flow
+- Issues: https://github.com/ruvnet/claude-flow/issues

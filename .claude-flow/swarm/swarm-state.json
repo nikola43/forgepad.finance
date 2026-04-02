@@ -1,0 +1,31 @@
+{
+  "swarms": {
+    "swarm-1775100945313-5ubozj": {
+      "swarmId": "swarm-1775100945313-5ubozj",
+      "topology": "hierarchical",
+      "maxAgents": 50,
+      "status": "running",
+      "agents": 7,
+      "agentPlan": [
+        { "role": "Coordinator", "type": "coordinator", "count": 1 },
+        { "role": "Researcher", "type": "researcher", "count": 1 },
+        { "role": "Architect", "type": "architect", "count": 1 },
+        { "role": "Coder", "type": "coder", "count": 2 },
+        { "role": "Tester", "type": "tester", "count": 1 },
+        { "role": "Reviewer", "type": "reviewer", "count": 1 }
+      ],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical",
+        "maxAgents": 50,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-04-02T03:35:45.313Z",
+      "updatedAt": "2026-04-02T03:35:45.313Z"
+    }
+  },
+  "version": "3.0.0"
+}

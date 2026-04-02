@@ -42,15 +42,6 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 lastKValue; // Added to track invariant preservation
     }
 
-    // Meta-transaction structure for gasless token creation
-    struct CreateTokenMetaTx {
-        uint256 nonce;
-        address creator;
-        string name;
-        string symbol;
-        uint256 deadline;
-    }
-
     // Contract variables
     IForgepadLiquidityManager public liquidityManager;
     AggregatorV3Interface internal priceFeed;
@@ -489,10 +480,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         // Store old K
         uint256 oldK = pool.lastKValue;
 
-        // Transfer tokens to user
-        IERC20(token).transfer(msg.sender, buyAmount);
-
-        // Update reserves
+        // Update reserves BEFORE external calls (Checks-Effects-Interactions pattern)
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= buyAmount;
         pool.virtualEthReserve += netAmountIn;
@@ -511,6 +499,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         require(newK >= minAllowedK, "Invariant violation");
         pool.lastKValue = newK;
+
+        // External calls AFTER state updates
+        IERC20(token).transfer(msg.sender, buyAmount);
 
         // Distribute fees
         if (tokenOwnerFee > 0) {
@@ -744,8 +735,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     function getTokenMarketCap(address token) public view returns (uint256) {
         uint256 circulatingSupply = IERC20(token).totalSupply();
-        if (tokenPools[token].ethReserve == 0 || tokenPools[token].tokenReserve == 0)
-            return 0;  
+        if (tokenPools[token].ethReserve == 0 || tokenPools[token].tokenReserve == 0) {
+            return 0;
+        }
 
         return
             (getETHPriceByUSD() *
@@ -763,8 +755,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         if (
             tokenPools[token].virtualEthReserve == 0 ||
             tokenPools[token].virtualTokenReserve == 0
-        ) 
-        return 0;
+        ) {
+            return 0;
+        }
 
         return
             (getETHPriceByUSD() *
@@ -990,13 +983,13 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     function setPlatformBuyFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10000, "Buy fee cannot exceed 100%");
-        require(percent + TOKEN_OWNER_FEE_PERCENT < 10000, "Combined fees too high");
+        require(percent <= 10, "Buy fee cannot exceed 10%");
+        require(percent + TOKEN_OWNER_FEE_PERCENT < 100, "Combined fees too high");
         PLATFORM_BUY_FEE_PERCENT = percent;
     }
 
     function setPlatformSellFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10000, "Sell fee cannot exceed 100%");
+        require(percent <= 10, "Sell fee cannot exceed 10%");
         PLATFORM_SELL_FEE_PERCENT = percent;
     }
 

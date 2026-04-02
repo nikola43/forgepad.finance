@@ -1,8 +1,30 @@
+# Environment files
 .env
+.env.*
+!.env.example
+
+# Dependencies
 yarn.lock
 package-lock.json
 */node_modules/
+node_modules/
+
+# Build outputs
 frontend/.next/
 frontend/out/
+.next/
+out/
+
+# Backend
 backend/uploads/*
 backend/out/
+
+# Foundry
+foundry/cache/
+foundry/out/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store

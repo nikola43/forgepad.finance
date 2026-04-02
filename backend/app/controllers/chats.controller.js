@@ -25,7 +25,8 @@ module.exports = {
 
             res.status(200).json(msgList);
         } catch (error) {
-            res.status(500).json({ error: 'Get Chats Error:', message: error });
+            console.error('Error in getChats:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch chats' });
         }
     },
     async replyByTokenAddress(req, res) {
@@ -103,7 +104,8 @@ module.exports = {
             res.status(200).json(chatList);
         } catch (error) {
             console.log(error)
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in replyByTokenAddress:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to post reply' });
         }
     },
 }

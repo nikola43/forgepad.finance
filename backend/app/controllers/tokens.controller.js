@@ -146,9 +146,9 @@ module.exports = {
             }
         } catch (error) {
             console.error('Error in createToken:', error)
-            res.status(500).json({ 
-                error: 'Internal Server Error', 
-                message: error.message || 'An unexpected error occurred' 
+            res.status(500).json({
+                error: 'Internal Server Error',
+                message: 'Failed to create token'
             })
         }
     },
@@ -186,7 +186,8 @@ module.exports = {
                 })
             }
         } catch (error) {
-            res.status(500).json({ error: 'Error', message: error.message });
+            console.error('Error in updateToken:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to update token' });
         }
     },
     async getKing(req, res) {
@@ -278,12 +279,14 @@ module.exports = {
                     model: userTable,
                 }],
                 where: {
-                    creatorAddress: userAddress, network: network === "ALL" ? undefined : network
+                    creatorAddress: userAddress,
+                    ...(network && network !== "ALL" ? { network } : {})
                 }
             });
             res.status(200).json(tokenList);
         } catch (error) {
-            res.status(500).json({ error: 'Error', message: error });
+            console.error('Error in myTokens:', error);
+            res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch user tokens' });
         }
     },
     async getTokenDetails(req, res) {
@@ -396,7 +399,7 @@ module.exports = {
             console.error('Error uploading logo:', error);
             res.status(500).json({
                 error: 'Internal Server Error',
-                message: error.message || 'Failed to upload file to Supabase S3.'
+                message: 'Failed to upload logo'
             });
         }
     }

@@ -528,7 +528,11 @@ function subscribe(io, chain) {
                                 token.ethPrice = ethers.formatEther(log.args.ethPriceUSD)
                                 token.marketcap = ethers.formatEther(log.args.marketCap)
                                 token.price = ethers.formatEther(log.args.tokenPrice)
-                                token.virtualEthAmount = ethers.formatEther(ethers.parseEther(String(token.virtualEthAmount)) - log.args.ethAmount)
+                                // FIX: Contract subtracts gross ETH (pre-fee) from reserves, but
+                                // SellTokens event emits net ETH (post-fee). Reconstruct gross amount.
+                                // With PLATFORM_SELL_FEE_PERCENT=3%: gross = net * 100 / 97
+                                const grossEthAmount = log.args.ethAmount * 100n / 97n
+                                token.virtualEthAmount = ethers.formatEther(ethers.parseEther(String(token.virtualEthAmount)) - grossEthAmount)
                                 token.virtualTokenAmount = ethers.formatEther(ethers.parseEther(String(token.virtualTokenAmount)) + log.args.tokenAmount)
                                 const volume = log.args.tokenAmount * log.args.ethPriceUSD * log.args.tokenPrice / ethers.parseUnits('1', 36)
                                 token.volume = ethers.formatEther(ethers.parseEther(String(token.volume)) + volume)
