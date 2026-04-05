@@ -7,7 +7,8 @@ export function getProfilePic(user: any, address?: string) {
     if (user?.avatar === "bondingCurv") return "/favicon.ico"
     if (user?.twitter_profile_picture) return user.twitter_profile_picture
     if (user?.avatar) return `${FILE_ENDPOINT}/${user.avatar}`
-    return `https://api.multiavatar.com/${parseInt((user?.address ?? address)?.slice(-6) ?? '0', 16)}.png`
+    const seed = (user?.address ?? address ?? '0x0').slice(2, 12)
+    return `https://api.dicebear.com/9.x/identicon/svg?seed=${seed}&backgroundColor=1a1a2e`
 }
 
 function profileHref(user: any, address?: string, me?: boolean) {

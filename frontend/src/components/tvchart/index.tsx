@@ -159,7 +159,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                         launchedAt: tokenDetails.launchedAt,
                         type: 'crypto',
                         session: '24x7',
-                        timezone: 450,
+                        timezone: 'Etc/UTC',
                         dex,
                         network,
                         exchange: dex ?? 'Forge Finance',
