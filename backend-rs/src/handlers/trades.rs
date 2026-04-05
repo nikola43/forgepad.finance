@@ -256,6 +256,20 @@ pub async fn get_chart_data(
         .await?;
 
     if trade_rows.is_empty() {
+        // Return initial price candle at token creation time
+        let initial_price: f64 = token.price.to_string().parse().unwrap_or(0.0);
+        if initial_price > 0.0 {
+            let created_ts = token.created_at.timestamp();
+            let bucket = (created_ts / resolution) * resolution;
+            return Ok(Json(vec![Candle {
+                time: bucket,
+                open: initial_price,
+                high: initial_price,
+                low: initial_price,
+                close: initial_price,
+                volume: 0.0,
+            }]));
+        }
         return Ok(Json(vec![]));
     }
 

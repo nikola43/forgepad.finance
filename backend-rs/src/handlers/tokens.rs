@@ -278,7 +278,9 @@ pub async fn list_tokens(
     }
 
     if let Some(ref network) = params.network {
-        query = query.filter(tokens::network.eq(network));
+        if network != "all" {
+            query = query.filter(tokens::network.eq(network));
+        }
     }
 
     if let Some(ref word) = params.search_word {
@@ -311,7 +313,9 @@ pub async fn list_tokens(
         count_q = count_q.filter(tokens::category.eq(TokenCategory::Normal));
     }
     if let Some(ref network) = params.network {
-        count_q = count_q.filter(tokens::network.eq(network));
+        if network != "all" {
+            count_q = count_q.filter(tokens::network.eq(network));
+        }
     }
     if let Some(ref word) = params.search_word {
         if !word.is_empty() {

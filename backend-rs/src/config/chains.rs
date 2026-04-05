@@ -36,14 +36,15 @@ pub fn default_chains() -> Vec<ChainConfig> {
             .and_then(|v| v.parse().ok())
             .unwrap_or(1),
         currency: "ETH".to_string(),
-        rpc_url: std::env::var("ETH_RPC_URL")
+        rpc_url: std::env::var("ETH_PUBLIC_RPC_URL")
+            .or_else(|_| std::env::var("ETH_RPC_URL"))
             .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string()),
         ws_url: Some(std::env::var("ETH_WS_URL")
             .unwrap_or_else(|_| "ws://127.0.0.1:8545".to_string())),
         explorer_url: "https://etherscan.io".to_string(),
-        contract_address: "0xe0105941Ee10cF0d3200845bE1FDb206BE64685D".to_string(),
+        contract_address: "0x9b9535f3bc5F3Fe1D525a0dc372eF4cC29d7a86d".to_string(),
         abi,
-        virtual_eth_amount: 4.0,
+        virtual_eth_amount: 2.5,
         virtual_token_amount: 1_073_000_000.0,
         total_supply: 1_000_000_000.0,
         target_market_cap: 69_000.0,

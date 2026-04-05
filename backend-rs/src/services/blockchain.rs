@@ -192,9 +192,11 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     if *topic == token_created_sig {
         process_token_created_log(state, chain, &data.data).await?;
     } else if *topic == buy_tokens_sig {
-        process_swap_log(state, chain, &data.data, true).await?;
+        let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
+        process_swap_log(state, chain, &data.data, true, &tx_hash).await?;
     } else if *topic == sell_tokens_sig {
-        process_swap_log(state, chain, &data.data, false).await?;
+        let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
+        process_swap_log(state, chain, &data.data, false, &tx_hash).await?;
     }
 
     Ok(())
@@ -216,7 +218,7 @@ async fn process_token_created_log(
     let request_id = u64::try_from(U256::from_be_slice(&data[96..128])).unwrap_or(0) as i32;
     let timestamp = u64::try_from(U256::from_be_slice(&data[128..160])).unwrap_or(0) as i64;
 
-    let eth_price = fetch_eth_price(chain).await.unwrap_or(3000.0);
+    let eth_price = fetch_eth_price(chain).await.unwrap_or(2040.0);
 
     process_token_created(
         state,
@@ -238,6 +240,7 @@ async fn process_swap_log(
     chain: &ChainConfig,
     data: &Bytes,
     is_buy: bool,
+    tx_hash: &str,
 ) -> anyhow::Result<()> {
     // BuyTokens/SellTokens(address user, address token, uint256 ethAmount, uint256 tokenAmount,
     //                       uint256 tokenPrice, uint256 ethPriceUSD, uint256 marketCap, uint256 date)
@@ -257,7 +260,7 @@ async fn process_swap_log(
         return Ok(()); // skip invalid events
     }
 
-    let eth_price = fetch_eth_price(chain).await.unwrap_or(3000.0);
+    let eth_price = fetch_eth_price(chain).await.unwrap_or(2040.0);
     let token_price = if token_amount > 0.0 {
         eth_amount / token_amount
     } else {
@@ -274,7 +277,7 @@ async fn process_swap_log(
         token_amount,
         token_price,
         eth_price,
-        &format!("0x{:x}", rand::random::<u64>()),
+        tx_hash,
         timestamp,
     )
     .await?;
@@ -290,18 +293,30 @@ async fn process_swap_log(
 }
 
 async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
+    // Read ETH price from Forgepad contract's getETHPriceByUSD() (uses Chainlink on-chain)
+    let rpc_url = std::env::var("ETH_RPC_URL")
+        .unwrap_or_else(|_| chain.rpc_url.clone());
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
-        .get(format!(
-            "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        ))
+        .post(&rpc_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_call",
+            "params": [{
+                "to": chain.contract_address,
+                "data": "0xa6c9d2ec" // getETHPriceByUSD() selector
+            }, "latest"],
+            "id": 1
+        }))
         .send()
         .await
         .ok()?
         .json()
         .await
         .ok()?;
-    resp.get("ethereum")?.get("usd")?.as_f64()
+    let hex = resp.get("result")?.as_str()?;
+    let price_wei = u128::from_str_radix(hex.trim_start_matches("0x"), 16).ok()?;
+    Some(price_wei as f64 / 1e18)
 }
 
 /// Process a token creation event from the blockchain.
