@@ -148,7 +148,7 @@ export function useKing() {
         return () => { socket.off('m', onTrade) }
     }, [mutate])
 
-    return { king: data ?? null }
+    return { king: data?.king ?? null }
 }
 
 export function useNewTrades() {

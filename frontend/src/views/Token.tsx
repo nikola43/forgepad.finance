@@ -630,8 +630,8 @@ const SwapContent = ({
                         ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading || !!error || !amountIn} onClick={approveHandler}>
                             Approve {isLoading && <CircularProgress size={18} style={{ color: "black", marginLeft: "1em" }} />}
                         </Button>
-                        : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
-                            {tradeType === "buy" ? "Buy" : "Sell"} {isLoading && <CircularProgress size={18} style={{ color: "black", marginLeft: "1em" }} />}
+                        : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
+                            {isLoading ? <CircularProgress size={20} style={{ color: "black" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
                         </Button>
                 : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.open()}>
                     Connect Wallet
@@ -810,7 +810,7 @@ export default function Token() {
             const msg = `Post comment on ${id}`
             const signature = await signer.signMessage(msg)
 
-            const { data } = await axios.post(`${API_ENDPOINT}/chats/reply`, {
+            await axios.post(`${API_ENDPOINT}/chats/reply`, {
                 tokenAddress: id,
                 replyAddress: address,
                 comment: chatComment.trim(),
@@ -819,9 +819,9 @@ export default function Token() {
                 signature,
                 msg
             })
-            setChatList(data)
             setChatComment('')
             setChatReplyTo(null)
+            await fetchChats()
         } catch (err: any) {
             const msg = err?.response?.data?.error || err?.message || 'Failed to send message'
             toast.error(msg)
