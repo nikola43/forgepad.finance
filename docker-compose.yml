@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: forgepad
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend-rs/migrations/00000000000000_create_schema/up.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil"]
+    command:
+      - "--fork-url"
+      - "https://ethereum-rpc.publicnode.com"
+      - "--chain-id"
+      - "31337"
+      - "--block-time"
+      - "2"
+      - "--host"
+      - "0.0.0.0"
+      - "--accounts"
+      - "10"
+      - "--balance"
+      - "10000"
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD", "cast", "bn", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend-rs
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/forgepad
+      REDIS_URL: redis://redis:6379
+      ETH_RPC_URL: http://anvil:8545
+      ETH_PUBLIC_RPC_URL: http://127.0.0.1:8545
+      ETH_WS_URL: ws://anvil:8545
+      CHAIN_ID: "31337"
+      PORT: "5001"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:8080"
+      API_KEY: hola
+      UPLOAD_DIR: /app/uploads
+      UPLOAD_BASE_URL: http://localhost:5001/uploads
+    ports:
+      - "5001:5001"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      anvil:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:
