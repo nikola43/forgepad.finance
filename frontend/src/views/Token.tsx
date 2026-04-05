@@ -1171,6 +1171,39 @@ export default function Token() {
                         }
                         <Box alignSelf={{ md: "flex-end", sm: "flex-start", xs: "flex-start" }} flex={1} ml="auto" display="flex" flexDirection="column" alignItems="flex-end" gap={{ xs: '4px', sm: '4px', md: '8px' }}>
                             {
+                                launched &&
+                                <Box sx={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-end',
+                                    gap: 1,
+                                    p: 2,
+                                    borderRadius: '12px',
+                                    background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))',
+                                    border: '1px solid rgba(16,185,129,0.2)',
+                                    maxWidth: '400px',
+                                }}>
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <Typography fontSize={16} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
+                                            🎓 Graduated
+                                        </Typography>
+                                        <span className="badge-graduated" style={{ fontSize: 11 }}>LIVE ON DEX</span>
+                                    </Box>
+                                    <Typography fontSize={12} color="#94A3B8" textAlign="right" lineHeight={1.4}>
+                                        This token has graduated from the bonding curve and is now trading on a decentralized exchange.
+                                    </Typography>
+                                    {detailData?.pairAddress && (
+                                        <Link
+                                            href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`}
+                                            target="_blank"
+                                            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, color: '#10B981', fontSize: 12, fontWeight: 600 }}
+                                        >
+                                            View LP pair <LinkIcon sx={{ fontSize: 14 }} />
+                                        </Link>
+                                    )}
+                                </Box>
+                            }
+                            {
                                 !launched &&
                                 <>
                                     <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} color="#DDD">Progress ({Math.min(99.99, Number(detailData?.progress ?? 0)).toFixed(2)}%)</Typography>
@@ -1257,10 +1290,28 @@ export default function Token() {
                                 </StatsBox>
                             }
                             <StatsBox>
-                                <Typography fontSize={12} color="#9E9E9E">Will be deposited to:</Typography>
-                                <Typography fontSize={12} color="white" textTransform="capitalize">{pool?.name} {pool?.version} pool</Typography>
+                                <Typography fontSize={12} color="#9E9E9E">{launched ? 'Trading on:' : 'Will be deposited to:'}</Typography>
+                                <Typography fontSize={12} color={launched ? '#10B981' : 'white'} textTransform="capitalize">
+                                    {launched ? '🎓 ' : ''}{pool?.name} {pool?.version} pool
+                                </Typography>
                             </StatsBox>
                         </Box>
+                        {launched && (
+                            <Box sx={{
+                                mt: 1,
+                                p: 1.5,
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))',
+                                border: '1px solid rgba(16,185,129,0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                            }}>
+                                <Typography fontSize={13} fontWeight={600} color="#10B981">
+                                    🎓 Graduated to DEX
+                                </Typography>
+                            </Box>
+                        )}
                     </Box>
                 }
                 <Box display="flex" justifyContent="space-between" gap="2em" flexDirection={{ md: 'row', sm: 'column', xs: 'column' }} mt={2} mb={4}>
@@ -1526,29 +1577,104 @@ export default function Token() {
                     {
                         !isMobile &&
                         <Box width="370px">
-                            <SwapBox className={isLoading || (!isSolanaToken && launched) ? "disabled" : ""}>
-                                <Toggle style={{ width: "inherit" }}>
-                                    <div className={tradeType === "buy" ? "active" : ""} onClick={() => setTradeType("buy")}>Buy</div>
-                                    <div className={tradeType === "sell" ? "active" : ""} onClick={() => setTradeType("sell")}>Sell</div>
-                                </Toggle>
-                                <SwapContent
-                                    amountIn={amountIn}
-                                    approveHandler={approveHandler}
-                                    detailData={detailData}
-                                    error={error}
-                                    estimateAmount={estimateAmount}
-                                    ethBalance={ethBalance}
-                                    exactInput={exactInput}
-                                    isLoading={isLoading}
-                                    swapHandler={swapHandler}
-                                    tokenAllowance={tokenAllowance}
-                                    tokenBalance={tokenBalance}
-                                    tradeType={tradeType}
-                                    setAmountIn={setAmountIn}
-                                    setExactInput={setExactInput}
-                                    setShowSlipaggeDialog={setShowSlipaggeDialog}
-                                />
-                            </SwapBox>
+                            {!isSolanaToken && launched ? (
+                                <SwapBox>
+                                    <Box display="flex" flexDirection="column" alignItems="center" gap={2} width="100%">
+                                        <Box display="flex" alignItems="center" gap={1}>
+                                            <Typography fontSize={18} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
+                                                🎓 Graduated
+                                            </Typography>
+                                        </Box>
+                                        <Typography fontSize={13} color="#94A3B8" textAlign="center" lineHeight={1.5}>
+                                            This token has graduated from the bonding curve and is now trading on Uniswap V2.
+                                        </Typography>
+                                        {detailData?.pairAddress ? (
+                                            <Box display="flex" flexDirection="column" gap={1.5} width="100%">
+                                                <Link
+                                                    href={`https://app.uniswap.org/swap?outputCurrency=${detailData.tokenAddress}&chain=mainnet`}
+                                                    target="_blank"
+                                                    style={{ textDecoration: 'none', width: '100%' }}
+                                                >
+                                                    <Button
+                                                        fullWidth
+                                                        sx={{
+                                                            borderRadius: '12px',
+                                                            py: 1.5,
+                                                            textTransform: 'none',
+                                                            fontWeight: 700,
+                                                            fontSize: 15,
+                                                            background: 'linear-gradient(135deg, #FF007A, #FF5CAA)',
+                                                            color: 'white',
+                                                            '&:hover': {
+                                                                boxShadow: '0 4px 20px rgba(255, 0, 122, 0.4)',
+                                                                background: 'linear-gradient(135deg, #FF007A, #FF5CAA)',
+                                                            },
+                                                        }}
+                                                    >
+                                                        Trade on Uniswap
+                                                        <LinkIcon sx={{ ml: 0.5, fontSize: 18 }} />
+                                                    </Button>
+                                                </Link>
+                                                <Link
+                                                    href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`}
+                                                    target="_blank"
+                                                    style={{ textDecoration: 'none', width: '100%' }}
+                                                >
+                                                    <Button
+                                                        fullWidth
+                                                        sx={{
+                                                            borderRadius: '12px',
+                                                            py: 1,
+                                                            textTransform: 'none',
+                                                            fontWeight: 600,
+                                                            fontSize: 13,
+                                                            background: 'rgba(255, 255, 255, 0.04)',
+                                                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                            color: '#94A3B8',
+                                                            '&:hover': {
+                                                                background: 'rgba(255, 255, 255, 0.08)',
+                                                                borderColor: 'rgba(16, 185, 129, 0.3)',
+                                                                color: '#10B981',
+                                                            },
+                                                        }}
+                                                    >
+                                                        View LP Pair
+                                                        <LinkIcon sx={{ ml: 0.5, fontSize: 14 }} />
+                                                    </Button>
+                                                </Link>
+                                            </Box>
+                                        ) : (
+                                            <Typography fontSize={12} color="#64748B" textAlign="center">
+                                                Pair address not available yet. The token may still be migrating to the DEX.
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </SwapBox>
+                            ) : (
+                                <SwapBox className={isLoading ? "disabled" : ""}>
+                                    <Toggle style={{ width: "inherit" }}>
+                                        <div className={tradeType === "buy" ? "active" : ""} onClick={() => setTradeType("buy")}>Buy</div>
+                                        <div className={tradeType === "sell" ? "active" : ""} onClick={() => setTradeType("sell")}>Sell</div>
+                                    </Toggle>
+                                    <SwapContent
+                                        amountIn={amountIn}
+                                        approveHandler={approveHandler}
+                                        detailData={detailData}
+                                        error={error}
+                                        estimateAmount={estimateAmount}
+                                        ethBalance={ethBalance}
+                                        exactInput={exactInput}
+                                        isLoading={isLoading}
+                                        swapHandler={swapHandler}
+                                        tokenAllowance={tokenAllowance}
+                                        tokenBalance={tokenBalance}
+                                        tradeType={tradeType}
+                                        setAmountIn={setAmountIn}
+                                        setExactInput={setExactInput}
+                                        setShowSlipaggeDialog={setShowSlipaggeDialog}
+                                    />
+                                </SwapBox>
+                            )}
                             <HolderBox as="ol" mb="1.5em">
                                 <Box component="h3">Top Holders</Box>
                                 {topHolderPercent > 50 && (
@@ -1603,17 +1729,27 @@ export default function Token() {
                 </Box>
             </div>
             {
-                isMobile &&
-                <TradeMenu>
-                    <button onClick={() => {
-                        setTradeType("buy")
-                        showModal('trade')
-                    }}>Buy</button>
-                    <button onClick={() => {
-                        setTradeType("sell")
-                        showModal('trade')
-                    }}>Sell</button>
-                </TradeMenu>
+                isMobile && !isSolanaToken && launched ? (
+                    <TradeMenu>
+                        <button
+                            onClick={() => window.open(`https://app.uniswap.org/swap?outputCurrency=${detailData?.tokenAddress}&chain=mainnet`, '_blank')}
+                            style={{ background: 'linear-gradient(135deg, #FF007A, #FF5CAA)', color: 'white', fontWeight: 700 }}
+                        >
+                            Trade on Uniswap
+                        </button>
+                    </TradeMenu>
+                ) : isMobile ? (
+                    <TradeMenu>
+                        <button onClick={() => {
+                            setTradeType("buy")
+                            showModal('trade')
+                        }}>Buy</button>
+                        <button onClick={() => {
+                            setTradeType("sell")
+                            showModal('trade')
+                        }}>Sell</button>
+                    </TradeMenu>
+                ) : null
             }
 
             <Dialog open={modal === "trade"} fullWidth keepMounted onClose={isLoading ? undefined : () => showModal(undefined)}>

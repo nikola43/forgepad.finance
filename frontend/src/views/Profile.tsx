@@ -183,12 +183,23 @@ export default function Profile() {
     const shortAddr = profileAddress ? `${profileAddress.slice(0, 6)}...${profileAddress.slice(-4)}` : ''
 
     // Check if connected user follows this profile
+    const [followOverride, setFollowOverride] = useState<boolean | null>(null)
     const isFollowing = useMemo(() => {
-        if (!connectedAddress || !profile?.followers) return false
-        return profile.followers.some((f: any) =>
-            f.followerId?.toLowerCase() === connectedAddress.toLowerCase()
-        )
-    }, [connectedAddress, profile?.followers])
+        if (followOverride !== null) return followOverride
+        if (!connectedAddress) return false
+        // Check followers array if available
+        if (Array.isArray(profile?.followers) && profile.followers.length > 0) {
+            return profile.followers.some((f: any) =>
+                (f.followerId ?? f.address)?.toLowerCase() === connectedAddress.toLowerCase()
+            )
+        }
+        return false
+    }, [connectedAddress, profile?.followers, followOverride])
+
+    // Reset follow override when profile reloads
+    useEffect(() => {
+        setFollowOverride(null)
+    }, [profile])
 
     const startEdit = useCallback(() => {
         setEditUsername(user?.username ?? '')
@@ -261,6 +272,7 @@ export default function Profile() {
                 : `${API_ENDPOINT}/users/follow/${profileAddress}`
             await axios.post(endpoint, { signature, msg })
             toast.success(isFollowing ? 'Unfollowed' : 'Following')
+            setFollowOverride(!isFollowing)
             reloadProfile()
         } catch (err: any) {
             const errMsg = err?.response?.data?.error || err?.message || 'Failed'
@@ -492,7 +504,7 @@ export default function Profile() {
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile?.followers?.length ?? 0}
+                            {profile?.followerCount ?? profile?.followers?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Followers</Typography>
                     </StatBox>
@@ -505,7 +517,7 @@ export default function Profile() {
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
-                            {profile?.followees?.length ?? 0}
+                            {profile?.followeeCount ?? profile?.followees?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Following</Typography>
                     </StatBox>
@@ -524,8 +536,8 @@ export default function Profile() {
                     <StyledTab label={`Created (${profile?.tokens?.length ?? 0})`} />
                     <StyledTab label={`Holdings (${profile?.helds?.length ?? 0})`} />
                     <StyledTab label={`Replies (${profile?.replies?.length ?? 0})`} />
-                    <StyledTab label={`Followers (${profile?.followers?.length ?? 0})`} />
-                    <StyledTab label={`Following (${profile?.followees?.length ?? 0})`} />
+                    <StyledTab label={`Followers (${profile?.followerCount ?? profile?.followers?.length ?? 0})`} />
+                    <StyledTab label={`Following (${profile?.followeeCount ?? profile?.followees?.length ?? 0})`} />
                 </Tabs>
 
                 <Box key={tab} className="animate-fade-in" mt={2} display="flex" flexDirection="column" gap={1}>
@@ -578,25 +590,30 @@ export default function Profile() {
                             : profile.helds?.length > 0
                                 ? <Box className="stagger-children" display="flex" flexDirection="column" gap={1}>
                                     {profile.helds.map((held: any) => (
-                                        <Link key={held.id} href={`/token?network=${held.token?.network ?? 'bsc'}&address=${held.tokenAddress}`} style={{ textDecoration: 'none' }}>
+                                        <Link key={held.id ?? held.tokenAddress} href={`/token?network=${held.network ?? 'localhost'}&address=${held.tokenAddress}`} style={{ textDecoration: 'none' }}>
                                             <ItemCard>
-                                                <TokenLogo logo={held.token?.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
+                                                <TokenLogo logo={held.tokenImage ?? held.token?.tokenImage} size="44px" style={{ borderRadius: '10px', flexShrink: 0 }} />
                                                 <Box flex={1} minWidth={0}>
                                                     <Box display="flex" alignItems="center" gap={1}>
                                                         <Typography fontSize={14} fontWeight={600} color="white" noWrap>
-                                                            {held.token?.tokenName ?? `${held.tokenAddress.slice(0, 6)}...${held.tokenAddress.slice(-4)}`}
+                                                            {held.tokenName ?? held.token?.tokenName ?? `${held.tokenAddress.slice(0, 6)}...${held.tokenAddress.slice(-4)}`}
                                                         </Typography>
-                                                        <Typography fontSize={12} color="#64748B">{held.token?.tokenSymbol}</Typography>
+                                                        <Typography fontSize={12} color="#64748B">{held.tokenSymbol ?? held.token?.tokenSymbol}</Typography>
+                                                        {held.network && (
+                                                            <img src={`/networks/${held.network}.svg`} height={14} alt="" />
+                                                        )}
                                                     </Box>
                                                     <Typography fontSize={12} color="#94A3B8" mt={0.3}>
                                                         {priceFormatter(held.tokenAmount, 2, true, true)} tokens
                                                     </Typography>
                                                 </Box>
-                                                {held.token?.marketcap > 0 && (
-                                                    <Typography fontSize={12} color="#FFD700" fontWeight={600} flexShrink={0}>
-                                                        ${priceFormatter(held.token.marketcap, 2)}
-                                                    </Typography>
-                                                )}
+                                                <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.3} flexShrink={0}>
+                                                    {(held.token?.marketcap ?? held.marketcap) > 0 && (
+                                                        <Typography fontSize={12} color="#FFD700" fontWeight={600}>
+                                                            MC ${priceFormatter(held.token?.marketcap ?? held.marketcap, 2)}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
                                             </ItemCard>
                                         </Link>
                                     ))}
@@ -631,24 +648,31 @@ export default function Profile() {
                     {tab === 3 && (
                         !profile
                             ? <ListSkeleton count={3} />
-                            : profile.followers?.length > 0
-                                ? profile.followers.map((f: any) => (
-                                    <Link key={f.followerId} href={`/profile?address=${f.followerId}`} style={{ textDecoration: 'none' }}>
-                                        <ItemCard>
-                                            <UserAvatar user={f.user} address={f.followerId} size={36} mr="0" />
-                                            <Box flex={1} minWidth={0}>
-                                                <UserName user={f.user} address={f.followerId} fontSize={14} color="white" />
-                                                <Typography fontSize={12} color="#64748B" fontFamily="monospace">
-                                                    {f.followerId?.slice(0, 6)}...{f.followerId?.slice(-4)}
-                                                </Typography>
-                                            </Box>
-                                            {f.followee?.followers > 0 && (
-                                                <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
-                                            )}
-                                        </ItemCard>
-                                    </Link>
-                                ))
-                                : <EmptyStateComponent icon="👥" title="No followers yet" description="Share your profile to grow your audience" />
+                            : Array.isArray(profile.followers) && profile.followers.length > 0
+                                ? profile.followers.map((f: any) => {
+                                    const addr = f.followerId ?? f.address
+                                    return (
+                                        <Link key={addr} href={`/profile?address=${addr}`} style={{ textDecoration: 'none' }}>
+                                            <ItemCard>
+                                                <UserAvatar user={f.user ?? f} address={addr} size={36} mr="0" />
+                                                <Box flex={1} minWidth={0}>
+                                                    <UserName user={f.user ?? f} address={addr} fontSize={14} color="white" />
+                                                    <Typography fontSize={12} color="#64748B" fontFamily="monospace">
+                                                        {addr?.slice(0, 6)}...{addr?.slice(-4)}
+                                                    </Typography>
+                                                </Box>
+                                            </ItemCard>
+                                        </Link>
+                                    )
+                                })
+                                : (profile?.followerCount ?? 0) > 0
+                                    ? <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1}>
+                                        <Typography fontSize={32} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
+                                            {profile.followerCount}
+                                        </Typography>
+                                        <Typography color="#64748B" fontSize={14}>followers</Typography>
+                                    </Box>
+                                    : <EmptyStateComponent icon="👥" title="No followers yet" description="Share your profile to grow your audience" />
                     )}
 
                     {/* Following */}
@@ -656,22 +680,22 @@ export default function Profile() {
                         !profile
                             ? <ListSkeleton count={3} />
                             : profile.followees?.length > 0
-                                ? profile.followees.map((f: any) => (
-                                    <Link key={f.followeeId} href={`/profile?address=${f.followeeId}`} style={{ textDecoration: 'none' }}>
-                                        <ItemCard>
-                                            <UserAvatar user={f.user} address={f.followeeId} size={36} mr="0" />
-                                            <Box flex={1} minWidth={0}>
-                                                <UserName user={f.user} address={f.followeeId} fontSize={14} color="white" />
-                                                <Typography fontSize={12} color="#64748B" fontFamily="monospace">
-                                                    {f.followeeId?.slice(0, 6)}...{f.followeeId?.slice(-4)}
-                                                </Typography>
-                                            </Box>
-                                            {f.followee?.followers > 0 && (
-                                                <Typography fontSize={11} color="#64748B">{f.followee.followers} followers</Typography>
-                                            )}
-                                        </ItemCard>
-                                    </Link>
-                                ))
+                                ? profile.followees.map((f: any) => {
+                                    const addr = f.followeeId ?? f.address
+                                    return (
+                                        <Link key={addr} href={`/profile?address=${addr}`} style={{ textDecoration: 'none' }}>
+                                            <ItemCard>
+                                                <UserAvatar user={f.user ?? f} address={addr} size={36} mr="0" />
+                                                <Box flex={1} minWidth={0}>
+                                                    <UserName user={f.user ?? f} address={addr} fontSize={14} color="white" />
+                                                    <Typography fontSize={12} color="#64748B" fontFamily="monospace">
+                                                        {addr?.slice(0, 6)}...{addr?.slice(-4)}
+                                                    </Typography>
+                                                </Box>
+                                            </ItemCard>
+                                        </Link>
+                                    )
+                                })
                                 : <EmptyStateComponent icon="🔍" title="Not following anyone" description="Discover and follow other traders" />
                     )}
                 </Box>

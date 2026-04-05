@@ -678,14 +678,14 @@ body::before {
 }
 
 .badge-graduated {
-  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  background: linear-gradient(135deg, #10B981, #059669);
   color: white;
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 100px;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 /* Smooth section transitions */

@@ -104,10 +104,28 @@ export function useUserProfile(profileAddress?: string) {
             } catch (err: any) {
                 if (err?.response?.status !== 404) throw err
             }
-            let profileData = { helds: [], replies: [], tokens: [], followers: [], followees: [], referrals: 0, points: null }
+            let profileData: any = { helds: [], replies: [], tokens: [], followers: 0, followees: [], followerCount: 0, followeeCount: 0, referrals: 0, points: null }
             try {
                 const res = await axios.get(`${API_ENDPOINT}/users/profile/${profileAddress}`)
-                profileData = res.data
+                const d = res.data
+                // Fetch followings list separately (the profile endpoint only returns counts)
+                let followeesList: any[] = []
+                try {
+                    const fRes = await axios.get(`${API_ENDPOINT}/users/followings/${profileAddress}`)
+                    followeesList = fRes.data ?? []
+                } catch { /* followings may not exist */ }
+                // Map backend camelCase fields to frontend expected names
+                profileData = {
+                    helds: d.holdings ?? d.helds ?? [],
+                    replies: d.chats ?? d.replies ?? [],
+                    tokens: d.createdTokens ?? d.tokens ?? [],
+                    followerCount: typeof d.followers === 'number' ? d.followers : (Array.isArray(d.followers) ? d.followers.length : 0),
+                    followeeCount: typeof d.followees === 'number' ? d.followees : (Array.isArray(d.followees) ? d.followees.length : 0),
+                    followers: Array.isArray(d.followers) ? d.followers : [],
+                    followees: followeesList,
+                    referrals: d.referralCount ?? d.referrals ?? 0,
+                    points: d.points ?? null,
+                }
             } catch { /* profile may not exist yet */ }
             return { user, ...profileData }
         },

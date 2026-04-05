@@ -163,7 +163,7 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
         <Image src={`/networks/${token.network}.svg`} width={24} height={24} alt="" style={{ position: "absolute", top: 8, right: 8 }} />
         {/* Status badges */}
         <Box position="absolute" top={8} right={40} display="flex" gap="4px" alignItems="center">
-          {token.launchedAt && <span className="badge-graduated">Graduated</span>}
+          {token.launchedAt && <span className="badge-graduated">Graduated 🎓</span>}
           {Number(token.progress ?? 0) > 70 && !token.launchedAt && <span className="badge-trending">🔥 Hot</span>}
           {trendIndex != null && trendIndex <= 2 && (
             <Typography fontSize={10} fontWeight={700} color="#FFD700" sx={{
@@ -228,7 +228,7 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
     <StyledCard {...props} className="effect-button card-enter" p="8px 16px 8px 8px" onClick={() => router.push(`/token?network=${token.network}&address=${token.tokenAddress}`)}>
       {/* Status badges */}
       <Box position="absolute" top={8} right={8} display="flex" gap="4px" alignItems="center" zIndex={2}>
-        {token.launchedAt && <span className="badge-graduated">Graduated</span>}
+        {token.launchedAt && <span className="badge-graduated">Graduated 🎓</span>}
         {Number(token.progress ?? 0) > 70 && !token.launchedAt && <span className="badge-trending">🔥 Hot</span>}
       </Box>
       <Box display="flex" gap="8px">
@@ -312,7 +312,7 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
           px: 1.5,
           py: 0.5,
         }}>
-          <Typography fontSize={11} fontWeight={600} color="#8B5CF6">✨ Graduated to DEX</Typography>
+          <Typography fontSize={11} fontWeight={600} color="#8B5CF6">🎓 Graduated to DEX</Typography>
         </Box>
       )}
     </StyledCard>
