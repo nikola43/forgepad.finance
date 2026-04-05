@@ -40,8 +40,9 @@ contract DeployForgepad is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        MockPriceFeed mockFeed = new MockPriceFeed(204000000000, 8);
-        console.log("MockPriceFeed:", address(mockFeed));
+        // Use real Chainlink ETH/USD feed on mainnet fork
+        address priceFeed = DATA_FEED;
+        console.log("PriceFeed (Chainlink):", priceFeed);
 
         ForgepadLiquidityManager liquidityManager = new ForgepadLiquidityManager(
             UNISWAP_V2_ROUTER,
@@ -58,7 +59,7 @@ contract DeployForgepad is Script {
         console.log("ForgepadLiquidityManager:", address(liquidityManager));
 
         Forgepad forgepad = new Forgepad(
-            address(mockFeed),
+            priceFeed,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR
@@ -80,7 +81,7 @@ contract DeployForgepad is Script {
         console.log("==================================================");
         console.log("DEPLOYMENT COMPLETE");
         console.log("==================================================");
-        console.log("MockPriceFeed:    ", address(mockFeed));
+        console.log("PriceFeed:        ", priceFeed);
         console.log("Forgepad:         ", address(forgepad));
         console.log("LiquidityManager: ", address(liquidityManager));
         console.log("==================================================");

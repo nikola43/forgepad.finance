@@ -40,8 +40,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
     uint256 public constant PUMP_FUN_TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 69_000; // Graduation at ~$69k virtual MCAP
-    uint256 public constant PUMP_FUN_VIRTUAL_ETH_INITIAL = 4 ether; // Low-start virtual ETH (EVM equivalent of ~30 SOL virtual start)
+    uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
+    uint256 public constant PUMP_FUN_VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
     uint256 public constant PUMP_FUN_VIRTUAL_TOKEN_INITIAL =
         1_073_000_000 * 1e18; // Virtual tokens for pricing curve
     uint256 public constant PUMP_FUN_REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
@@ -295,6 +295,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 tokenOwnerFee = _mul(buyAmount, TOKEN_OWNER_FEE_PERCENT) / 100;
         uint256 netAmountIn = buyAmount - buyFee - tokenOwnerFee;
 
+        // Cap amountOut to real token reserve to prevent underflow
+        if (amountOut > pool.tokenReserve) {
+            amountOut = pool.tokenReserve;
+        }
+
         // Update real + virtual reserves (K preserved by construction)
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= amountOut;
@@ -337,6 +342,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 buyFee = _mul(amountIn, PLATFORM_BUY_FEE_PERCENT) / 100;
         uint256 tokenOwnerFee = _mul(amountIn, TOKEN_OWNER_FEE_PERCENT) / 100;
         uint256 netAmountIn = amountIn - buyFee - tokenOwnerFee;
+
+        // Cap buyAmount to real token reserve to prevent underflow
+        if (buyAmount > pool.tokenReserve) {
+            buyAmount = pool.tokenReserve;
+        }
 
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= buyAmount;
@@ -577,12 +587,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             ? pool.ethReserve - totalFeesToReserve
             : pool.ethReserve;
 
-        uint256 tokenAmountForLP = pool.tokenReserve;
-        if (pool.ethReserve > 0) {
-            tokenAmountForLP =
-                _mul(pool.tokenReserve, ethAmountForLP) /
-                pool.ethReserve;
-        }
+        // Use actual contract balance — real reserve may be depleted near graduation
+        uint256 tokenAmountForLP = IERC20(token).balanceOf(address(this));
 
         _addLiquidity(token, ethAmountForLP, tokenAmountForLP);
 
