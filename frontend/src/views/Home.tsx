@@ -205,17 +205,51 @@ const CardGrid = styled(Box) <{ min: number, space: number }>`
 const GraduatingSection = styled(Box)`
     position: relative;
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(255, 100, 0, 0.06) 0%, rgba(255, 166, 0, 0.04) 50%, rgba(255, 215, 0, 0.02) 100%);
-    border: 1px solid rgba(255, 100, 0, 0.12);
-    padding: 16px;
+    background: linear-gradient(135deg, rgba(255, 100, 0, 0.05) 0%, rgba(13, 13, 20, 0.8) 40%, rgba(255, 166, 0, 0.03) 100%);
+    border: 1px solid rgba(255, 100, 0, 0.15);
+    padding: 20px;
     overflow: hidden;
     &::before {
         content: "";
         position: absolute;
         inset: 0;
         border-radius: inherit;
-        background: radial-gradient(ellipse at 50% 0%, rgba(255, 100, 0, 0.08) 0%, transparent 70%);
+        background: radial-gradient(ellipse at 30% 0%, rgba(255, 100, 0, 0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 100%, rgba(255, 166, 0, 0.06) 0%, transparent 50%);
         pointer-events: none;
+    }
+    &::after {
+        content: "";
+        position: absolute;
+        top: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(255, 140, 0, 0.6), rgba(255, 200, 0, 0.8), rgba(255, 140, 0, 0.6), transparent);
+        background-size: 200% 100%;
+        animation: graduating-border-glow 3s ease-in-out infinite;
+        border-radius: 16px 16px 0 0;
+    }
+    @keyframes graduating-border-glow {
+        0%, 100% { background-position: 200% 0; }
+        50% { background-position: -200% 0; }
+    }
+    .graduation-card {
+        animation: grad-card-enter 0.5s ease-out both;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        &:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 8px 32px rgba(255, 140, 0, 0.2);
+        }
+    }
+    .graduation-card:nth-child(1) { animation-delay: 0s; }
+    .graduation-card:nth-child(2) { animation-delay: 0.1s; }
+    .graduation-card:nth-child(3) { animation-delay: 0.2s; }
+    .graduation-card:nth-child(4) { animation-delay: 0.3s; }
+    .graduation-card:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes grad-card-enter {
+        from { opacity: 0; transform: translateY(16px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
     }
 `;
 
@@ -530,28 +564,57 @@ export default function Home() {
             {filteredGraduatingTokens.length > 0 && (
                 <>
                     <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center">
-                        <Box sx={{ fontSize: 16, lineHeight: 1 }}>🔥</Box>
+                        <Box sx={{
+                            fontSize: 16, lineHeight: 1,
+                            animation: 'pulse 2s ease-in-out infinite',
+                            filter: 'drop-shadow(0 0 4px rgba(255,100,0,0.5))',
+                        }}>🔥</Box>
                         <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
                             About to Graduate
                         </Typography>
-                        <Typography fontSize={11} color="#64748B" ml="auto">
-                            Progress &gt; 70%
-                        </Typography>
+                        <Box sx={{
+                            display: 'flex', alignItems: 'center', gap: 1, ml: 'auto',
+                            background: 'rgba(255,140,0,0.08)', borderRadius: '8px', px: 1.5, py: 0.5,
+                            border: '1px solid rgba(255,140,0,0.15)',
+                        }}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#FF8C00', boxShadow: '0 0 8px #FF8C00', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                            <Typography fontSize={11} color="#FFA600" fontWeight={600}>
+                                Progress &gt; 70%
+                            </Typography>
+                        </Box>
                     </Box>
                     <GraduatingSection>
                         <Box
                             sx={{
                                 display: 'flex',
-                                gap: '12px',
+                                gap: '16px',
                                 overflowX: 'auto',
                                 pb: 1,
+                                justifyContent: filteredGraduatingTokens.length <= 3 ? 'center' : 'flex-start',
                                 '&::-webkit-scrollbar': { height: 4 },
                                 '&::-webkit-scrollbar-track': { background: 'transparent' },
-                                '&::-webkit-scrollbar-thumb': { background: 'rgba(255,166,0,0.2)', borderRadius: 2 },
+                                '&::-webkit-scrollbar-thumb': { background: 'rgba(255,166,0,0.3)', borderRadius: 2 },
                             }}
                         >
                             {filteredGraduatingTokens.map((item: any) => (
-                                <Box key={`graduating-${item.tokenAddress}`} sx={{ minWidth: 180, flex: '0 0 auto' }} className="graduation-glow">
+                                <Box key={`graduating-${item.tokenAddress}`} className="graduation-card" sx={{
+                                    minWidth: 200, flex: '0 0 auto',
+                                    position: 'relative',
+                                    borderRadius: '14px',
+                                    overflow: 'hidden',
+                                    '&::after': {
+                                        content: '""',
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        left: 0,
+                                        height: '3px',
+                                        width: `${Math.min(99, Number(item.progress ?? 0))}%`,
+                                        background: 'linear-gradient(90deg, #FF6400, #FFD700)',
+                                        borderRadius: '0 3px 3px 0',
+                                        boxShadow: '0 0 12px rgba(255,200,0,0.4)',
+                                        transition: 'width 1s ease-out',
+                                    }
+                                }}>
                                     <TokenCard token={item} mode="trends" />
                                 </Box>
                             ))}

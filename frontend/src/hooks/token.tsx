@@ -14,6 +14,20 @@ import BN from 'bn.js'
 import { erc20Abi } from "viem";
 import { ChainController } from "@reown/appkit-controllers"
 
+const uniswapV2RouterAbi = [
+    "function WETH() external view returns (address)",
+    "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
+    "function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
+    "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
+    "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
+    "function getAmountsIn(uint amountOut, address[] calldata path) external view returns (uint[] memory amounts)",
+]
+
+const liquidityManagerAbi = [
+    "function getRouterV2() external view returns (address)",
+    "function WETH() external view returns (address)",
+]
+
 export function useTokenInfo(tokenAddress: string, network: string, pageNumber: number, pageSize: number) {
     const { chains } = useMainContext()
     const { address } = useAppKitAccount()
@@ -50,11 +64,24 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
                         const tokenContract = new Contract(tokenAddress, erc20Abi, readProvider)
                         const contract = new Contract(tokenChain.contractAddress, tokenChain.abi, readProvider)
                         data.curveBalance = await tokenContract.balanceOf(tokenChain.contractAddress).catch(() => 0n)
+                        data.poolInfo = await contract.tokenPools(tokenAddress).catch(() => undefined)
                         if (address) {
                             data.balance = await tokenContract.balanceOf(address).catch(() => 0n)
-                            data.allowance = await tokenContract.allowance(address, tokenChain.contractAddress).catch(() => 0n)
+                            if (data.poolInfo?.launched) {
+                                // Graduated token: check allowance against Uniswap V2 router
+                                try {
+                                    const lmAddress = await contract.liquidityManager()
+                                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                                    const routerAddress = await lm.getRouterV2()
+                                    data.allowance = await tokenContract.allowance(address, routerAddress).catch(() => 0n)
+                                    data.routerAddress = routerAddress
+                                } catch {
+                                    data.allowance = 0n
+                                }
+                            } else {
+                                data.allowance = await tokenContract.allowance(address, tokenChain.contractAddress).catch(() => 0n)
+                            }
                         }
-                        data.poolInfo = await contract.tokenPools(tokenAddress).catch(() => undefined)
                     } else if (tokenNetwork.chainNamespace === "solana" && connection) {
                         const client = new DynamicBondingCurveClient(connection, 'confirmed')
                         const mint = new PublicKey(tokenAddress)
@@ -257,18 +284,48 @@ export function useHandlers(network?: CaipNetwork) {
                 if (!address)
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
-                const contract = new Contract(token, erc20Abi, signer)
-                return await contract.approve(chain.contractAddress, MaxUint256)
+                const tokenContract = new Contract(token, erc20Abi, signer)
+                const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                if (poolInfo?.launched) {
+                    const lmAddress = await readContract.liquidityManager()
+                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                    const routerAddress = await lm.getRouterV2()
+                    return await tokenContract.approve(routerAddress, MaxUint256)
+                }
+                return await tokenContract.approve(chain.contractAddress, MaxUint256)
             },
             buyToken: async (token: string, amount: string, slippage: bigint, exactInput?: boolean) => {
                 if (!address)
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
-                const contract = new Contract(chain.contractAddress, chain.abi, signer)
-                const firstBuyFee = await readContract.getFirstBuyFee(token)
                 const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
+
+                if (poolInfo.launched) {
+                    // Graduated token: route through Uniswap V2
+                    const lmAddress = await readContract.liquidityManager()
+                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                    const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
+                    const router = new Contract(routerAddress, uniswapV2RouterAbi, signer)
+                    const deadline = Math.floor(Date.now() / 1000) + 1200
+                    const path = [wethAddress, token]
+
+                    if (exactInput) {
+                        const amountInput = ethers.parseEther(amount ?? '0')
+                        const amountsOut = await router.getAmountsOut(amountInput, path)
+                        const amountOutMin = amountsOut[1] * (10000n - slippage) / 10000n
+                        return await router.swapExactETHForTokens(amountOutMin, path, address, deadline, { value: amountInput })
+                    }
+                    const amountOut = ethers.parseEther(amount ?? '0')
+                    const amountsIn = await router.getAmountsIn(amountOut, path)
+                    const amountInMax = amountsIn[0] * (10000n + slippage) / 10000n
+                    return await router.swapETHForExactTokens(amountOut, path, address, deadline, { value: amountInMax })
+                }
+
+                // Bonding curve swap
+                const contract = new Contract(chain.contractAddress, chain.abi, signer)
+                const firstBuyFee = await readContract.getFirstBuyFee(token)
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
                     const amountInWithFee = amountInput * 97n / 100n
@@ -287,10 +344,26 @@ export function useHandlers(network?: CaipNetwork) {
                 if (!address)
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
-                const contract = new Contract(chain.contractAddress, chain.abi, signer)
                 const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
+
+                if (poolInfo.launched) {
+                    // Graduated token: route through Uniswap V2
+                    const lmAddress = await readContract.liquidityManager()
+                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                    const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
+                    const router = new Contract(routerAddress, uniswapV2RouterAbi, signer)
+                    const deadline = Math.floor(Date.now() / 1000) + 1200
+                    const path = [token, wethAddress]
+                    const amountInput = ethers.parseEther(amount ?? '0')
+                    const amountsOut = await router.getAmountsOut(amountInput, path)
+                    const amountOutMin = amountsOut[1] * (10000n - slippage) / 10000n
+                    return await router.swapExactTokensForETH(amountInput, amountOutMin, path, address, deadline)
+                }
+
+                // Bonding curve swap
+                const contract = new Contract(chain.contractAddress, chain.abi, signer)
                 const amountInput = ethers.parseEther(amount ?? '0')
                 const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
                 const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
@@ -302,6 +375,29 @@ export function useHandlers(network?: CaipNetwork) {
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
                 const balance = address ? await readProvider.getBalance(address) : 0n
+
+                if (poolInfo.launched) {
+                    // Graduated token: quote via Uniswap V2
+                    const lmAddress = await readContract.liquidityManager()
+                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                    const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
+                    const router = new Contract(routerAddress, uniswapV2RouterAbi, readProvider)
+                    const path = [wethAddress, token]
+                    if (exactInput) {
+                        const amountInput = ethers.parseEther(amount ?? '0')
+                        if (balance < amountInput)
+                            throw Error(`Insufficient ${network.nativeCurrency.symbol} balance`)
+                        const amountsOut = await router.getAmountsOut(amountInput, path)
+                        return ethers.formatEther(amountsOut[1])
+                    }
+                    const amountOut = ethers.parseEther(amount ?? '0')
+                    const amountsIn = await router.getAmountsIn(amountOut, path)
+                    if (balance < amountsIn[0])
+                        throw Error(`Insufficient ${network.nativeCurrency.symbol} balance`)
+                    return ethers.formatEther(amountsIn[0])
+                }
+
+                // Bonding curve quote
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
                     const amountInWithFee = amountInput * 97n / 100n
@@ -321,6 +417,20 @@ export function useHandlers(network?: CaipNetwork) {
                 const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
+
+                if (poolInfo.launched) {
+                    // Graduated token: quote via Uniswap V2
+                    const lmAddress = await readContract.liquidityManager()
+                    const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
+                    const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
+                    const router = new Contract(routerAddress, uniswapV2RouterAbi, readProvider)
+                    const path = [token, wethAddress]
+                    const amountInput = ethers.parseEther(amount ?? '0')
+                    const amountsOut = await router.getAmountsOut(amountInput, path)
+                    return ethers.formatEther(amountsOut[1])
+                }
+
+                // Bonding curve quote
                 const amountInput = ethers.parseEther(amount ?? '0')
                 const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
                 return ethers.formatEther(estimateAmount)

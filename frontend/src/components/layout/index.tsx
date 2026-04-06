@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, lazy, Suspense } from "react";
 import Header from "./header";
 import Footer from "./footer";
 import Sidebar from "./sidebar";
@@ -8,6 +8,10 @@ import { styled, useMediaQuery } from "@mui/material";
 import MobileMenu from "./menu";
 import imgBackground from "../../assets/images/bg.jpg"
 import { Toaster } from "react-hot-toast"
+import ErrorBoundary from "@/components/ErrorBoundary"
+import { ScrollRestoration, ScrollToTopButton } from "@/components/ScrollToTop"
+
+const ParticleBackground = lazy(() => import("@/components/ParticleBackground"))
 
 const Main = styled('div')`
     position: relative;
@@ -25,11 +29,18 @@ function MainLayout({ children }: { children: ReactNode }) {
 
     return (
         <>
+            <Suspense fallback={null}>
+                <ParticleBackground />
+            </Suspense>
             <Main>
                 <Header />
-                { children }
+                <ErrorBoundary>
+                    <ScrollRestoration />
+                    { children }
+                </ErrorBoundary>
                 { !isMobile && <Footer /> }
             </Main>
+            <ScrollToTopButton />
             {
                 isMobile &&
                 <MobileMenu open={isMenuOpen} onMenuOpen={(isOpen) => setMenuOpen(isOpen)} />

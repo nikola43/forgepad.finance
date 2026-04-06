@@ -49,6 +49,23 @@ body {
   line-height: 1.5;
 }
 
+/* Smooth transitions for all interactive elements */
+a, button, input, select, textarea {
+  transition: all 0.2s var(--ease-out);
+}
+
+::selection {
+  background: rgba(255, 166, 0, 0.3);
+  color: white;
+}
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -691,6 +708,53 @@ body::before {
 /* Smooth section transitions */
 .section-enter {
   animation: fadeInUp 0.5s ease-out both;
+}
+
+/* Enhanced skeleton loading */
+.MuiSkeleton-root {
+  background: rgba(255, 255, 255, 0.04) !important;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 166, 0, 0.06) 40%,
+    rgba(255, 255, 255, 0.04) 80%
+  ) !important;
+  background-size: 400% 100% !important;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite !important;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Smooth image loading */
+img {
+  transition: opacity 0.3s ease;
+}
+img[src=""] {
+  opacity: 0;
+}
+
+/* Enhanced tooltip styles */
+.MuiTooltip-tooltip {
+  background: rgba(10, 10, 16, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+  box-shadow: var(--shadow-md) !important;
+  animation: tooltip-in 0.15s ease-out !important;
+}
+
+/* Link hover underline animation */
+a:not(.MuiButton-root):not([class*="styled"]) {
+  text-decoration: none;
+}
+
+/* Number counter smooth transitions */
+.MuiTypography-root {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Responsive improvements */

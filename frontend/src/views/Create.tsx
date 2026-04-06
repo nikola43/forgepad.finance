@@ -42,6 +42,7 @@ import { ethers } from "ethers";
 import toast from "react-hot-toast";
 import { useUserInfo } from "@/hooks/user";
 import { useHandlers } from "@/hooks/token";
+import { playSuccessSound } from "@/utils/sounds";
 import Confetti from "react-confetti";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { socket } from "@/utils/socket";
@@ -148,6 +149,7 @@ const CurrencyInput = styled(Box)`
 const AvatarWrapper = styled(Box)`
   position: relative;
   display: inline-block;
+  cursor: pointer;
   & > label {
     position: absolute;
     right: 5px;
@@ -176,6 +178,15 @@ const AvatarWrapper = styled(Box)`
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
       transform: scale(1.05);
     }
+  }
+
+  &.dragover .MuiAvatar-root {
+    border-color: rgba(255, 166, 0, 0.7);
+    box-shadow:
+      0 12px 32px rgba(255, 166, 0, 0.4),
+      0 0 60px rgba(255, 166, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: scale(1.03);
   }
 `;
 
@@ -522,6 +533,7 @@ export default function Create() {
       setDeployModal(false);
       setSuccessModal(true);
       resetForm();
+      playSuccessSound();
       toast.success("Token created successfully!");
     } catch (ex: any) {
       console.error("Error deploying token:", ex);
@@ -550,6 +562,19 @@ export default function Create() {
 
   const handleClose = () => {
     if (!isLoading) setDeployModal(false);
+  };
+
+  const handleAvatarFile = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    // Set the file on the input ref so upload works
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    if (fileLogoRef.current) fileLogoRef.current.files = dt.files;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAvatar = (e: any) => {
@@ -613,7 +638,26 @@ export default function Create() {
             <InputLabel shrink className="required">
               Token logo <span style={{ color: "red" }}>*</span>
             </InputLabel>
-            <AvatarWrapper sx={{ width: { xs: "100%", sm: "100%", md: 250 } }}>
+            <AvatarWrapper
+              sx={{ width: { xs: "100%", sm: "100%", md: 250 } }}
+              onClick={() => fileLogoRef.current?.click()}
+              onDragOver={(e: React.DragEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.currentTarget as HTMLElement).classList.add('dragover');
+              }}
+              onDragLeave={(e: React.DragEvent) => {
+                e.preventDefault();
+                (e.currentTarget as HTMLElement).classList.remove('dragover');
+              }}
+              onDrop={(e: React.DragEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.currentTarget as HTMLElement).classList.remove('dragover');
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleAvatarFile(file);
+              }}
+            >
               <Avatar
                 sx={{
                   width: { xs: "100%", sm: "100%", md: 250 },
@@ -624,16 +668,27 @@ export default function Create() {
                 }}
                 src={avatar}
               >
-                <DollarIcon sx={{ color: "black", width: 48, height: 48 }} />
+                {!avatar ? (
+                  <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
+                    <DollarIcon sx={{ color: "rgba(0,0,0,0.3)", width: 36, height: 36 }} />
+                    <Typography fontSize={11} color="rgba(0,0,0,0.4)" fontWeight={500}>
+                      Click or drop image
+                    </Typography>
+                  </Box>
+                ) : (
+                  <DollarIcon sx={{ color: "black", width: 48, height: 48 }} />
+                )}
               </Avatar>
               <IconButton
                 sx={{ bgcolor: "black", "&:hover": { bgcolor: "#555" } }}
                 component="label"
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
               >
                 <EditIcon sx={{ width: 16, height: 16 }} />
                 <HiddenInput
                   ref={fileLogoRef}
                   type="file"
+                  accept="image/*"
                   onChange={handleAvatar}
                 />
               </IconButton>

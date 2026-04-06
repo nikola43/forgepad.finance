@@ -134,7 +134,8 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
 
     const dataFeed = React.useMemo(() => ({
         onReady: (callback: any) => {
-            callback({
+            // TradingView requires onReady callback to be called asynchronously
+            setTimeout(() => callback({
                 supported_resolutions: ['1', '15', '1D', '1W', '1M'],
                 exchanges: [
                     { value: 'Uniswap', name: 'Uniswap', desc: 'Uniswap exchange' },
@@ -142,7 +143,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                 symbols_types: [
                     { name: 'crypto', value: 'crypto' }
                 ]
-            })
+            }), 0)
         },
         searchSymbols: () => {
         },
@@ -185,13 +186,13 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                 fetchChartData(symbolInfo.network, {
                     tokenAddress: symbolInfo.address,
                     interval: resolution,
-                    from: symbolInfo.dex ? new Date(symbolInfo.launchedAt).getTime() / 1000 : from,
+                    from: symbolInfo.launchedAt ? new Date(symbolInfo.launchedAt).getTime() / 1000 : from,
                     to,
                     countBack,
                     ...(firstDataRequest ? { first: 1 } : {}),
                     dex: symbolInfo.dex
                 }).then((data) => {
-                    if (data === 'nodata') {
+                    if (data === 'nodata' || !Array.isArray(data) || data.length === 0) {
                         onHistoryCallback([], { noData: true })
                     } else {
                         const bars = data.map((d: any) => ({ ...d, time: d.time * 1000, volume: Number(d.volume) }))

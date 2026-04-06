@@ -27,6 +27,7 @@ import WebsiteIcon from '@/assets/images/website.svg';
 // import ethIcon from '@/assets/images/coin/eth-1.png';
 
 import { TVChartContainer as TVChartContainerAdvanced } from '@/components/tvchart';
+import { playBuySound, playSellSound } from '@/utils/sounds';
 import { TimeDiff } from "@/components/time";
 // import { useContractInfo } from "@/hooks/contract";
 import { useHandlers, useTokenInfo } from "@/hooks/token";
@@ -1005,9 +1006,11 @@ export default function Token() {
             let tx;
             if (tradeType === "buy") {
                 tx = await handlers.buyToken(detailData.tokenAddress, amountIn ?? '0', _slippage, exactInput)
+                playBuySound()
                 showSuccessToast(tx.hash, 'buy')
             } else {
                 tx = await handlers.sellToken(detailData.tokenAddress, amountIn ?? '0', _slippage)
+                playSellSound()
                 showSuccessToast(tx.hash, 'sell')
             }
             // Wait for tx to be mined so backend can process the event
@@ -1106,6 +1109,17 @@ export default function Token() {
                             toast.success('Contract address copied!', { duration: 2000 })
                         }}>
                             <CopyIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
+                        </IconButton>
+                        <IconButton sx={{ width: 'fit-content' }} onClick={() => {
+                            const url = window.location.href
+                            if (navigator.share) {
+                                navigator.share({ title: `${detailData?.tokenName} (${detailData?.tokenSymbol})`, url })
+                            } else {
+                                copy(url)
+                                toast.success('Token link copied!', { duration: 2000 })
+                            }
+                        }}>
+                            <LinkIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
                     </Box>
                     <Box display="flex" gap="8px" alignItems="center" width="100%">
@@ -1577,81 +1591,21 @@ export default function Token() {
                     {
                         !isMobile &&
                         <Box width="370px">
-                            {!isSolanaToken && launched ? (
-                                <SwapBox>
-                                    <Box display="flex" flexDirection="column" alignItems="center" gap={2} width="100%">
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Typography fontSize={18} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
-                                                🎓 Graduated
+                            <SwapBox className={isLoading ? "disabled" : ""}>
+                                    {!isSolanaToken && launched && (
+                                        <Box display="flex" flexDirection="column" alignItems="center" gap={0.5} mb={1.5} pb={1.5} borderBottom="1px solid rgba(255,255,255,0.06)">
+                                            <Typography fontSize={14} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
+                                                🎓 Trading via Uniswap V2
                                             </Typography>
+                                            {detailData?.pairAddress && (
+                                                <Link href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
+                                                    <Typography fontSize={11} color="#64748B" sx={{ '&:hover': { color: '#10B981' } }}>
+                                                        View LP Pair <LinkIcon sx={{ fontSize: 11, verticalAlign: 'middle' }} />
+                                                    </Typography>
+                                                </Link>
+                                            )}
                                         </Box>
-                                        <Typography fontSize={13} color="#94A3B8" textAlign="center" lineHeight={1.5}>
-                                            This token has graduated from the bonding curve and is now trading on Uniswap V2.
-                                        </Typography>
-                                        {detailData?.pairAddress ? (
-                                            <Box display="flex" flexDirection="column" gap={1.5} width="100%">
-                                                <Link
-                                                    href={`https://app.uniswap.org/swap?outputCurrency=${detailData.tokenAddress}&chain=mainnet`}
-                                                    target="_blank"
-                                                    style={{ textDecoration: 'none', width: '100%' }}
-                                                >
-                                                    <Button
-                                                        fullWidth
-                                                        sx={{
-                                                            borderRadius: '12px',
-                                                            py: 1.5,
-                                                            textTransform: 'none',
-                                                            fontWeight: 700,
-                                                            fontSize: 15,
-                                                            background: 'linear-gradient(135deg, #FF007A, #FF5CAA)',
-                                                            color: 'white',
-                                                            '&:hover': {
-                                                                boxShadow: '0 4px 20px rgba(255, 0, 122, 0.4)',
-                                                                background: 'linear-gradient(135deg, #FF007A, #FF5CAA)',
-                                                            },
-                                                        }}
-                                                    >
-                                                        Trade on Uniswap
-                                                        <LinkIcon sx={{ ml: 0.5, fontSize: 18 }} />
-                                                    </Button>
-                                                </Link>
-                                                <Link
-                                                    href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`}
-                                                    target="_blank"
-                                                    style={{ textDecoration: 'none', width: '100%' }}
-                                                >
-                                                    <Button
-                                                        fullWidth
-                                                        sx={{
-                                                            borderRadius: '12px',
-                                                            py: 1,
-                                                            textTransform: 'none',
-                                                            fontWeight: 600,
-                                                            fontSize: 13,
-                                                            background: 'rgba(255, 255, 255, 0.04)',
-                                                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                                                            color: '#94A3B8',
-                                                            '&:hover': {
-                                                                background: 'rgba(255, 255, 255, 0.08)',
-                                                                borderColor: 'rgba(16, 185, 129, 0.3)',
-                                                                color: '#10B981',
-                                                            },
-                                                        }}
-                                                    >
-                                                        View LP Pair
-                                                        <LinkIcon sx={{ ml: 0.5, fontSize: 14 }} />
-                                                    </Button>
-                                                </Link>
-                                            </Box>
-                                        ) : (
-                                            <Typography fontSize={12} color="#64748B" textAlign="center">
-                                                Pair address not available yet. The token may still be migrating to the DEX.
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                </SwapBox>
-                            ) : (
-                                <SwapBox className={isLoading ? "disabled" : ""}>
+                                    )}
                                     <Toggle style={{ width: "inherit" }}>
                                         <div className={tradeType === "buy" ? "active" : ""} onClick={() => setTradeType("buy")}>Buy</div>
                                         <div className={tradeType === "sell" ? "active" : ""} onClick={() => setTradeType("sell")}>Sell</div>
@@ -1674,7 +1628,6 @@ export default function Token() {
                                         setShowSlipaggeDialog={setShowSlipaggeDialog}
                                     />
                                 </SwapBox>
-                            )}
                             <HolderBox as="ol" mb="1.5em">
                                 <Box component="h3">Top Holders</Box>
                                 {topHolderPercent > 50 && (
@@ -1729,16 +1682,7 @@ export default function Token() {
                 </Box>
             </div>
             {
-                isMobile && !isSolanaToken && launched ? (
-                    <TradeMenu>
-                        <button
-                            onClick={() => window.open(`https://app.uniswap.org/swap?outputCurrency=${detailData?.tokenAddress}&chain=mainnet`, '_blank')}
-                            style={{ background: 'linear-gradient(135deg, #FF007A, #FF5CAA)', color: 'white', fontWeight: 700 }}
-                        >
-                            Trade on Uniswap
-                        </button>
-                    </TradeMenu>
-                ) : isMobile ? (
+                isMobile ? (
                     <TradeMenu>
                         <button onClick={() => {
                             setTradeType("buy")

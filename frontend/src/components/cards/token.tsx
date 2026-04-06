@@ -54,6 +54,19 @@ const StyledCard = styled(Box)`
     pointer-events: none;
   }
 
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+    transition: none;
+    pointer-events: none;
+    z-index: 2;
+  }
+
   &:hover {
     transform: translateY(-4px);
     border-color: rgba(255, 166, 0, 0.2);
@@ -64,6 +77,10 @@ const StyledCard = styled(Box)`
 
     &::before {
       opacity: 1;
+    }
+    &::after {
+      left: 150%;
+      transition: left 0.8s ease;
     }
   }
 
