@@ -21,3 +21,4 @@ runs = 256
 [rpc_endpoints]
 bsc = "https://bsc-rpc.publicnode.com"
 bsc_backup = "https://bsc-dataseed1.defibit.io"
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"

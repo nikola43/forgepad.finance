@@ -48,7 +48,7 @@ contract ForgepadTest is Test {
     uint256 constant VIRTUAL_ETH_INITIAL = 2.5 ether;
     uint256 constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18;
     uint256 constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18;
-    uint256 constant TARGET_MCAP_USD = 69_000 * 1e18;
+    uint256 constant TARGET_MCAP_USD = 10_000 * 1e18;
 
     IUniswapV2Router02 constant router =
         IUniswapV2Router02(UNISWAP_V2_ROUTER);
@@ -67,6 +67,7 @@ contract ForgepadTest is Test {
 
         liquidityManager = new ForgepadLiquidityManager(
             UNISWAP_V2_ROUTER,
+            0x1F98431c8aD98523631AE4a59f267346ea31F984, // V3 Factory
             V3_POS_MGR,
             V4_POOL_MGR,
             UNIVERSAL_ROUTER,
@@ -106,7 +107,7 @@ contract ForgepadTest is Test {
         uint8 pt
     ) internal returns (address) {
         vm.recordLogs();
-        forgepad.createToken{value: 0.001 ether}(name, sym, 0, 0, 0, pt);
+        forgepad.createToken{value: 0.001 ether}(name, sym, 0, 0, 0, pt, block.timestamp);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 tcSig = keccak256(
             "TokenCreated(address,uint256,uint256,uint32,uint256)"
@@ -137,7 +138,8 @@ contract ForgepadTest is Test {
             buyAmount,
             0,
             0,
-            pt
+            pt,
+            block.timestamp
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 tcSig = keccak256(
@@ -294,7 +296,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee1}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
         IForgepad.PoolInfo memory p1 = _pool(t);
         uint256 k1 = p1.virtualEthReserve * p1.virtualTokenReserve;
@@ -308,7 +311,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.05 ether + fee2}(
             t,
             0.05 ether,
-            0
+            0,
+            block.timestamp
         );
         IForgepad.PoolInfo memory p2 = _pool(t);
         uint256 k2 = p2.virtualEthReserve * p2.virtualTokenReserve;
@@ -319,7 +323,7 @@ contract ForgepadTest is Test {
         uint256 sellAmt = IERC20(t).balanceOf(addr1) / 2;
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), sellAmt);
-        forgepad.swapExactTokensForETH(t, sellAmt, 0);
+        forgepad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         IForgepad.PoolInfo memory p3 = _pool(t);
@@ -343,7 +347,7 @@ contract ForgepadTest is Test {
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.prank(addr1);
-        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0);
+        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 bal = IERC20(t).balanceOf(addr1);
         assertTrue(bal > 0, "received tokens");
@@ -378,7 +382,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.05 ether + fee}(
                 t,
                 0.05 ether,
-                0
+                0,
+                block.timestamp
             );
 
             uint256 newPrice = forgepad.getVirtualPrice(t);
@@ -402,7 +407,7 @@ contract ForgepadTest is Test {
         uint256 fee = forgepad.getFirstBuyFee(t);
 
         vm.prank(addr1);
-        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0);
+        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 bal = IERC20(t).balanceOf(addr1);
         console.log("Tokens from 1 ETH buy:", bal / 1e18);
@@ -424,7 +429,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 tokenBal = IERC20(t).balanceOf(addr1);
@@ -437,7 +443,7 @@ contract ForgepadTest is Test {
 
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), sellAmt);
-        forgepad.swapExactTokensForETH(t, sellAmt, 0);
+        forgepad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -464,7 +470,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.05 ether + fee}(
             t,
             0.05 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 tokenBal = IERC20(t).balanceOf(addr1);
@@ -472,7 +479,7 @@ contract ForgepadTest is Test {
 
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), tokenBal);
-        forgepad.swapExactTokensForETH(t, tokenBal, 0);
+        forgepad.swapExactTokensForETH(t, tokenBal, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -493,7 +500,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         IForgepad.PoolInfo memory pBefore = _pool(t);
@@ -506,7 +514,7 @@ contract ForgepadTest is Test {
 
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), sellAmt);
-        forgepad.swapExactTokensForETH(t, sellAmt, 0);
+        forgepad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -546,7 +554,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee1}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 price1 = forgepad.getVirtualPrice(t);
         uint256 mcap1 = forgepad.getTokenVirtualMarketCap(t);
@@ -560,7 +569,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee2}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 price2 = forgepad.getVirtualPrice(t);
         uint256 mcap2 = forgepad.getTokenVirtualMarketCap(t);
@@ -572,7 +582,7 @@ contract ForgepadTest is Test {
         if (sellAmt > 0) {
             vm.startPrank(addr1);
             IERC20(t).approve(address(forgepad), sellAmt);
-            forgepad.swapExactTokensForETH(t, sellAmt, 0);
+            forgepad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
             vm.stopPrank();
         }
         uint256 price3 = forgepad.getVirtualPrice(t);
@@ -586,7 +596,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.5 ether + fee3}(
             t,
             0.5 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 price4 = forgepad.getVirtualPrice(t);
         uint256 mcap4 = forgepad.getTokenVirtualMarketCap(t);
@@ -635,7 +646,7 @@ contract ForgepadTest is Test {
             }
 
             vm.prank(addr2);
-            forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0);
+            forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
             totalETHSpent += buyAmt;
 
             IForgepad.PoolInfo memory pAfter = _pool(t);
@@ -705,7 +716,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
         }
 
@@ -778,7 +790,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 bal = IERC20(t).balanceOf(addr1);
@@ -813,7 +826,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 bal = IERC20(t).balanceOf(addr1);
@@ -821,7 +835,7 @@ contract ForgepadTest is Test {
         // Sell back to forgepad (this is a transferFrom to owner = forgepad)
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), bal / 4);
-        forgepad.swapExactTokensForETH(t, bal / 4, 0);
+        forgepad.swapExactTokensForETH(t, bal / 4, 0, block.timestamp);
         vm.stopPrank();
 
         console.log(
@@ -842,7 +856,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
         }
 
@@ -874,7 +889,7 @@ contract ForgepadTest is Test {
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.prank(addr1);
-        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0);
+        forgepad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 feeWalletGain = FEE_WALLET.balance - feeWalletBefore;
         uint256 distGain = DIST_ADDR.balance - distBefore;
@@ -913,7 +928,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 tokenBal = IERC20(t).balanceOf(addr1);
@@ -926,7 +942,7 @@ contract ForgepadTest is Test {
 
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), sellAmt);
-        forgepad.swapExactTokensForETH(t, sellAmt, 0);
+        forgepad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -961,7 +977,7 @@ contract ForgepadTest is Test {
 
         vm.prank(addr1);
         vm.expectRevert();
-        forgepad.swapExactETHForTokens{value: 0}(t, 0, 0);
+        forgepad.swapExactETHForTokens{value: 0}(t, 0, 0, block.timestamp);
     }
 
     function test_10b_ZeroSellReverts() public {
@@ -971,7 +987,7 @@ contract ForgepadTest is Test {
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), type(uint256).max);
         vm.expectRevert();
-        forgepad.swapExactTokensForETH(t, 0, 0);
+        forgepad.swapExactTokensForETH(t, 0, 0, block.timestamp);
         vm.stopPrank();
     }
 
@@ -983,12 +999,13 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether}(
             address(0xdead),
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
 
         vm.prank(addr1);
         vm.expectRevert("Pool does not exist");
-        forgepad.swapExactTokensForETH(address(0xdead), 1e18, 0);
+        forgepad.swapExactTokensForETH(address(0xdead), 1e18, 0, block.timestamp);
     }
 
     function test_10d_BuyAfterLaunchReverts() public {
@@ -1004,7 +1021,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
         }
         assertTrue(_pool(t).launched, "launched");
@@ -1012,7 +1030,7 @@ contract ForgepadTest is Test {
         // After launch virtualEthReserve=0, so maxBuy=0, any buy reverts
         vm.prank(addr2);
         vm.expectRevert("Exceeds maximum price impact");
-        forgepad.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0);
+        forgepad.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0, block.timestamp);
 
         console.log("Buy after launch correctly reverts");
     }
@@ -1030,7 +1048,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
         }
         assertTrue(_pool(t).launched, "launched");
@@ -1041,7 +1060,7 @@ contract ForgepadTest is Test {
             vm.startPrank(addr1);
             IERC20(t).approve(address(forgepad), bal);
             vm.expectRevert("Sell amount too large");
-            forgepad.swapExactTokensForETH(t, bal, 0);
+            forgepad.swapExactTokensForETH(t, bal, 0, block.timestamp);
             vm.stopPrank();
         }
         console.log("Sell after launch correctly reverts");
@@ -1058,7 +1077,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
-            type(uint256).max
+            type(uint256).max,
+            block.timestamp
         );
 
         console.log("Slippage protection works");
@@ -1080,7 +1100,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 2.4 ether + fee}(
             t,
             2.4 ether,
-            0
+            0,
+            block.timestamp
         );
 
         console.log("Price impact limit enforced");
@@ -1222,7 +1243,7 @@ contract ForgepadTest is Test {
 
         // Create token should revert when paused
         vm.expectRevert();
-        forgepad.createToken{value: 0.001 ether}("X", "X", 0, 0, 0, 1);
+        forgepad.createToken{value: 0.001 ether}("X", "X", 0, 0, 0, 1, block.timestamp);
 
         // Buy should revert when paused
         uint256 fee = forgepad.getFirstBuyFee(t);
@@ -1231,13 +1252,14 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
 
         // Sell should revert when paused
         vm.prank(addr1);
         vm.expectRevert();
-        forgepad.swapExactTokensForETH(t, 1e18, 0);
+        forgepad.swapExactTokensForETH(t, 1e18, 0, block.timestamp);
 
         forgepad.unpause();
 
@@ -1247,7 +1269,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
-            0
+            0,
+            block.timestamp
         );
         assertTrue(IERC20(t).balanceOf(addr1) > 0, "buy works after unpause");
 
@@ -1264,7 +1287,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 1 ether + fee}(
             t,
             1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 contractBal = address(forgepad).balance;
@@ -1299,7 +1323,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
-            0
+            0,
+            block.timestamp
         );
 
         forgepad.requestEmergencyWithdrawETH(0.1 ether);
@@ -1337,7 +1362,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee1}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 bal1 = IERC20(t).balanceOf(addr1);
         console.log("User1 tokens:", bal1 / 1e18);
@@ -1350,7 +1376,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.2 ether + fee2}(
             t,
             0.2 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 bal2 = IERC20(t).balanceOf(addr2);
         console.log("User2 tokens:", bal2 / 1e18);
@@ -1363,7 +1390,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.05 ether + fee3}(
             t,
             0.05 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 bal3 = IERC20(t).balanceOf(addr3);
         console.log("User3 tokens:", bal3 / 1e18);
@@ -1374,7 +1402,7 @@ contract ForgepadTest is Test {
         uint256 sell1 = bal1 / 2;
         vm.startPrank(addr1);
         IERC20(t).approve(address(forgepad), sell1);
-        forgepad.swapExactTokensForETH(t, sell1, 0);
+        forgepad.swapExactTokensForETH(t, sell1, 0, block.timestamp);
         vm.stopPrank();
         console.log("User1 sold", sell1 / 1e18, "tokens");
 
@@ -1383,7 +1411,7 @@ contract ForgepadTest is Test {
         // User 2 sells all
         vm.startPrank(addr2);
         IERC20(t).approve(address(forgepad), bal2);
-        forgepad.swapExactTokensForETH(t, bal2, 0);
+        forgepad.swapExactTokensForETH(t, bal2, 0, block.timestamp);
         vm.stopPrank();
         console.log("User2 sold all tokens");
 
@@ -1421,7 +1449,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
 
             IForgepad.PoolInfo memory p = _pool(t);
@@ -1458,7 +1487,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee1}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 tokens1 = IERC20(t).balanceOf(addr1);
         console.log("Early buyer (0.1 ETH) tokens:", tokens1 / 1e18);
@@ -1469,7 +1499,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 1 ether + fee2}(
             t,
             1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         // Buyer 3: late (same 0.1 ETH)
@@ -1478,7 +1509,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee3}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
         uint256 tokens3 = IERC20(t).balanceOf(addr3);
         console.log("Late buyer (0.1 ETH) tokens:", tokens3 / 1e18);
@@ -1511,7 +1543,8 @@ contract ForgepadTest is Test {
         forgepad.swapETHForExactTokens{value: maxETH + fee}(
             t,
             desiredTokens,
-            maxETH
+            maxETH,
+            block.timestamp
         );
 
         uint256 bal = IERC20(t).balanceOf(addr1);
@@ -1539,7 +1572,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 progress1 = forgepad.getBondingCurveProgress(t);
@@ -1556,7 +1590,8 @@ contract ForgepadTest is Test {
             forgepad.swapExactETHForTokens{value: 0.5 ether + f}(
                 t,
                 0.5 ether,
-                0
+                0,
+                block.timestamp
             );
         }
 
@@ -1599,7 +1634,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 1 ether + fee}(
             t,
             1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         (uint256 mcap2, , uint256 prog2, bool can2) = forgepad
@@ -1651,7 +1687,8 @@ contract ForgepadTest is Test {
         forgepad.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
-            0
+            0,
+            block.timestamp
         );
 
         uint256 maxSellAfter = forgepad.getMaxSellableETH(t);

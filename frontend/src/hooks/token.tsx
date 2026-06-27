@@ -256,6 +256,7 @@ export function useHandlers(network?: CaipNetwork) {
                 const firstBuyFee = Number(buyAmt) > 0 ? await readContract.getFirstBuyFee(ethers.ZeroAddress) : 0n
                 const balance = await readProvider.getBalance(address)
                 const value = ethers.parseEther(buyAmt) + createFeeAmount + firstBuyFee
+                const deadline = Math.floor(Date.now() / 1000) + 3600
                 console.log('[value] buyAmt:', buyAmt, 'createFeeAmount:', createFeeAmount.toString(), 'firstBuyFee:', firstBuyFee.toString())
                 console.log('[createToken] params:', {
                     name: token.name,
@@ -275,7 +276,7 @@ export function useHandlers(network?: CaipNetwork) {
                 if (balance < value)
                     throw Error("Insufficient balance")
                 const tx = await contract.createToken(
-                    token.name, token.symbol, ethers.parseEther(buyAmt), 0n, sig, token.pool, { value }
+                    token.name, token.symbol, ethers.parseEther(buyAmt), 0n, sig, token.pool, deadline, { value }
                 )
                 console.log('[createToken] tx hash:', tx.hash)
                 return tx
@@ -326,19 +327,20 @@ export function useHandlers(network?: CaipNetwork) {
                 // Bonding curve swap
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
                 const firstBuyFee = await readContract.getFirstBuyFee(token)
+                const swapDeadline = Math.floor(Date.now() / 1000) + 1200
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
                     const amountInWithFee = amountInput * 97n / 100n
                     const estimateAmount = amountInWithFee * poolInfo.virtualTokenReserve / (poolInfo.virtualEthReserve + amountInWithFee)
                     const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
-                    const gasLimit = await contract.swapExactETHForTokens.estimateGas(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee })
-                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, { value: amountInput + firstBuyFee, gasLimit })
+                    const gasLimit = await contract.swapExactETHForTokens.estimateGas(token, amountInput, amountOutMin, swapDeadline, { value: amountInput + firstBuyFee })
+                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, swapDeadline, { value: amountInput + firstBuyFee, gasLimit })
                 }
                 const amountOut = ethers.parseEther(amount ?? '0')
                 const amountInWei = amountOut * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve - amountOut) + 1n
                 const estimateAmount = amountInWei * 100n / 97n
                 const amountInMax = estimateAmount * (10000n + slippage) / 10000n
-                return await contract.swapETHForExactTokens(token, amountOut, amountInMax, { value: amountInMax + firstBuyFee })
+                return await contract.swapETHForExactTokens(token, amountOut, amountInMax, swapDeadline, { value: amountInMax + firstBuyFee })
             },
             sellToken: async (token: string, amount: string, slippage: bigint) => {
                 if (!address)
@@ -367,8 +369,9 @@ export function useHandlers(network?: CaipNetwork) {
                 const amountInput = ethers.parseEther(amount ?? '0')
                 const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
                 const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
-                const gasLimit = await contract.swapExactTokensForETH.estimateGas(token, amountInput, amountOutMin)
-                return await contract.swapExactTokensForETH(token, amountInput, amountOutMin, { gasLimit })
+                const swapDeadline = Math.floor(Date.now() / 1000) + 1200
+                const gasLimit = await contract.swapExactTokensForETH.estimateGas(token, amountInput, amountOutMin, swapDeadline)
+                return await contract.swapExactTokensForETH(token, amountInput, amountOutMin, swapDeadline, { gasLimit })
             },
             quoteBuy: async (token: string, amount: string, exactInput?: boolean) => {
                 const poolInfo = await readContract.tokenPools(token).catch(() => undefined)

@@ -21,17 +21,23 @@ const Toggle = styled(Box)<{ inner?: "true" }>`
         text-align: center;
         flex: 1;
         transition: all 0.2s ease;
-        &.active {
-            background: linear-gradient(135deg, #FFA600, #FFD700);
-            color: #0a0a0f;
+        cursor: pointer;
+        &.active[data-tradetype="buy"] {
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(255, 166, 0, 0.2);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        &.active[data-tradetype="sell"] {
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
         &:not(.active):hover {
             color: white;
             background: rgba(255, 255, 255, 0.05);
         }
-        cursor: pointer;
     }
 `
 export default Toggle

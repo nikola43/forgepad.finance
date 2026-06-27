@@ -187,20 +187,24 @@ contract ForgepadLiquidityManager is
     /**
      * @notice Initializes the contract with Uniswap protocol addresses
      * @param _routerV2 Uniswap V2 router address
-     * @param _routerV3 Uniswap V3 position manager address
+     * @param _factoryV3 Uniswap V3 factory address
+     * @param _v3PositionManager Uniswap V3 position manager address
      * @param _poolV4Manager Uniswap V4 pool manager address
      * @param _universalRouter Universal router address for V4 operations
-     * @param _positionManager Position manager for V4 operations
+     * @param _v4PositionManager V4 position manager address
      * @param _permit2 Permit2 contract address for token approvals
      * @param _marginRecipient Recipient address for margin ETH after adding liquidity
      * @param _owner Initial owner of the contract
+     * @param _ethAmountPercentToLP Percent of ETH to use for LP (in basis points)
+     * @param _tokenAmountPercentToLP Percent of tokens to use for LP (in basis points)
      */
     constructor(
         address _routerV2,
-        address _routerV3,
+        address _factoryV3,
+        address _v3PositionManager,
         address _poolV4Manager,
         address _universalRouter,
-        address _positionManager,
+        address _v4PositionManager,
         address _permit2,
         address _marginRecipient,
         address _owner,
@@ -208,18 +212,18 @@ contract ForgepadLiquidityManager is
         uint16 _tokenAmountPercentToLP
     ) Ownable(_owner) {
         if (_routerV2 == address(0)) revert ZeroAddress();
-        if (_routerV3 == address(0)) revert ZeroAddress();
+        if (_factoryV3 == address(0)) revert ZeroAddress();
         if (_poolV4Manager == address(0)) revert ZeroAddress();
         if (_universalRouter == address(0)) revert ZeroAddress();
-        if (_positionManager == address(0)) revert ZeroAddress();
+        if (_v4PositionManager == address(0)) revert ZeroAddress();
         if (_marginRecipient == address(0)) revert ZeroAddress();
 
         routerV2 = IUniswapV2Router02(_routerV2);
-        nonfungiblePositionManager = INonfungiblePositionManager(_routerV3);
-        factoryV3 = IUniswapV3Factory(nonfungiblePositionManager.factory());
+        factoryV3 = IUniswapV3Factory(_factoryV3);
+        nonfungiblePositionManager = INonfungiblePositionManager(_v3PositionManager);
         poolV4Manager = IPoolManager(_poolV4Manager);
         universalRouter = _universalRouter;
-        positionManager = IPositionManager(_positionManager);
+        positionManager = IPositionManager(_v4PositionManager);
         permit2 = IPermit2(_permit2);
         marginRecipient = _marginRecipient;
         ethAmountPercentToLP = _ethAmountPercentToLP;
@@ -396,7 +400,7 @@ contract ForgepadLiquidityManager is
         require(totalSupply > 0, "Total supply must be positive");
 
         // Calculate the required ratio: ethReserve / tokenReserve = targetMarketCap / (totalSupply * ethPriceUSD)
-        // To maintain precision, we calculate: tokenToAdd = ethToAdd * totalSupply * ethPriceUSD / targetMarketCap
+        // tokenToAdd = ethToAdd * totalSupply * ethPriceUSD / targetMarketCap / 1e18
 
         // Calculate optimal amounts maintaining the target market cap
         uint256 ethAmountToLP;

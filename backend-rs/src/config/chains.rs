@@ -28,26 +28,54 @@ fn load_abi() -> serde_json::Value {
 pub fn default_chains() -> Vec<ChainConfig> {
     let abi = load_abi();
 
-    vec![ChainConfig {
-        name: "Ethereum".to_string(),
-        network: "mainnet".to_string(),
-        chain_id: std::env::var("CHAIN_ID")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1),
-        currency: "ETH".to_string(),
-        rpc_url: std::env::var("ETH_PUBLIC_RPC_URL")
-            .or_else(|_| std::env::var("ETH_RPC_URL"))
-            .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string()),
-        ws_url: Some(std::env::var("ETH_WS_URL")
-            .unwrap_or_else(|_| "ws://127.0.0.1:8545".to_string())),
-        explorer_url: "https://etherscan.io".to_string(),
-        contract_address: "0x9b9535f3bc5F3Fe1D525a0dc372eF4cC29d7a86d".to_string(),
-        abi,
-        virtual_eth_amount: 2.5,
-        virtual_token_amount: 1_073_000_000.0,
-        total_supply: 1_000_000_000.0,
-        target_market_cap: 69_000.0,
-        pools: vec!["uniswap:v2".to_string()],
-    }]
+    vec![
+        ChainConfig {
+            name: "Ethereum".to_string(),
+            network: "mainnet".to_string(),
+            chain_id: std::env::var("CHAIN_ID")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1),
+            currency: "ETH".to_string(),
+            rpc_url: std::env::var("ETH_PUBLIC_RPC_URL")
+                .or_else(|_| std::env::var("ETH_RPC_URL"))
+                .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string()),
+            ws_url: Some(
+                std::env::var("ETH_WS_URL")
+                    .unwrap_or_else(|_| "ws://127.0.0.1:8545".to_string()),
+            ),
+            explorer_url: "https://etherscan.io".to_string(),
+            contract_address: "0x9b9535f3bc5F3Fe1D525a0dc372eF4cC29d7a86d".to_string(),
+            abi: abi.clone(),
+            virtual_eth_amount: 2.5,
+            virtual_token_amount: 1_073_000_000.0,
+            total_supply: 1_000_000_000.0,
+            target_market_cap: 10_000.0,
+            pools: vec!["uniswap:v2".to_string()],
+        },
+        ChainConfig {
+            name: "Sepolia".to_string(),
+            network: "sepolia".to_string(),
+            chain_id: std::env::var("SEPOLIA_CHAIN_ID")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(11155111),
+            currency: "ETH".to_string(),
+            rpc_url: std::env::var("SEPOLIA_PUBLIC_RPC_URL")
+                .or_else(|_| std::env::var("SEPOLIA_RPC_URL"))
+                .unwrap_or_else(|_| "https://ethereum-sepolia-rpc.publicnode.com".to_string()),
+            ws_url: Some(
+                std::env::var("SEPOLIA_WS_URL")
+                    .unwrap_or_else(|_| "wss://ethereum-sepolia-rpc.publicnode.com".to_string()),
+            ),
+            explorer_url: "https://sepolia.etherscan.io".to_string(),
+            contract_address: "0x9d5e3991AaA43Fc544Ddd4931F72F9C413f63628".to_string(),
+            abi,
+            virtual_eth_amount: 2.5,
+            virtual_token_amount: 1_073_000_000.0,
+            total_supply: 1_000_000_000.0,
+            target_market_cap: 10_000.0,
+            pools: vec!["uniswap:v2".to_string()],
+        },
+    ]
 }

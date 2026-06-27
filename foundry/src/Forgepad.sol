@@ -40,7 +40,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
     uint256 public constant PUMP_FUN_TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
+    // uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
+    uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 10_000 * 1e18; // Graduation at ~$10K virtual MCAP
     uint256 public constant PUMP_FUN_VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
     uint256 public constant PUMP_FUN_VIRTUAL_TOKEN_INITIAL =
         1_073_000_000 * 1e18; // Virtual tokens for pricing curve
@@ -218,16 +219,19 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 buyAmount,
         uint256 minAmountOut,
         uint32 sig,
-        uint8 poolType
+        uint8 poolType,
+        uint256 deadline
     ) external payable whenNotPaused nonReentrant returns (address) {
-        uint256 firstBuyFee = buyAmount > 0 ? getFirstBuyFee(address(0)) : 0;
-        require(
-            msg.value >= buyAmount + firstBuyFee + CREATE_TOKEN_FEE_AMOUNT,
-            "Insufficient ETH value"
-        );
+        require(deadline >= block.timestamp, "Swap expired");
 
         address newToken = address(
             new Token(name, symbol, PUMP_FUN_TOTAL_SUPPLY)
+        );
+
+        uint256 firstBuyFee = buyAmount > 0 ? getFirstBuyFee(newToken) : 0;
+        require(
+            msg.value >= buyAmount + firstBuyFee + CREATE_TOKEN_FEE_AMOUNT,
+            "Insufficient ETH value"
         );
 
         // Initialize exactly like Pump.fun: virtual curve + real reserves
@@ -448,8 +452,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function swapExactETHForTokens(
         address token,
         uint256 buyAmount,
-        uint256 minAmountOut
+        uint256 minAmountOut,
+        uint256 deadline
     ) public payable whenNotPaused nonReentrant {
+        require(deadline >= block.timestamp, "Swap expired");
         require(tokenPools[token].token != address(0), "Pool does not exist");
         uint256 maxBuy = _mul(
             tokenPools[token].virtualEthReserve,
@@ -473,8 +479,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function swapETHForExactTokens(
         address token,
         uint256 buyAmount,
-        uint256 maxAmountIn
+        uint256 maxAmountIn,
+        uint256 deadline
     ) public payable whenNotPaused nonReentrant {
+        require(deadline >= block.timestamp, "Swap expired");
         require(tokenPools[token].token != address(0), "Pool does not exist");
         uint256 maxBuy = _mul(
             tokenPools[token].virtualTokenReserve,
@@ -505,8 +513,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function swapExactTokensForETH(
         address token,
         uint256 sellAmount,
-        uint256 minAmountOut
+        uint256 minAmountOut,
+        uint256 deadline
     ) public whenNotPaused nonReentrant {
+        require(deadline >= block.timestamp, "Swap expired");
         require(tokenPools[token].token != address(0), "Pool does not exist");
         uint256 maxSell = _mul(
             tokenPools[token].virtualTokenReserve,
@@ -521,7 +531,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function getETHPriceByUSD() public view returns (uint256) {
         (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
         require(price > 0, "Invalid price");
-        // require(block.timestamp - updatedAt <= 3600, "Stale price feed");
+        require(block.timestamp - updatedAt <= 3600, "Stale price feed");
         return uint256(price) * 1e10; // Normalize to 18 decimals
     }
 
@@ -579,8 +589,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             return;
         }
 
-        ILaunchable(token).launch();
         pool.launched = true;
+        ILaunchable(token).launch();
 
         uint256 totalFeesToReserve = tokenOwnerLPFee + platformLPFee;
         uint256 ethAmountForLP = pool.ethReserve > totalFeesToReserve
@@ -632,7 +642,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
                 tokenAmount,
                 ethAmount,
                 burnAddress,
-                PUMP_FUN_TARGET_MARKET_CAP_USD * 1 ether, // Pass as wei for compatibility
+                PUMP_FUN_TARGET_MARKET_CAP_USD,
                 getETHPriceByUSD()
             );
         } else if (pool.poolType == 2) {

@@ -631,8 +631,19 @@ const SwapContent = ({
                         ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading || !!error || !amountIn} onClick={approveHandler}>
                             Approve {isLoading && <CircularProgress size={18} style={{ color: "black", marginLeft: "1em" }} />}
                         </Button>
-                        : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
-                            {isLoading ? <CircularProgress size={20} style={{ color: "black" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
+                        : <Button fullWidth sx={{
+                            borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                            background: tradeType === "buy"
+                                ? 'linear-gradient(135deg, #10B981, #059669)'
+                                : 'linear-gradient(135deg, #EF4444, #DC2626)',
+                            '&:hover': {
+                                background: tradeType === "buy"
+                                    ? 'linear-gradient(135deg, #059669, #047857)'
+                                    : 'linear-gradient(135deg, #DC2626, #B91C1C)',
+                            }
+                        }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
+                            {isLoading ? <CircularProgress size={20} style={{ color: "white" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
                         </Button>
                 : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.open()}>
                     Connect Wallet
@@ -1607,8 +1618,8 @@ export default function Token() {
                                         </Box>
                                     )}
                                     <Toggle style={{ width: "inherit" }}>
-                                        <div className={tradeType === "buy" ? "active" : ""} onClick={() => setTradeType("buy")}>Buy</div>
-                                        <div className={tradeType === "sell" ? "active" : ""} onClick={() => setTradeType("sell")}>Sell</div>
+                                        <div className={tradeType === "buy" ? "active" : ""} data-tradetype="buy" onClick={() => setTradeType("buy")}>Buy</div>
+                                        <div className={tradeType === "sell" ? "active" : ""} data-tradetype="sell" onClick={() => setTradeType("sell")}>Sell</div>
                                     </Toggle>
                                     <SwapContent
                                         amountIn={amountIn}

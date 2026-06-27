@@ -181,8 +181,12 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                 }).catch(() => { })
         },
         getBars: (symbolInfo: any, resolution: any, periodParams: any, onHistoryCallback: any, onErrorCallback: any) => {
-            const { from, to, firstDataRequest, countBack } = periodParams;
-            if (from > 0) {
+            try {
+                const { from, to, firstDataRequest, countBack } = periodParams || {};
+                if (!from || from <= 0 || !to || to <= 0) {
+                    onHistoryCallback([], { noData: true });
+                    return;
+                }
                 fetchChartData(symbolInfo.network, {
                     tokenAddress: symbolInfo.address,
                     interval: resolution,
@@ -191,7 +195,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                     countBack,
                     ...(firstDataRequest ? { first: 1 } : {}),
                     dex: symbolInfo.dex
-                }).then((data) => {
+                }).then((data: any) => {
                     if (data === 'nodata' || !Array.isArray(data) || data.length === 0) {
                         onHistoryCallback([], { noData: true })
                     } else {
@@ -201,9 +205,11 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                         }
                         onHistoryCallback(bars, { noData: false })
                     }
-                }).catch(ex => {
+                }).catch((ex: any) => {
                     onErrorCallback(ex)
                 })
+            } catch (ex) {
+                onErrorCallback(ex)
             }
         },
         subscribeBars: (

@@ -233,6 +233,10 @@ pub async fn get_chart_data(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ChartDataQuery>,
 ) -> AppResult<Json<Vec<Candle>>> {
+    eprintln!(
+        "CHART_REQ: token={}, interval={}, from={}, to={}, count_back={:?}, first={:?}",
+        params.token_address, params.interval, params.from, params.to, params.count_back, params.first,
+    );
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     // Parse resolution from interval string (e.g. "5m", "1d", "1w")
@@ -246,10 +250,19 @@ pub async fn get_chart_data(
         .optional()?
         .ok_or_else(|| AppError::NotFound("Token not found".to_string()))?;
 
-    // Query all trades for the token in [from, to] range, ordered by traded_at ASC
+    // When count_back is provided, widen the query range so we have enough data
+    // to build candles. Otherwise use the client-provided [from, to].
+    let query_from = if let Some(cb) = params.count_back {
+        let lookback = (cb as i64).max(1) * resolution;
+        (params.to - lookback).min(params.from)
+    } else {
+        params.from
+    };
+
+    // Query trades for the token in the calculated range, ordered ASC
     let trade_rows: Vec<Trade> = trades::table
         .filter(trades::token_id.eq(token.id))
-        .filter(trades::traded_at.ge(params.from))
+        .filter(trades::traded_at.ge(query_from))
         .filter(trades::traded_at.le(params.to))
         .order(trades::traded_at.asc())
         .load(&mut conn)
@@ -273,21 +286,42 @@ pub async fn get_chart_data(
         return Ok(Json(vec![]));
     }
 
+    // Determine candle range
+    // When count_back is provided, generate that many candles ending at the last trade
+    // Otherwise, generate from first trade bucket to params.to (capped at MAX_CANDLES)
+    let first_trade_ts = trade_rows[0].traded_at;
+    let last_trade_ts = trade_rows[trade_rows.len() - 1].traded_at;
+    let first_bucket = (first_trade_ts / resolution) * resolution;
+    let last_bucket = (last_trade_ts / resolution) * resolution;
+
+    let max_candles = params
+        .count_back
+        .map(|c| (c as usize).min(2000))
+        .unwrap_or(2000);
+
+    let start_bucket = if params.count_back.is_some() {
+        let candidate = last_bucket - (max_candles as i64 - 1) * resolution;
+        candidate.max(first_bucket)
+    } else {
+        first_bucket
+    };
+
+    let end_bucket = if params.count_back.is_some() {
+        last_bucket
+    } else {
+        (params.to / resolution) * resolution
+    };
+
     // Build OHLCV candles by grouping trades into time buckets
     let mut candles: Vec<Candle> = Vec::new();
-    let bucket_start = (trade_rows[0].traded_at / resolution) * resolution;
     let mut prev_close: f64 = trade_rows[0]
         .token_price
         .to_f64()
         .unwrap_or(0.0);
 
-    // Walk through every bucket from the first trade to params.to
-    let final_bucket = (params.to / resolution) * resolution;
     let mut trade_idx: usize = 0;
-
-    const MAX_CANDLES: usize = 2000;
-    let mut current = bucket_start;
-    while current <= final_bucket && candles.len() < MAX_CANDLES {
+    let mut current = start_bucket;
+    while current <= end_bucket && candles.len() < max_candles {
         let bucket_end = current + resolution;
 
         // Collect trades in this bucket

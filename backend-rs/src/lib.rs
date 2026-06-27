@@ -52,7 +52,7 @@ impl AppState {
         let upload_dir = std::env::var("UPLOAD_DIR")
             .unwrap_or_else(|_| "./uploads".to_string());
         let upload_base_url = std::env::var("UPLOAD_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:5000/uploads".to_string());
+            .unwrap_or_else(|_| "http://localhost:5001/uploads".to_string());
 
         // Ensure upload directory exists
         std::fs::create_dir_all(&upload_dir).ok();

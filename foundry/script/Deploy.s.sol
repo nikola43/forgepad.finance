@@ -10,6 +10,8 @@ import "../src/MockPriceFeed.sol";
 contract DeployForgepad is Script {
     // Uniswap V2 Router on Ethereum
     address constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    // Uniswap V3 Factory on Ethereum
+    address constant V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     // Uniswap V3 Position Manager on Ethereum
     address constant V3_POS_MGR = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
     // Uniswap V4 Pool Manager on Ethereum
@@ -46,6 +48,7 @@ contract DeployForgepad is Script {
 
         ForgepadLiquidityManager liquidityManager = new ForgepadLiquidityManager(
             UNISWAP_V2_ROUTER,
+            V3_FACTORY,
             V3_POS_MGR,
             V4_POOL_MGR,
             UNIVERSAL_ROUTER,

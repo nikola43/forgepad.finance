@@ -1,24 +1,22 @@
 import useSWR from "swr";
 import { BrowserProvider, ethers } from "ethers";
 import { type Provider as EVMProvider, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
-import { API_ENDPOINT, isDevEnv } from "@/config";
+import { API_ENDPOINT } from "@/config";
 import axios from "axios";
 import { useEffect, useRef } from "react";
 
-const LOCAL_RPC = "http://127.0.0.1:8545";
-
 export function useUserInfo() {
     const { address } = useAppKitAccount()
+    const { walletProvider } = useAppKitProvider<EVMProvider>("eip155")
 
     const { data: userInfo, mutate } = useSWR(
       address ? '/info/user' : undefined,
       async () => {
         if (!address) return { balance: 0 } as any
         try {
-          // In dev mode, query local Anvil directly; in prod, use wallet's provider
-          const provider = isDevEnv
-            ? new ethers.JsonRpcProvider(LOCAL_RPC)
-            : new ethers.BrowserProvider((window as any).ethereum)
+          const provider = walletProvider
+            ? new ethers.BrowserProvider(walletProvider)
+            : new ethers.JsonRpcProvider("https://ethereum-sepolia-rpc.publicnode.com")
           const balanceWei = await provider.getBalance(address)
           const balanceInEther = ethers.formatEther(balanceWei)
           return {

@@ -22,29 +22,14 @@ import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
 import {
   solana,
   bitcoin,
-  defineChain,
-  mainnet,
+  sepolia,
   base,
   bsc,
-  localhost,
 } from "@reown/appkit/networks";
-import { projectId, isDevEnv } from "@/config";
+import { projectId } from "@/config";
 import { WagmiProvider } from "wagmi";
 
-// In dev mode, override to use local Ethereum fork
-const ethNetwork = isDevEnv
-  ? defineChain({
-      id: 31337,
-      caipNetworkId: "eip155:31337",
-      chainNamespace: "eip155",
-      name: "Localhost",
-      nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-      rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
-      blockExplorers: {
-        default: { name: "Etherscan", url: "https://etherscan.io" },
-      },
-    })
-  : mainnet;
+const ethNetwork = sepolia;
 
 const theme = createTheme({
   palette: {
