@@ -50,6 +50,18 @@ services:
       timeout: 5s
       retries: 20
 
+  contract-deployer:
+    build:
+      context: ./foundry
+      dockerfile: Dockerfile
+    environment:
+      PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    depends_on:
+      anvil:
+        condition: service_healthy
+    profiles:
+      - deploy
+
   backend:
     build:
       context: ./backend-rs
@@ -66,6 +78,7 @@ services:
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: http://localhost:5001/uploads
+      RUST_LOG: info,forgepad_backend=debug
     ports:
       - "5001:5001"
     volumes:
@@ -84,6 +97,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
+        NEXT_PUBLIC_LOCAL_MODE: "true"
     ports:
       - "3000:80"
     depends_on:
