@@ -233,10 +233,6 @@ pub async fn get_chart_data(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ChartDataQuery>,
 ) -> AppResult<Json<Vec<Candle>>> {
-    eprintln!(
-        "CHART_REQ: token={}, interval={}, from={}, to={}, count_back={:?}, first={:?}",
-        params.token_address, params.interval, params.from, params.to, params.count_back, params.first,
-    );
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     // Parse resolution from interval string (e.g. "5m", "1d", "1w")

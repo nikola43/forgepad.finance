@@ -6,7 +6,10 @@ import NextLink from "next/link";
 export function getProfilePic(user: any, address?: string) {
     if (user?.avatar === "bondingCurv") return "/favicon.ico"
     if (user?.twitter_profile_picture) return user.twitter_profile_picture
-    if (user?.avatar) return `${FILE_ENDPOINT}/${user.avatar}`
+    if (user?.avatar) {
+        if (user.avatar.startsWith("http")) return user.avatar
+        return `${FILE_ENDPOINT}/${user.avatar}`
+    }
     const seed = (user?.address ?? address ?? '0x0').slice(2, 12)
     return `https://api.dicebear.com/9.x/identicon/svg?seed=${seed}&backgroundColor=1a1a2e`
 }

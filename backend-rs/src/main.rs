@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     let api_key = std::env::var("API_KEY").unwrap_or_else(|_| "default-api-key".to_string());
 
     // Create app state
-    let state = AppState::new(db_pool, redis_client, chain_configs.clone(), api_key);
+    let state = AppState::new(db_pool, redis_client, chain_configs.clone(), api_key).await;
 
     // Spawn blockchain listeners
     for chain in chain_configs {

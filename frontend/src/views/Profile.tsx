@@ -216,7 +216,7 @@ export default function Profile() {
             const msg = `Update profile\n${connectedAddress}\n${Date.now()}`
             const signature = await signer.signMessage(msg)
             await axios.post(`${API_ENDPOINT}/users/update`, {
-                user: { username: editUsername, bio: editBio, avatar: user?.avatar ?? '' },
+                user: { username: editUsername, bio: editBio, avatar: user?.avatar || null },
                 signature,
                 msg
             })

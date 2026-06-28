@@ -776,11 +776,24 @@ pub async fn upload_avatar(
 
     let ext = original_name.rsplit('.').next().unwrap_or("png");
     let filename = format!("avatar-{}.{}", uuid::Uuid::new_v4(), ext);
-    let filepath = format!("{}/{}", state.upload_dir, filename);
 
-    tokio::fs::write(&filepath, &data)
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to save file: {e}")))?;
+    let public_url = if let Some(ref s3) = state.s3_client {
+        s3.put_object()
+            .bucket(&state.s3_bucket)
+            .key(&filename)
+            .body(data.clone().into())
+            .content_type(&_content_type)
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("S3 upload failed: {e}")))?;
+        format!("{}/{}", state.s3_public_url, filename)
+    } else {
+        let filepath = format!("{}/{}", state.upload_dir, filename);
+        tokio::fs::write(&filepath, &data)
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to save file: {e}")))?;
+        format!("{}/{}", state.upload_base_url, filename)
+    };
 
     // Update user avatar in database
     let mut conn = state
@@ -798,7 +811,7 @@ pub async fn upload_avatar(
     let user = match user {
         Some(u) => {
             diesel::update(users::table.find(u.id))
-                .set(users::avatar.eq(&filename))
+                .set(users::avatar.eq(&public_url))
                 .execute(&mut conn)
                 .await?;
             users::table.find(u.id).first::<User>(&mut conn).await?
@@ -807,7 +820,7 @@ pub async fn upload_avatar(
             let new_user = NewUser {
                 address: &recovered,
                 username: None,
-                avatar: Some(&filename),
+                avatar: Some(&public_url),
                 bio: None,
             };
             diesel::insert_into(users::table)
@@ -819,7 +832,7 @@ pub async fn upload_avatar(
     };
 
     Ok(Json(serde_json::json!({
-        "avatar": filename,
+        "avatar": public_url,
         "user": UserResponse::from(user),
     })))
 }

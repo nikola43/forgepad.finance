@@ -52,6 +52,7 @@ const getLanguageFromURL = (): LanguageCode | null => {
 
 const lastBarsCache = new Map()
 const channelToSubscription = new Map()
+const chartDataCache = new Map()
 
 // function getSeconds(resolution: ResolutionString) {
 //     const RESOLUTIONS: any = {
@@ -100,7 +101,7 @@ const fetchChartData = async (network: string, params: any) => {
             const response = await axios.get(`${JUPITER_BASE_URL}/v2/charts/${tokenAddress}`, {
                 params: {
                     baseAsset: tokenAddress,
-                    from: from * 1000, // Convert to milliseconds
+                    from: from * 1000,
                     to: to * 1000,
                     interval: jupiterInterval,
                     candles: countBack || 100,
@@ -112,12 +113,29 @@ const fetchChartData = async (network: string, params: any) => {
                 return response.data.candles;
             }
         } else {
-            const { data } = await axios.get(`${API_ENDPOINT}/trades/getChartData`, { params })
-            return data
+            const cacheKey = `${params.tokenAddress}_${params.interval}`;
+            if (!chartDataCache.has(cacheKey)) {
+                const { data } = await axios.get(`${API_ENDPOINT}/trades/getChartData`, {
+                    params: {
+                        tokenAddress: params.tokenAddress,
+                        interval: params.interval,
+                        from: 0,
+                        to: Math.floor(Date.now() / 1000) + 86400,
+                        countBack: 10000
+                    }
+                });
+                if (Array.isArray(data) && data.length > 0) {
+                    chartDataCache.set(cacheKey, data);
+                }
+            }
+            const cached = chartDataCache.get(cacheKey);
+            if (cached) {
+                return cached.filter((d: any) => d.time >= params.from && d.time <= params.to);
+            }
         }
         return 'nodata';
     } catch (error) {
-        console.error('Error fetching Solana chart data:', error);
+        console.error('Error fetching chart data:', error);
         return 'nodata';
     }
 }

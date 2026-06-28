@@ -78,6 +78,12 @@ services:
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: http://localhost:5001/uploads
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: forgepad
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_REGION: us-east-1
+      S3_PUBLIC_URL: http://localhost:9000/forgepad
       RUST_LOG: info,forgepad_backend=debug
     ports:
       - "5001:5001"
@@ -90,6 +96,37 @@ services:
         condition: service_healthy
       anvil:
         condition: service_healthy
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb local/forgepad --ignore-existing &&
+      mc anonymous set public local/forgepad &&
+      echo 'Bucket forgepad created and public' &&
+      exit 0
+      "
 
   frontend:
     build:
@@ -106,3 +143,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  minio_data:
