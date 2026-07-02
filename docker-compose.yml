@@ -33,10 +33,10 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/forgepad
       REDIS_URL: redis://redis:6379
-      ETH_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
-      ETH_PUBLIC_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
-      ETH_WS_URL: wss://ethereum-sepolia-rpc.publicnode.com
-      CHAIN_ID: "11155111"
+      ROBINHOOD_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+      ROBINHOOD_PUBLIC_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+      ROBINHOOD_WS_URL: ${ROBINHOOD_WS_URL:-wss://rpc.mainnet.chain.robinhood.com}
+      CHAIN_ID: "4663"
       PORT: "5001"
       CORS_ORIGINS: "http://localhost:3000,http://localhost:8080"
       API_KEY: hola

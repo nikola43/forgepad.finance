@@ -16,7 +16,7 @@ export function useUserInfo() {
         try {
           const provider = walletProvider
             ? new ethers.BrowserProvider(walletProvider)
-            : new ethers.JsonRpcProvider("https://ethereum-sepolia-rpc.publicnode.com")
+            : new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com")
           const balanceWei = await provider.getBalance(address)
           const balanceInEther = ethers.formatEther(balanceWei)
           return {
@@ -72,7 +72,7 @@ export function useAccount() {
             try {
                 const provider = new BrowserProvider(walletProvider)
                 const signer = await provider.getSigner()
-                const msg = `Register on Forgepad\n${address}\n${Date.now()}`
+                const msg = `Register on Arrowpad\n${address}\n${Date.now()}`
                 const signature = await signer.signMessage(msg)
                 await axios.post(`${API_ENDPOINT}/users`, {
                     user: { username: '', bio: '', avatar: '' },

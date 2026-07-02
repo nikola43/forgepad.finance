@@ -89,11 +89,11 @@ export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle
                                     borderRadius: '10px',
                                     justifyContent: open ? 'initial' : 'center',
                                     color: active ? '#0a0a0f' : 'rgba(255,255,255,0.8)',
-                                    background: active ? 'linear-gradient(135deg, #d1ff1a, #e4ff66)' : 'transparent',
+                                    background: active ? 'linear-gradient(135deg, #D3FF24, #e4ff66)' : 'transparent',
                                     fontWeight: active ? 700 : 500,
                                     '&:hover': {
                                         background: active
-                                            ? 'linear-gradient(135deg, #d1ff1a, #e4ff66)'
+                                            ? 'linear-gradient(135deg, #D3FF24, #e4ff66)'
                                             : 'rgba(209,255,26,0.1)',
                                         color: active ? '#0a0a0f' : '#e4ff66',
                                     },

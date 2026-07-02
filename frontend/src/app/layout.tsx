@@ -5,9 +5,9 @@ import MainLayout from "@/components/layout"
 import '@/assets/globals.css'
 
 export const metadata: Metadata = {
-  title: "ForgePad",
-  description: "Forge Pad Finance",
-  icons: ['/favicon.ico']
+  title: "ArrowPad",
+  description: "ArrowPad Finance",
+  icons: ['/favicon.png']
 };
 
 export default async function RootLayout({

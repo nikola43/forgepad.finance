@@ -6,30 +6,38 @@ import "forge-std/console.sol";
 import "../src/Arrowpad.sol";
 import "../src/ArrowpadLiquidityManager.sol";
 
-/// @notice Deploys Arrowpad + ArrowpadLiquidityManager to Sepolia with V2, V3 and
-///         V4 all enabled. The DEX version is chosen per token via createToken's
+/// @notice Deploys Arrowpad + ArrowpadLiquidityManager to Robinhood Chain
+///         (Arbitrum Orbit L2, chainId 4663, ETH gas token) with V2, V3 and V4
+///         all enabled. DEX version is chosen per token via createToken's
 ///         `poolType` argument: 1 = Uniswap V2, 2 = Uniswap V3, 3 = Uniswap V4.
-contract DeployArrowpadSepolia is Script {
-    // ---- Uniswap V2 (Sepolia) ----
-    address constant V2_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
+///
+/// Run against a fork:
+///   anvil --fork-url https://rpc.mainnet.chain.robinhood.com &
+///   PRIVATE_KEY=0x... forge script script/DeployRobinhood.s.sol \
+///     --rpc-url http://127.0.0.1:8545 --broadcast
+contract DeployArrowpadRobinhood is Script {
+    // ---- Uniswap V2 (Robinhood) ----
+    address constant V2_ROUTER = 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba;
 
-    // ---- Uniswap V3 (Sepolia) ----
-    address constant V3_FACTORY = 0x0227628f3F023bb0B980b67D528571c95c6DaC1c;
+    // ---- Uniswap V3 (Robinhood) ----
+    address constant V3_FACTORY = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
     address constant V3_POSITION_MANAGER =
-        0x1238536071E1c677A632429e3655c799b22cDA52;
+        0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3;
 
-    // ---- Uniswap V4 (Sepolia) ----
+    // ---- Uniswap V4 (Robinhood) ----
     address constant V4_POOL_MANAGER =
-        0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;
+        0x8366a39CC670B4001A1121B8F6A443A643e40951;
     address constant V4_POSITION_MANAGER =
-        0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4;
+        0x58daec3116aae6D93017bAAea7749052E8a04fA7;
     address constant UNIVERSAL_ROUTER =
-        0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b;
+        0x8876789976dEcBfCbBbe364623C63652db8C0904;
 
     // ---- Shared ----
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
-    // Chainlink ETH/USD (Sepolia, 8 decimals)
-    address constant DATA_FEED = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
+    // Chainlink ETH/USD (Robinhood, 8 decimals)
+    address constant DATA_FEED = 0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9;
+    // Distributor (receives distributor role on Arrowpad)
+    address constant DISTRIBUTOR = 0x5941B12F8a511811a06133F7b2f56484faD60F1d;
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -61,7 +69,7 @@ contract DeployArrowpadSepolia is Script {
             DATA_FEED,
             address(lm),
             deployer, // _feeAddress
-            deployer // _distributorAddress
+            DISTRIBUTOR // _distributorAddress
         );
         console.log("Arrowpad:", address(arrowpad));
 
@@ -78,7 +86,7 @@ contract DeployArrowpadSepolia is Script {
 
         console.log("");
         console.log("=================================================");
-        console.log("SEPOLIA DEPLOYMENT COMPLETE (V2 + V3 + V4 enabled)");
+        console.log("ROBINHOOD DEPLOYMENT COMPLETE (V2 + V3 + V4 enabled)");
         console.log("=================================================");
         console.log("Arrowpad:         ", address(arrowpad));
         console.log("LiquidityManager: ", address(lm));

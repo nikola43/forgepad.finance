@@ -127,7 +127,7 @@ const KingSparkline = ({ address, network }: { address: string, network: string 
     ])
     const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
     const area = `${line} L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`
-    const stroke = '#d1ff1a'
+    const stroke = '#D3FF24'
     return (
         <Box sx={{ flex: '0 0 auto', display: { xs: 'none', md: 'block' }, width: w, pointerEvents: 'none' }}>
             <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible', display: 'block' }}>
@@ -214,7 +214,7 @@ const KingProgress = styled('div')<{ value: number }>`
         display: block;
         height: 100%;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(90deg, #D3FF24, #e4ff66);
         box-shadow: 0 0 8px rgba(209, 255, 26, 0.4);
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -370,7 +370,7 @@ export default function Home() {
                     <span style={{ fontWeight: 600 }}>Buy successful</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                        <a style={{ textDecoration: 'none', color: '#d1ff1a', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
+                        <a style={{ textDecoration: 'none', color: '#D3FF24', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
                     </div>
                 </div>,
                 { duration: 8000 }
@@ -638,7 +638,7 @@ export default function Home() {
                             border: '1px solid rgba(196,239,14,0.15)',
                         }}>
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#c4ef0e', boxShadow: '0 0 8px #c4ef0e', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                            <Typography fontSize={11} color="#d1ff1a" fontWeight={600}>
+                            <Typography fontSize={11} color="#D3FF24" fontWeight={600}>
                                 Progress &gt; 70%
                             </Typography>
                         </Box>
@@ -687,7 +687,7 @@ export default function Home() {
 
             {/* All Tokens Section Header with Sort/Filter */}
             <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center" flexWrap="wrap">
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#d1ff1a', boxShadow: '0 0 8px #d1ff1a' }} />
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#D3FF24', boxShadow: '0 0 8px #D3FF24' }} />
                 <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
                     All Tokens
                 </Typography>

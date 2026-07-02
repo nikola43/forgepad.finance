@@ -22,3 +22,4 @@ runs = 256
 bsc = "https://bsc-rpc.publicnode.com"
 bsc_backup = "https://bsc-dataseed1.defibit.io"
 sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+robinhood = "https://rpc.mainnet.chain.robinhood.com"

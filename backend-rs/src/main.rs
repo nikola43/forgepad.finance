@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    tracing::info!("Starting Forgepad backend...");
+    tracing::info!("Starting Arrowpad backend...");
 
     // Database pool (supports both DATABASE_URL and SUPABASE_URL)
     let database_url = std::env::var("DATABASE_URL")

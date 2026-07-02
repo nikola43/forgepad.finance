@@ -27,13 +27,13 @@ import "./v4-periphery/interfaces/IPositionManager.sol";
 import "./permit2/interfaces/IPermit2.sol";
 
 /**
- * @title ForgepadLiquidityManager
- * @author Forgepad Protocol
+ * @title ArrowpadLiquidityManager
+ * @author Arrowpad Protocol
  * @notice A comprehensive liquidity management contract supporting Uniswap V2, V3, and V4
  * @dev This contract allows users to add liquidity to different versions of Uniswap protocols
  *      while maintaining security through reentrancy protection
  */
-contract ForgepadLiquidityManager is
+contract ArrowpadLiquidityManager is
     ReentrancyGuard,
     Ownable,
     Pausable,

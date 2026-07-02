@@ -10,7 +10,7 @@ import {
     SafeERC20,
     IERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IForgepadLiquidityManager} from "./IForgepadLiquidityManager.sol";
+import {IArrowpadLiquidityManager} from "./IArrowpadLiquidityManager.sol";
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -20,7 +20,7 @@ interface ILaunchable {
     function launch() external;
 }
 
-interface IForgepad {
+interface IArrowpad {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;
@@ -35,7 +35,7 @@ interface IForgepad {
     function tokenPools(address) external view returns (PoolInfo memory);
 }
 
-contract Forgepad is ReentrancyGuard, Ownable, Pausable {
+contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
@@ -57,7 +57,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== STATE VARIABLES ====================
-    IForgepadLiquidityManager public liquidityManager;
+    IArrowpadLiquidityManager public liquidityManager;
     AggregatorV3Interface internal priceFeed;
 
     mapping(address => PoolInfo) public tokenPools;
@@ -159,7 +159,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         );
 
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
-        liquidityManager = IForgepadLiquidityManager(_liquidityManagerAddress);
+        liquidityManager = IArrowpadLiquidityManager(_liquidityManagerAddress);
         feeAddress = _feeAddress;
         distributorAddress = _distributorAddress;
     }
@@ -793,7 +793,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             block.timestamp >= liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
             "Timelock not expired"
         );
-        liquidityManager = IForgepadLiquidityManager(pendingLiquidityManager);
+        liquidityManager = IArrowpadLiquidityManager(pendingLiquidityManager);
         emit LiquidityManagerChanged(pendingLiquidityManager);
         pendingLiquidityManager = address(0);
         liquidityManagerChangeTime = 0;

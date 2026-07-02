@@ -21,8 +21,8 @@ pub struct ChainConfig {
 }
 
 fn load_abi() -> serde_json::Value {
-    let abi_str = include_str!("ForgepadV1.json");
-    serde_json::from_str(abi_str).expect("Failed to parse ForgepadV1.json ABI")
+    let abi_str = include_str!("ArrowpadV1.json");
+    serde_json::from_str(abi_str).expect("Failed to parse ArrowpadV1.json ABI")
 }
 
 pub fn default_chains() -> Vec<ChainConfig> {
@@ -30,26 +30,27 @@ pub fn default_chains() -> Vec<ChainConfig> {
 
     vec![
         ChainConfig {
-            name: "Sepolia".to_string(),
-            network: "sepolia".to_string(),
+            name: "Robinhood".to_string(),
+            network: "robinhood".to_string(),
             chain_id: std::env::var("CHAIN_ID")
-                .or_else(|_| std::env::var("SEPOLIA_CHAIN_ID"))
+                .or_else(|_| std::env::var("ROBINHOOD_CHAIN_ID"))
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(11155111),
+                .unwrap_or(4663),
             currency: "ETH".to_string(),
-            rpc_url: std::env::var("SEPOLIA_PUBLIC_RPC_URL")
-                .or_else(|_| std::env::var("SEPOLIA_RPC_URL"))
+            rpc_url: std::env::var("ROBINHOOD_PUBLIC_RPC_URL")
+                .or_else(|_| std::env::var("ROBINHOOD_RPC_URL"))
                 .or_else(|_| std::env::var("ETH_PUBLIC_RPC_URL"))
                 .or_else(|_| std::env::var("ETH_RPC_URL"))
-                .unwrap_or_else(|_| "https://ethereum-sepolia-rpc.publicnode.com".to_string()),
+                .unwrap_or_else(|_| "https://rpc.mainnet.chain.robinhood.com".to_string()),
             ws_url: Some(
-                std::env::var("SEPOLIA_WS_URL")
+                std::env::var("ROBINHOOD_WS_URL")
                     .or_else(|_| std::env::var("ETH_WS_URL"))
-                    .unwrap_or_else(|_| "wss://ethereum-sepolia-rpc.publicnode.com".to_string()),
+                    .unwrap_or_else(|_| "wss://rpc.mainnet.chain.robinhood.com".to_string()),
             ),
-            explorer_url: "https://sepolia.etherscan.io".to_string(),
-            contract_address: "0xfd1B70c51dA4e9D24c92B00f44B1a290A506349A".to_string(),
+            explorer_url: std::env::var("ROBINHOOD_EXPLORER_URL")
+                .unwrap_or_else(|_| "https://explorer.mainnet.chain.robinhood.com".to_string()),
+            contract_address: "0x955b9e7809Ee9bdD4C6cD0D07cA9cb6ECAF47a8F".to_string(),
             abi,
             virtual_eth_amount: 2.5,
             virtual_token_amount: 1_073_000_000.0,

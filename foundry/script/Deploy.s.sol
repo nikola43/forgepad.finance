@@ -3,11 +3,11 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/Forgepad.sol";
-import "../src/ForgepadLiquidityManager.sol";
+import "../src/Arrowpad.sol";
+import "../src/ArrowpadLiquidityManager.sol";
 import "../src/MockPriceFeed.sol";
 
-contract DeployForgepad is Script {
+contract DeployArrowpad is Script {
     // Uniswap V2 Router on Ethereum
     address constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     // Uniswap V3 Factory on Ethereum
@@ -46,7 +46,7 @@ contract DeployForgepad is Script {
         address priceFeed = DATA_FEED;
         console.log("PriceFeed (Chainlink):", priceFeed);
 
-        ForgepadLiquidityManager liquidityManager = new ForgepadLiquidityManager(
+        ArrowpadLiquidityManager liquidityManager = new ArrowpadLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -59,23 +59,23 @@ contract DeployForgepad is Script {
             10000,
             10000
         );
-        console.log("ForgepadLiquidityManager:", address(liquidityManager));
+        console.log("ArrowpadLiquidityManager:", address(liquidityManager));
 
-        Forgepad forgepad = new Forgepad(
+        Arrowpad arrowpad = new Arrowpad(
             priceFeed,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR
         );
-        console.log("Forgepad:", address(forgepad));
+        console.log("Arrowpad:", address(arrowpad));
 
-        liquidityManager.setAuthorizedCaller(address(forgepad), true);
-        console.log("Forgepad authorized as LiquidityManager caller");
+        liquidityManager.setAuthorizedCaller(address(arrowpad), true);
+        console.log("Arrowpad authorized as LiquidityManager caller");
 
-        forgepad.setPlatformBuyFeeBps(300);
-        forgepad.setPlatformSellFeeBps(300);
-        forgepad.setMaxBuyPercent(10000);
-        forgepad.setMaxSellPercent(10000);
+        arrowpad.setPlatformBuyFeeBps(300);
+        arrowpad.setPlatformSellFeeBps(300);
+        arrowpad.setMaxBuyPercent(10000);
+        arrowpad.setMaxSellPercent(10000);
         console.log("Fees configured: 3% buy/sell, 100% max buy/sell");
 
         vm.stopBroadcast();
@@ -85,7 +85,7 @@ contract DeployForgepad is Script {
         console.log("DEPLOYMENT COMPLETE");
         console.log("==================================================");
         console.log("PriceFeed:        ", priceFeed);
-        console.log("Forgepad:         ", address(forgepad));
+        console.log("Arrowpad:         ", address(arrowpad));
         console.log("LiquidityManager: ", address(liquidityManager));
         console.log("==================================================");
     }

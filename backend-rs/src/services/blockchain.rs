@@ -79,7 +79,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     // For WebSocket provider
     let ws_url = chain.ws_url.as_ref().expect("ws_url is required");
     let ws = WsConnect::new(ws_url.as_str());
-    let ws_provider = ProviderBuilder::new()
+    let provider = ProviderBuilder::new()
         .connect_ws(ws)
         .await
         .expect("Failed to create WS provider");
@@ -87,7 +87,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     // let abi_functions: Vec<alloy::json_abi::Function> =
     //     serde_json::from_value(chain.abi.clone()).expect("Failed to parse ABI");
 
-    let current_block = match ws_provider.get_block_number().await {
+    let current_block = match provider.get_block_number().await {
         Ok(b) => b,
         Err(e) => {
             tracing::error!("Failed to get current block: {e}");
@@ -122,7 +122,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
             .from_block(alloy::rpc::types::BlockNumberOrTag::Number(last_block))
             .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
 
-        match ws_provider.get_logs(&filter).await {
+        match provider.get_logs(&filter).await {
             Ok(logs) => {
                 for log in logs {
                     if let Err(e) = process_log(&state, &chain, &log).await {
@@ -148,7 +148,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     let chain_clone = chain.clone();
 
     tokio::spawn(async move {
-        let stream = ws_provider
+        let stream = provider
             .subscribe_blocks()
             .await
             .expect("Failed to subscribe to blocks");
@@ -164,7 +164,7 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
                 .from_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num))
                 .to_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num));
 
-            if let Ok(logs) = ws_provider.get_logs(&filter).await {
+            if let Ok(logs) = provider.get_logs(&filter).await {
                 for log in logs {
                     if let Err(e) = process_log(&state_clone, &chain_clone, &log).await {
                         tracing::error!("Error processing log: {e}");
@@ -301,7 +301,7 @@ async fn process_swap_log(
 }
 
 async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
-    // Read ETH price from Forgepad contract's getETHPriceByUSD() (uses Chainlink on-chain)
+    // Read ETH price from Arrowpad contract's getETHPriceByUSD() (uses Chainlink on-chain)
     let rpc_url = std::env::var("ETH_RPC_URL")
         .unwrap_or_else(|_| chain.rpc_url.clone());
     let client = reqwest::Client::new();

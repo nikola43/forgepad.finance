@@ -45,6 +45,56 @@ export default function Leaderboard() {
                 </Typography>
             </Box>
 
+            {/* Rewards banner */}
+            <Box
+                sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: '16px',
+                    p: { xs: 2.5, sm: 3 },
+                    mb: 3,
+                    border: '1px solid rgba(211,255,36,0.25)',
+                    background:
+                        'linear-gradient(135deg, rgba(211,255,36,0.12) 0%, rgba(211,255,36,0.03) 45%, rgba(139,92,246,0.06) 100%)',
+                }}
+            >
+                <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <Box sx={{ fontSize: 34, lineHeight: 1, flexShrink: 0 }}>💸</Box>
+                    <Box>
+                        <Typography fontSize={{ xs: 17, sm: 19 }} fontWeight={800} color="#fff" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
+                            Trade. Earn points. Get paid every week.
+                        </Typography>
+                        <Typography fontSize={13.5} color="rgba(255,255,255,0.75)" mt={0.75} lineHeight={1.6}>
+                            Every buy and sell carries a flat <b style={{ color: '#D3FF24' }}>1% fee</b> — and half of it flows
+                            straight back to traders. You earn <b style={{ color: '#D3FF24' }}>10 points per $1 bought</b> and
+                            {' '}<b style={{ color: '#D3FF24' }}>−4 per $1 sold</b>, so climbing the board rewards real conviction.
+                            Each week we pool <b style={{ color: '#D3FF24' }}>50% of all platform fees</b> and pay it out in{' '}
+                            <b style={{ color: '#D3FF24' }}>ETH</b> to everyone here, split by your share of points. Trade more,
+                            rank higher, and claim a bigger weekly cut.
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                            {['+10 pts / $1 buy', '−4 pts / $1 sell', '1% flat fee', '50% shared weekly', 'Paid in ETH'].map((chip) => (
+                                <Box
+                                    key={chip}
+                                    sx={{
+                                        fontSize: 11.5,
+                                        fontWeight: 600,
+                                        color: '#D3FF24',
+                                        border: '1px solid rgba(211,255,36,0.3)',
+                                        background: 'rgba(211,255,36,0.06)',
+                                        borderRadius: '100px',
+                                        px: 1.25,
+                                        py: 0.4,
+                                    }}
+                                >
+                                    {chip}
+                                </Box>
+                            ))}
+                        </Box>
+                    </Box>
+                </Box>
+            </Box>
+
             {rows === null ? (
                 <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
             ) : rows.length === 0 ? (
@@ -68,7 +118,7 @@ export default function Leaderboard() {
                                 '&:hover': { background: 'rgba(255,255,255,0.03)' },
                             }}
                         >
-                            <Box sx={{ fontWeight: 700, color: r.rank <= 3 ? '#d1ff1a' : '#94A3B8' }}>{r.rank}</Box>
+                            <Box sx={{ fontWeight: 700, color: r.rank <= 3 ? '#D3FF24' : '#94A3B8' }}>{r.rank}</Box>
                             <Box display="flex" alignItems="center" gap={1} minWidth={0}>
                                 <Avatar src={r.avatar || undefined} sx={{ width: 28, height: 28 }} />
                                 <Typography color="white" fontSize={14} noWrap>

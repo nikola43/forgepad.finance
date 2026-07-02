@@ -48,7 +48,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             fontWeight={700}
             fontFamily="'Space Grotesk', sans-serif"
             sx={{
-              background: 'linear-gradient(135deg, #d1ff1a, #e4ff66)',
+              background: 'linear-gradient(135deg, #D3FF24, #e4ff66)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',

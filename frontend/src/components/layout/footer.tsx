@@ -55,7 +55,7 @@ const Brand = styled.div`
         font-family: 'Space Grotesk', sans-serif;
         font-size: 20px;
         font-weight: 700;
-        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(135deg, #D3FF24, #e4ff66);
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -101,7 +101,7 @@ const LinkGroup = styled.div`
         text-decoration: none;
         transition: color 0.2s ease;
         &:hover {
-            color: #d1ff1a;
+            color: #D3FF24;
         }
     }
 `
@@ -168,7 +168,7 @@ export default function Footer() {
         <FooterInner>
             <FooterTop>
                 <Brand>
-                    <span className="brand-name">Forgepad</span>
+                    <span className="brand-name">Arrowpad</span>
                     <span className="brand-tagline">
                         Launch tokens with fair bonding curves. Trade instantly, graduate to DEX.
                     </span>
@@ -198,8 +198,8 @@ export default function Footer() {
             </FooterTop>
 
             <FooterBottom>
-                <span className="copyright">&copy; {new Date().getFullYear()} Forgepad. All rights reserved.</span>
-                <span className="built-with">Built with <span className="heart">&hearts;</span> on Ethereum</span>
+                <span className="copyright">&copy; {new Date().getFullYear()} Arrowpad. All rights reserved.</span>
+                <span className="built-with">Built with <span className="heart">&hearts;</span> on Robinhood</span>
             </FooterBottom>
         </FooterInner>
     </FooterWrapper>

@@ -24,7 +24,7 @@ import EditIcon from "@mui/icons-material/BorderColorOutlined";
 import ArrowRightIcon from "@mui/icons-material/KeyboardArrowRightOutlined";
 import ArrowDownIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import DollarIcon from "@mui/icons-material/MonetizationOn";
-// import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { TransitionProps } from "@mui/material/transitions";
 import axios from "axios";
 import { NumericFormat } from "react-number-format";
@@ -57,9 +57,9 @@ const Title = styled(Typography)`
   background: linear-gradient(
     135deg,
     #e4ff66 0%,
-    #d1ff1a 25%,
+    #D3FF24 25%,
     #edff8f 50%,
-    #d1ff1a 75%,
+    #D3FF24 75%,
     #e4ff66 100%
   );
   background-size: 200% 200%;
@@ -81,37 +81,98 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
     marginTop: theme.spacing(3),
   },
   "& .MuiInputBase-input": {
-    color: "#0a0a0f",
-    fontSize: "16px",
+    color: "#F8FAFC",
+    fontSize: "15px",
     fontWeight: 500,
     fontFamily: "'Inter', sans-serif",
-    borderRadius: "16px",
+    borderRadius: "12px",
     position: "relative",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    border: "2px solid rgba(255, 255, 255, 0.1)",
-    padding: "14px 20px",
-    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05), inset 0 1px 2px rgba(255, 255, 255, 0.5)",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    padding: "14px 18px",
+    transition: "border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
     "&:focus": {
-      borderColor: "#d1ff1a",
-      backgroundColor: "#FFF",
-      boxShadow: "0 8px 24px rgba(209, 255, 26, 0.15), 0 0 0 4px rgba(209, 255, 26, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.8)",
-      transform: "translateY(-1px)",
+      borderColor: "#D3FF24",
+      backgroundColor: "rgba(255, 255, 255, 0.06)",
+      boxShadow: "0 0 0 3px rgba(211, 255, 36, 0.15)",
     },
     "&:hover": {
-      borderColor: "rgba(209, 255, 26, 0.4)",
-      backgroundColor: "#FFF",
-      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08), inset 0 1px 2px rgba(255, 255, 255, 0.6)",
+      borderColor: "rgba(211, 255, 36, 0.4)",
     },
     "&::placeholder": {
-      color: "rgba(10, 10, 15, 0.5)",
+      color: "rgba(255, 255, 255, 0.35)",
       fontWeight: 400,
+      opacity: 1,
     },
   },
   "& .MuiInputBase-inputMultiline": {
-    padding: "14px 20px",
+    padding: "0",
   },
 }));
+
+// Dashed drag-and-drop zone for the token logo.
+const DropZone = styled(Box)`
+  position: relative;
+  border: 2px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 16px;
+  transition: all 0.2s ease;
+  &:hover {
+    border-color: rgba(211, 255, 36, 0.5);
+    background: rgba(211, 255, 36, 0.04);
+  }
+  &.dragover {
+    border-color: #D3FF24;
+    background: rgba(211, 255, 36, 0.08);
+    box-shadow: 0 0 0 3px rgba(211, 255, 36, 0.15);
+  }
+  & .cloud {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.2s ease;
+  }
+  &:hover .cloud, &.dragover .cloud {
+    background: rgba(211, 255, 36, 0.15);
+    color: #D3FF24;
+  }
+  & img.preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  & .change {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  &:hover .change { opacity: 1; }
+`;
 
 const MaxButton = styled(Button)`
   &.MuiButton-root {
@@ -217,7 +278,7 @@ const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
   border-radius: 16px;
   background: ${({ checked }) =>
     checked
-      ? "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)"
+      ? "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)"
       : "rgba(255, 255, 255, 0.04)"
   };
   backdrop-filter: blur(20px);
@@ -636,13 +697,20 @@ export default function Create() {
       </Box>
       <Box
         marginTop="20px"
-        py={3}
         mx="auto"
         width={{ md: "80%", sm: "80%", xs: "100%" }}
+        maxWidth="900px"
         display="flex"
         flexDirection="column"
         gap="1.5rem"
-        sx={{ boxSizing: "border-box", zIndex: 1 }}
+        sx={{
+          boxSizing: "border-box",
+          zIndex: 1,
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "20px",
+          p: { xs: 2.5, md: 4 },
+        }}
       >
         <Box
           display="flex"
@@ -653,8 +721,8 @@ export default function Create() {
             <InputLabel shrink className="required">
               Token logo <span style={{ color: "red" }}>*</span>
             </InputLabel>
-            <AvatarWrapper
-              sx={{ width: { xs: "100%", sm: "100%", md: 250 } }}
+            <DropZone
+              sx={{ width: { xs: "100%", sm: "100%", md: 250 }, height: 160 }}
               onClick={() => fileLogoRef.current?.click()}
               onDragOver={(e: React.DragEvent) => {
                 e.preventDefault();
@@ -673,41 +741,34 @@ export default function Create() {
                 if (file) handleAvatarFile(file);
               }}
             >
-              <Avatar
-                sx={{
-                  width: { xs: "100%", sm: "100%", md: 250 },
-                  height: 135,
-                  borderRadius: "4px",
-                  background: "white",
-                  objectFit: "contain",
-                }}
-                src={avatar}
-              >
-                {!avatar ? (
-                  <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
-                    <DollarIcon sx={{ color: "rgba(0,0,0,0.3)", width: 36, height: 36 }} />
-                    <Typography fontSize={11} color="rgba(0,0,0,0.4)" fontWeight={500}>
-                      Click or drop image
-                    </Typography>
+              {avatar ? (
+                <>
+                  <img className="preview" src={avatar} alt="logo preview" />
+                  <Box className="change">
+                    <EditIcon sx={{ fontSize: 16 }} /> Change
                   </Box>
-                ) : (
-                  <DollarIcon sx={{ color: "black", width: 48, height: 48 }} />
-                )}
-              </Avatar>
-              <IconButton
-                sx={{ bgcolor: "black", "&:hover": { bgcolor: "#555" } }}
-                component="label"
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-              >
-                <EditIcon sx={{ width: 16, height: 16 }} />
-                <HiddenInput
-                  ref={fileLogoRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatar}
-                />
-              </IconButton>
-            </AvatarWrapper>
+                </>
+              ) : (
+                <>
+                  <Box className="cloud">
+                    <CloudUploadIcon sx={{ fontSize: 26 }} />
+                  </Box>
+                  <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.85)">
+                    Drag your logo here
+                  </Typography>
+                  <Typography fontSize={11} color="rgba(255,255,255,0.4)">
+                    or click to browse · PNG, JPG
+                  </Typography>
+                </>
+              )}
+              <HiddenInput
+                ref={fileLogoRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatar}
+                style={{ pointerEvents: "none" }}
+              />
+            </DropZone>
           </div>
           <Box display="flex" flex="1" flexDirection="column" gap="1.5rem">
             <FormControl variant="standard">
@@ -848,7 +909,7 @@ export default function Create() {
         {address ? (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
+              background: "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
@@ -874,7 +935,7 @@ export default function Create() {
         ) : (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
+              background: "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
@@ -982,7 +1043,7 @@ export default function Create() {
             sx={{
               background: isLoading || !!error
                 ? "rgba(209, 255, 26, 0.3)"
-                : "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
+                : "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
@@ -1165,7 +1226,7 @@ export default function Create() {
             sx={{
               background: waitingForDeploy || !createdTokenData?.tokenAddress
                 ? "rgba(209, 255, 26, 0.3)"
-                : "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
+                : "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
               color: "black",
               py: 2.5,
               fontSize: 18,

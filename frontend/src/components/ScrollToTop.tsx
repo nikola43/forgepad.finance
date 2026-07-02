@@ -39,7 +39,7 @@ export function ScrollToTopButton() {
           background: 'rgba(209, 255, 26, 0.15)',
           backdropFilter: 'blur(12px)',
           border: '1px solid rgba(209, 255, 26, 0.25)',
-          color: '#d1ff1a',
+          color: '#D3FF24',
           transition: 'all 0.25s ease',
           '&:hover': {
             background: 'rgba(209, 255, 26, 0.25)',

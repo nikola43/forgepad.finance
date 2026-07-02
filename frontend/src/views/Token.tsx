@@ -91,7 +91,7 @@ const Progress = styled('div') <{ value: number }>`
         top: 0;
         bottom: 0;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(90deg, #D3FF24, #e4ff66);
         box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -335,7 +335,7 @@ const ChatInputBox = styled(Box)`
 
 const ChatSendButton = styled(IconButton)`
     &.MuiIconButton-root {
-        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(135deg, #D3FF24, #e4ff66);
         border-radius: 10px;
         width: 40px;
         height: 40px;
@@ -361,7 +361,7 @@ const ReplyBadge = styled(Box)`
     border: 1px solid rgba(209, 255, 26, 0.15);
     border-radius: 8px;
     font-size: 12px;
-    color: #d1ff1a;
+    color: #D3FF24;
     margin: 0 16px;
 `
 
@@ -676,7 +676,7 @@ const SwapContent = ({
                     width: '100%',
                     boxSizing: 'border-box',
                 }}>
-                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#d1ff1a'} fontWeight={500}>
+                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#D3FF24'} fontWeight={500}>
                         {'\u26A0\uFE0F'} Price impact: ~{priceImpact.toFixed(1)}%
                     </Typography>
                 </Box>
@@ -993,7 +993,7 @@ export default function Token() {
                 <span style={{ fontWeight: 600 }}>{type === 'sell' ? 'Sell' : 'Buy'} successful</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                    <a style={{ textDecoration: 'none', color: '#d1ff1a', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
+                    <a style={{ textDecoration: 'none', color: '#D3FF24', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
                 </div>
             </div>,
             { duration: 8000 }
@@ -1156,7 +1156,7 @@ export default function Token() {
                                     </Box>
                                 </Box>
                                 <Box display="flex" gap="8px" alignItems="baseline">
-                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#d1ff1a"}>
+                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#D3FF24"}>
                                         {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                                     </Typography>
                                     <Typography fontSize={12} color="white">Past 15m</Typography>
@@ -1423,7 +1423,7 @@ export default function Token() {
                                     <ChatMessages ref={chatMessagesRef}>
                                         {chatLoading ? (
                                             <Box display="flex" justifyContent="center" py={4}>
-                                                <CircularProgress size={24} sx={{ color: '#d1ff1a' }} />
+                                                <CircularProgress size={24} sx={{ color: '#D3FF24' }} />
                                             </Box>
                                         ) : threadedChats.length === 0 ? (
                                             <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1}>
@@ -1472,7 +1472,7 @@ export default function Token() {
                                                 Replying to {chatReplyTo.replyAddress?.slice(0, 6)}...{chatReplyTo.replyAddress?.slice(-4)}
                                             </Typography>
                                             <IconButton size="small" onClick={() => setChatReplyTo(null)} sx={{ padding: '2px' }}>
-                                                <CloseIcon sx={{ fontSize: 14, color: '#d1ff1a' }} />
+                                                <CloseIcon sx={{ fontSize: 14, color: '#D3FF24' }} />
                                             </IconButton>
                                         </ReplyBadge>
                                     )}

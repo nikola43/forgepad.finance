@@ -258,7 +258,7 @@ pub async fn list_tokens(
         for tid in &token_ids {
             if let Some((token, user)) = token_map.remove(tid) {
                 let chain = find_chain(&state, &token.network).unwrap_or_else(|_| state.chains[0].clone());
-                token_list.push(TokenResponse::from_token_and_creator(&token, &user.address, &chain));
+                token_list.push(TokenResponse::from_token_and_creator(&token, &user, &chain));
             }
         }
 
@@ -374,7 +374,7 @@ pub async fn list_tokens(
         .iter()
         .map(|(token, user)| {
             let chain = find_chain(&state, &token.network).unwrap_or_else(|_| state.chains[0].clone());
-            TokenResponse::from_token_and_creator(token, &user.address, &chain)
+            TokenResponse::from_token_and_creator(token, &user, &chain)
         })
         .collect();
 
@@ -404,7 +404,7 @@ pub async fn get_king(
     match result {
         Some((token, user)) => {
             let chain = find_chain(&state, &token.network).unwrap_or_else(|_| state.chains[0].clone());
-            let resp = TokenResponse::from_token_and_creator(&token, &user.address, &chain);
+            let resp = TokenResponse::from_token_and_creator(&token, &user, &chain);
             Ok(Json(serde_json::json!({ "king": resp })))
         }
         None => Ok(Json(serde_json::json!({ "king": null }))),
@@ -437,7 +437,7 @@ pub async fn get_token_details(
         .ok_or_else(|| AppError::NotFound("Token not found".to_string()))?;
 
     let chain = find_chain(&state, &token.network).unwrap_or_else(|_| state.chains[0].clone());
-    let mut token_resp = TokenResponse::from_token_and_creator(&token, &creator.address, &chain);
+    let mut token_resp = TokenResponse::from_token_and_creator(&token, &creator, &chain);
 
     // Recent trades (paginated) with swapper info
     let trade_rows: Vec<(Trade, User)> = trades::table

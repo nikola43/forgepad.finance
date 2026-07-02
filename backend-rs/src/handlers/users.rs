@@ -450,7 +450,7 @@ pub async fn get_user_profile(
                 .find(|c| c.network.eq_ignore_ascii_case(&token.network))
                 .cloned()
                 .unwrap_or_else(|| state.chains[0].clone());
-            TokenResponse::from_token_and_creator(token, &user.address, &chain)
+            TokenResponse::from_token_and_creator(token, &user, &chain)
         })
         .collect();
 

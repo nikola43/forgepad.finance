@@ -1,7 +1,7 @@
 import { Avatar, Box, Menu, MenuItem, Typography, styled } from "@mui/material";
 // import marketcapIcon from '@/assets/images/marketcap.png';
 // import { priceFormatter } from "../tvchart/chart";
-import { CreatorName } from "./user";
+import { CreatorAvatar, CreatorName } from "./user";
 import { API_ENDPOINT } from "@/config";
 import React, { useCallback, useMemo } from "react";
 // import { useUserInfo } from "../../hooks/user";
@@ -108,7 +108,7 @@ const Progress = styled('div') <{ value: number }>`
     top: 0;
     bottom: 0;
     width: ${({ value }) => value}%;
-    background: linear-gradient(90deg, #d1ff1a 0%, #e4ff66 100%);
+    background: linear-gradient(90deg, #D3FF24 0%, #e4ff66 100%);
     box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
     transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     border-radius: 100px;
@@ -218,7 +218,8 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
             <Typography color="#B5B7AC" fontSize={12}>
               Created by:
             </Typography>
-            <Box display="flex" alignItems="center">
+            <Box display="flex" alignItems="center" gap="6px">
+              <CreatorAvatar token={token} size={18} mr="0" />
               <CreatorName token={token} size="16px" fontSize={12} />
             </Box>
           </Box>
@@ -289,7 +290,8 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
             <Typography color="#B5B7AC" fontSize={12}>
               Created by:
             </Typography>
-            <Box display="flex" alignItems="center">
+            <Box display="flex" alignItems="center" gap="6px">
+              <CreatorAvatar token={token} size={18} mr="0" />
               <CreatorName token={token} size="16px" fontSize={12} />
             </Box>
           </Box>

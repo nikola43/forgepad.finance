@@ -5,7 +5,7 @@ import styled, { keyframes } from "styled-components"
 // import imgLogo from '@/assets/images/logo.png';
 // import imgForge0 from '@/assets/images/forge0.png';
 // import imgForge1 from '@/assets/images/forge1.png';
-// import imgForge2 from "@/assets/images/forge2.png";
+// import imgForge2 from "@/assets/images/logo.png";
 // import imgBanner from "@/assets/images/banner.png"
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -145,7 +145,7 @@ const Banner = styled.div`
 const StyledButton = styled.button`
     height: 40px;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%);
+    background: linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%);
     border: none;
     border-radius: 10px;
     color: #0a0a0f;
@@ -462,7 +462,7 @@ export default function Header() {
         return <>
             <HeaderBox p="6px 8px" style={{ border: 'none' }}>
                 <Link href="/">
-                    <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #d1ff1a", borderRadius: "4px" }} alt="" />
+                    <img src="/images/logo.png" width={54} height={54} style={{ border: "1px solid #D3FF24", borderRadius: "4px" }} alt="" />
                 </Link>
                 <Link href="/forge" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')} style={{ height: "40px" }}>
@@ -653,7 +653,7 @@ export default function Header() {
                                 me
                                 mr={0}
                                 fontSize="12px"
-                                color="white"
+                                color="#0a0a0f"
                             />
                             {
                                 isSwitching

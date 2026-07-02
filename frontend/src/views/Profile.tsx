@@ -55,7 +55,7 @@ const StyledTab = styled(Tab)`
     color: #64748B;
     min-height: 40px;
     &.Mui-selected {
-        color: #d1ff1a;
+        color: #D3FF24;
     }
 `
 
@@ -114,7 +114,7 @@ const FollowButton = styled(Button)<{ following?: number }>`
             color: #EF4444;
         }
     ` : `
-        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(135deg, #D3FF24, #e4ff66);
         color: #0a0a0f;
         border: none;
         &:hover {
@@ -145,7 +145,7 @@ const ProgressBar = styled('div')<{ value: number }>`
         display: block;
         height: 100%;
         width: ${({ value }) => Math.min(100, value)}%;
-        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
+        background: linear-gradient(90deg, #D3FF24, #e4ff66);
         border-radius: 100px;
     }
 `
@@ -402,7 +402,7 @@ export default function Profile() {
                                         variant="contained"
                                         disabled={saving}
                                         onClick={saveProfile}
-                                        sx={{ borderRadius: '10px', textTransform: 'none', background: '#d1ff1a', color: '#0a0a0f', fontWeight: 600, '&:hover': { background: '#e4ff66' } }}
+                                        sx={{ borderRadius: '10px', textTransform: 'none', background: '#D3FF24', color: '#0a0a0f', fontWeight: 600, '&:hover': { background: '#e4ff66' } }}
                                     >
                                         {saving ? <CircularProgress size={16} sx={{ color: '#0a0a0f' }} /> : 'Save'}
                                     </Button>
@@ -422,7 +422,7 @@ export default function Profile() {
                                         {user?.username?.trim() || shortAddr}
                                     </Typography>
                                     {isOwnProfile && (
-                                        <IconButton size="small" onClick={startEdit} sx={{ color: '#64748B', '&:hover': { color: '#d1ff1a' } }}>
+                                        <IconButton size="small" onClick={startEdit} sx={{ color: '#64748B', '&:hover': { color: '#D3FF24' } }}>
                                             <EditIcon fontSize="small" />
                                         </IconButton>
                                     )}
@@ -538,7 +538,7 @@ export default function Profile() {
                     onChange={(_, v) => setTab(v)}
                     variant={isMobile ? "scrollable" : "standard"}
                     scrollButtons="auto"
-                    sx={{ '& .MuiTabs-indicator': { background: '#d1ff1a' }, minHeight: 40 }}
+                    sx={{ '& .MuiTabs-indicator': { background: '#D3FF24' }, minHeight: 40 }}
                 >
                     <StyledTab label={`Created (${profile?.tokens?.length ?? 0})`} />
                     <StyledTab label={`Holdings (${profile?.helds?.length ?? 0})`} />
@@ -637,7 +637,7 @@ export default function Profile() {
                                     <ItemCard key={reply.id}>
                                         <Box flex={1} minWidth={0}>
                                             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                                                <Typography fontSize={11} color="#d1ff1a" fontWeight={500}>
+                                                <Typography fontSize={11} color="#D3FF24" fontWeight={500}>
                                                     {reply.tokenAddress ? `${reply.tokenAddress.slice(0, 6)}...${reply.tokenAddress.slice(-4)}` : 'Token'}
                                                 </Typography>
                                                 <Typography fontSize={11} color="#475569">

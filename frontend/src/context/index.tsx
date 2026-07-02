@@ -22,14 +22,39 @@ import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
 import {
   solana,
   bitcoin,
-  sepolia,
   base,
   bsc,
+  defineChain,
 } from "@reown/appkit/networks";
 import { projectId } from "@/config";
 import { WagmiProvider } from "wagmi";
 
-const ethNetwork = sepolia;
+// Robinhood Chain (Arbitrum Orbit L2, chainId 4663, ETH gas token)
+const robinhood = defineChain({
+  id: 4663,
+  caipNetworkId: "eip155:4663",
+  chainNamespace: "eip155",
+  name: "Robinhood Chain",
+  nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: {
+      http: [
+        process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL ||
+          "https://rpc.mainnet.chain.robinhood.com",
+      ],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "Robinhood Explorer",
+      url:
+        process.env.NEXT_PUBLIC_ROBINHOOD_EXPLORER_URL ||
+        "https://explorer.mainnet.chain.robinhood.com",
+    },
+  },
+});
+
+const ethNetwork = robinhood;
 
 const theme = createTheme({
   palette: {
@@ -54,10 +79,10 @@ const queryClient = new QueryClient();
 
 // Set up metadata
 // const metadata = {
-//   name: 'ForgePad',
-//   description: 'ForgePad Finance',
-//   url: 'https://forgepad.finance', // origin must match your domain & subdomain
-//   icons: ['https://forgepad.finance/favicon.ico']
+//   name: 'ArrowPad',
+//   description: 'ArrowPad Finance',
+//   url: 'https://arrowpad.finance', // origin must match your domain & subdomain
+//   icons: ['https://arrowpad.finance/favicon.ico']
 // }
 
 interface Chain {
@@ -108,7 +133,7 @@ const appKit = createAppKit({
   enableWalletGuide: false,
   defaultAccountTypes: { eip155: "eoa", solana: "eoa" },
   themeVariables: {
-    "--w3m-accent": "#d1ff1a",
+    "--w3m-accent": "#D3FF24",
     "--w3m-border-radius-master": "2px",
   },
 });

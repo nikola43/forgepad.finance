@@ -124,7 +124,7 @@ const Button = styled.button`
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #d1ff1a, #e4ff66);
+  background: linear-gradient(135deg, #D3FF24, #e4ff66);
   border: none;
   outline: none;
   border-radius: 10px;
@@ -230,7 +230,7 @@ export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: ()
         : <Box display="flex" justifyContent="space-between" alignItems="center">
           <img src="/images/forge3.png" width={431} height={22} alt="" />
           <CloseButton onClick={onClose}>
-              <CloseIcon style={{ color: "#d1ff1a" }} />
+              <CloseIcon style={{ color: "#D3FF24" }} />
           </CloseButton>
         </Box>
       }
@@ -320,11 +320,11 @@ function Sidebar({ minimized, setMinimize }: Props) {
 
   return (
     <div className="sidebar">
-      <Title>Forge</Title>
+      <Title>ArrowPad</Title>
 
       <Logo as={Link} href="/">
         <img src="/images/logo.png" height={90} alt="logo" />
-        <span>Forge</span>
+        <span>ArrowPad</span>
       </Logo>
 
       <Buttons>

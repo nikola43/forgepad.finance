@@ -67,6 +67,16 @@ pub struct NewToken {
     pub twitter_link: Option<String>,
 }
 
+/// Minimal creator info nested in TokenResponse so the UI can show the creator's
+/// username + avatar instead of just the raw address.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatorInfo {
+    pub address: String,
+    pub username: Option<String>,
+    pub avatar: Option<String>,
+}
+
 /// Response DTO sent to the frontend, with computed fields.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +89,7 @@ pub struct TokenResponse {
     pub token_image: Option<String>,
     pub token_banner: Option<String>,
     pub creator_address: String,
+    pub user: CreatorInfo,
     pub network: String,
     pub marketcap: String,
     pub price: String,
@@ -112,7 +123,7 @@ impl TokenResponse {
     /// chain configuration so that we can compute derived fields.
     pub fn from_token_and_creator(
         token: &Token,
-        creator_address: &str,
+        creator: &crate::models::user::User,
         chain: &ChainConfig,
     ) -> Self {
         use bigdecimal::ToPrimitive;
@@ -155,7 +166,12 @@ impl TokenResponse {
             token_description: token.description.clone(),
             token_image: token.image.clone(),
             token_banner: token.banner.clone(),
-            creator_address: creator_address.to_string(),
+            creator_address: creator.address.clone(),
+            user: CreatorInfo {
+                address: creator.address.clone(),
+                username: creator.username.clone(),
+                avatar: creator.avatar.clone(),
+            },
             network: token.network.clone(),
             marketcap: token.marketcap.to_string(),
             price: token.price.to_string(),
