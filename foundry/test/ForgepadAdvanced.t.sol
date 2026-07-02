@@ -87,8 +87,8 @@ contract ForgepadAdvancedTest is Test {
         iForgepad = IForgepad(address(forgepad));
 
         liquidityManager.setAuthorizedCaller(address(forgepad), true);
-        forgepad.setPlatformBuyFeePercent(3);
-        forgepad.setPlatformSellFeePercent(3);
+        forgepad.setPlatformBuyFeeBps(300);
+        forgepad.setPlatformSellFeeBps(300);
         forgepad.setMaxBuyPercent(300);
         forgepad.setMaxSellPercent(300);
     }
@@ -130,54 +130,54 @@ contract ForgepadAdvancedTest is Test {
 
     function test_FeePercentCannotExceed10() public {
         // Buy fee at boundary (10) should succeed
-        forgepad.setPlatformBuyFeePercent(10);
-        assertEq(forgepad.PLATFORM_BUY_FEE_PERCENT(), 10);
+        forgepad.setPlatformBuyFeeBps(1000);
+        assertEq(forgepad.PLATFORM_BUY_FEE_BPS(), 1000);
 
         // Buy fee above 10 should revert
         vm.expectRevert("Buy fee cannot exceed 10%");
-        forgepad.setPlatformBuyFeePercent(11);
+        forgepad.setPlatformBuyFeeBps(1001);
 
         // Sell fee at boundary (10) should succeed
-        forgepad.setPlatformSellFeePercent(10);
-        assertEq(forgepad.PLATFORM_SELL_FEE_PERCENT(), 10);
+        forgepad.setPlatformSellFeeBps(1000);
+        assertEq(forgepad.PLATFORM_SELL_FEE_BPS(), 1000);
 
         // Sell fee above 10 should revert
         vm.expectRevert("Sell fee cannot exceed 10%");
-        forgepad.setPlatformSellFeePercent(11);
+        forgepad.setPlatformSellFeeBps(1001);
 
         // Much larger values should also revert
         vm.expectRevert("Buy fee cannot exceed 10%");
-        forgepad.setPlatformBuyFeePercent(50);
+        forgepad.setPlatformBuyFeeBps(5000);
 
         vm.expectRevert("Sell fee cannot exceed 10%");
-        forgepad.setPlatformSellFeePercent(100);
+        forgepad.setPlatformSellFeeBps(10000);
 
         // Reset to defaults
-        forgepad.setPlatformBuyFeePercent(3);
-        forgepad.setPlatformSellFeePercent(3);
+        forgepad.setPlatformBuyFeeBps(300);
+        forgepad.setPlatformSellFeeBps(300);
     }
 
     function test_CombinedFeesCannotExceed100() public {
         // Set token owner fee to 10 (max)
-        forgepad.setTokenOwnerFeePercent(10);
-        assertEq(forgepad.TOKEN_OWNER_FEE_PERCENT(), 10);
+        forgepad.setTokenOwnerFeeBps(1000);
+        assertEq(forgepad.TOKEN_OWNER_FEE_BPS(), 1000);
 
         // Combined platform buy + owner must be < 100
         // With owner at 10, setting buy to 10 => 20 < 100, should pass
-        forgepad.setPlatformBuyFeePercent(10);
-        assertEq(forgepad.PLATFORM_BUY_FEE_PERCENT(), 10);
+        forgepad.setPlatformBuyFeeBps(1000);
+        assertEq(forgepad.PLATFORM_BUY_FEE_BPS(), 1000);
 
-        // Verify that setTokenOwnerFeePercent also validates combined fees
+        // Verify that setTokenOwnerFeeBps also validates combined fees
         // Reset buy fee to 3 first
-        forgepad.setPlatformBuyFeePercent(3);
+        forgepad.setPlatformBuyFeeBps(300);
 
         // Owner fee cannot exceed 10
         vm.expectRevert("Fee cannot exceed 10%");
-        forgepad.setTokenOwnerFeePercent(11);
+        forgepad.setTokenOwnerFeeBps(1001);
 
         // Reset
-        forgepad.setTokenOwnerFeePercent(0);
-        forgepad.setPlatformBuyFeePercent(3);
+        forgepad.setTokenOwnerFeeBps(0);
+        forgepad.setPlatformBuyFeeBps(300);
     }
 
     // ============================================================

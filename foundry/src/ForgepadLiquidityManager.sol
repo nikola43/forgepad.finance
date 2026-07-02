@@ -11,6 +11,7 @@ import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/inter
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
@@ -20,6 +21,8 @@ import "./v4-core//interfaces/IPoolManager.sol";
 import "./v4-core/libraries/LiquidityAmounts.sol";
 import "./v4-core/libraries/TickMath.sol";
 import "./v4-core/libraries/Actions.sol";
+import {StateLibrary} from "./v4-core/libraries/StateLibrary.sol";
+import {PoolId, PoolIdLibrary} from "./v4-core/types/PoolId.sol";
 import "./v4-periphery/interfaces/IPositionManager.sol";
 import "./permit2/interfaces/IPermit2.sol";
 
@@ -37,6 +40,9 @@ contract ForgepadLiquidityManager is
     IERC721Receiver
 {
     using CurrencyLibrary for Currency;
+    using StateLibrary for IPoolManager;
+    using PoolIdLibrary for PoolKey;
+    using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
@@ -55,6 +61,13 @@ contract ForgepadLiquidityManager is
 
     /// @dev Q96 for calculations
     uint256 internal constant Q96 = 0x1000000000000000000000000;
+
+    /// @dev Max allowed deviation (bps) between a pre-existing DEX pool's price and
+    ///      our target price before graduation aborts. Guards against a griefer
+    ///      pre-initializing the pool at a hostile price to skim the migrated ETH.
+    uint256 internal constant PRICE_TOLERANCE_BPS = 500; // 5%
+    /// @dev Slippage floor (bps) applied to concentrated-liquidity mint amounts.
+    uint256 internal constant MINT_SLIPPAGE_BPS = 500; // 5%
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -426,34 +439,28 @@ contract ForgepadLiquidityManager is
         require(ethAmountToLP <= ethAmount, "Not enough ETH");
         require(tokenAmountToLP <= tokenAmount, "Not enough tokens");
 
-        // Approve router to spend tokens
-        IERC20(token).approve(address(routerV2), tokenAmountToLP);
+        // Seed the pair directly via first-mint instead of the router. The router
+        // reverts if a pre-existing pair has one-sided (donated) reserves, which
+        // would let a griefer permanently brick graduation for a few gwei. Since
+        // the token is transfer-gated until launch(), nobody can have supplied
+        // token-side liquidity, so graduation is always the first real mint and
+        // sets the price; any donated WETH dust is simply absorbed into the LP.
+        address weth = routerV2.WETH();
+        IUniswapV2Factory factory = IUniswapV2Factory(routerV2.factory());
+        pairAddress = factory.getPair(token, weth);
+        if (pairAddress == address(0)) {
+            pairAddress = factory.createPair(token, weth);
+        }
 
-        // Add liquidity with 2% slippage tolerance
-        uint256 tokenMin = (tokenAmountToLP * 98) / 100;
-        uint256 ethMin = (ethAmountToLP * 98) / 100;
-        routerV2.addLiquidityETH{value: ethAmountToLP}(
-            token,
-            tokenAmountToLP,
-            tokenMin,
-            ethMin,
-            recipient,
-            block.timestamp + DEADLINE_BUFFER
-        );
-
-        // Reset approval after router call
-        IERC20(token).approve(address(routerV2), 0);
-
-        // Get pair address
-        pairAddress = IUniswapV2Factory(routerV2.factory()).getPair(
-            token,
-            routerV2.WETH()
-        );
+        IWETH(weth).deposit{value: ethAmountToLP}();
+        IERC20(token).safeTransfer(pairAddress, tokenAmountToLP);
+        IERC20(weth).safeTransfer(pairAddress, ethAmountToLP);
+        IUniswapV2Pair(pairAddress).mint(recipient);
 
         // Transfer any remaining tokens to dead address
         uint256 remainingTokens = IERC20(token).balanceOf(address(this));
         if (remainingTokens > 0) {
-            IERC20(token).transfer(address(0xdead), remainingTokens);
+            IERC20(token).safeTransfer(address(0xdead), remainingTokens);
         }
 
         // Transfer any remaining ETH to margin recipient
@@ -559,14 +566,20 @@ contract ForgepadLiquidityManager is
                 tickUpper: tickUpper,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
+                amount0Min: (amount0Desired * (10_000 - MINT_SLIPPAGE_BPS)) /
+                    10_000,
+                amount1Min: (amount1Desired * (10_000 - MINT_SLIPPAGE_BPS)) /
+                    10_000,
                 recipient: recipient,
                 deadline: block.timestamp + 10 minutes
             });
 
         (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager
             .mint(params);
+
+        // Don't leave standing allowances to the position manager.
+        token0.approve(address(nonfungiblePositionManager), 0);
+        token1.approve(address(nonfungiblePositionManager), 0);
 
         if (IERC20(token).balanceOf(address(this)) > 0) {
             IERC20(token).transfer(
@@ -645,6 +658,17 @@ contract ForgepadLiquidityManager is
             amount1Desired
         );
 
+        // If a griefer pre-initialized this pool, initializePool() below silently
+        // no-ops; abort unless the existing price matches our target so we never
+        // mint into a hostile pool.
+        (uint160 existingV4, , , ) = poolV4Manager.getSlot0(poolKey.toId());
+        if (existingV4 != 0) {
+            require(
+                _withinTolerance(existingV4, sqrtPriceX96),
+                "V4 pool price mismatch"
+            );
+        }
+
         // V4 pool uses TICK_SPACING, so full-range ticks must align to it.
         (int24 tickLower, int24 tickUpper) = _fullRangeTicks(TICK_SPACING);
 
@@ -709,6 +733,12 @@ contract ForgepadLiquidityManager is
         );
 
         positionManager.multicall(params);
+
+        // Revoke the approvals granted above (don't leave standing allowances).
+        IERC20(token0Address).approve(address(permit2), 0);
+        IERC20(token1Address).approve(address(permit2), 0);
+        permit2.approve(token0Address, address(positionManager), 0, 0);
+        permit2.approve(token1Address, address(positionManager), 0, 0);
 
         if (IERC20(token).balanceOf(address(this)) > 0) {
             IERC20(token).transfer(
@@ -844,10 +874,32 @@ contract ForgepadLiquidityManager is
 
         if (pool == address(0)) {
             pool = factoryV3.createPool(token, weth, fee);
-            IUniswapV3Pool(pool).initialize(sqrtPriceX96);
-
-            emit PoolCreatedV3(token, weth, fee, pool);
         }
+
+        (uint160 existing, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        if (existing == 0) {
+            // Freshly created (or created-but-not-initialized): set our price.
+            IUniswapV3Pool(pool).initialize(sqrtPriceX96);
+            emit PoolCreatedV3(token, weth, fee, pool);
+        } else {
+            // Pool already initialized (possibly by a griefer at a hostile price).
+            // Abort unless its price is within tolerance of our target.
+            require(
+                _withinTolerance(existing, sqrtPriceX96),
+                "V3 pool price mismatch"
+            );
+        }
+    }
+
+    /// @dev True if `actual` is within PRICE_TOLERANCE_BPS of `target` sqrtPrice.
+    function _withinTolerance(
+        uint160 actual,
+        uint160 target
+    ) internal pure returns (bool) {
+        uint256 diff = actual > target
+            ? uint256(actual) - target
+            : uint256(target) - actual;
+        return diff * 10_000 <= uint256(target) * PRICE_TOLERANCE_BPS;
     }
 
     /**

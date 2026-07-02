@@ -72,8 +72,8 @@ contract DeployForgepad is Script {
         liquidityManager.setAuthorizedCaller(address(forgepad), true);
         console.log("Forgepad authorized as LiquidityManager caller");
 
-        forgepad.setPlatformBuyFeePercent(3);
-        forgepad.setPlatformSellFeePercent(3);
+        forgepad.setPlatformBuyFeeBps(300);
+        forgepad.setPlatformSellFeeBps(300);
         forgepad.setMaxBuyPercent(10000);
         forgepad.setMaxSellPercent(10000);
         console.log("Fees configured: 3% buy/sell, 100% max buy/sell");

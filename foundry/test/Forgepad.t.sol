@@ -19,6 +19,18 @@ import {
 import {
     IUniswapV3Factory
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {
+    IUniswapV3Pool
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
+interface IWETHMinimal {
+    function deposit() external payable;
+    function transfer(address to, uint256 value) external returns (bool);
+}
+
+interface IV2PairMinimal {
+    function sync() external;
+}
 import {StateLibrary} from "../src/v4-core/libraries/StateLibrary.sol";
 import {IPoolManager} from "../src/v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "../src/v4-core/types/PoolKey.sol";
@@ -108,8 +120,8 @@ contract ForgepadTest is Test {
         liquidityManager.setAuthorizedCaller(address(forgepad), true);
 
         // Set fees to 3% buy / 3% sell, uncapped buy/sell percent
-        forgepad.setPlatformBuyFeePercent(3);
-        forgepad.setPlatformSellFeePercent(3);
+        forgepad.setPlatformBuyFeeBps(300);
+        forgepad.setPlatformSellFeeBps(300);
         forgepad.setMaxBuyPercent(10000);
         forgepad.setMaxSellPercent(10000);
     }
@@ -1009,6 +1021,22 @@ contract ForgepadTest is Test {
         vm.stopPrank();
     }
 
+    function test_10h_InvalidPoolTypeReverts() public {
+        console.log("=== TEST 10h: Invalid pool type reverts at creation ===");
+        vm.expectRevert("Invalid pool type");
+        forgepad.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 0, block.timestamp);
+
+        vm.expectRevert("Invalid pool type");
+        forgepad.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 4, block.timestamp);
+
+        // Valid types 1-3 succeed
+        address t1 = _create("OkV2", "OK2", 1);
+        address t2 = _create("OkV3", "OK3", 2);
+        address t3 = _create("OkV4", "OK4", 3);
+        assertTrue(t1 != address(0) && t2 != address(0) && t3 != address(0), "valid types ok");
+        console.log("Pool type validation works");
+    }
+
     function test_10c_NonExistentPoolReverts() public {
         console.log("=== TEST 10c: Non-existent pool reverts ===");
 
@@ -1136,10 +1164,10 @@ contract ForgepadTest is Test {
         vm.startPrank(addr1);
 
         vm.expectRevert();
-        forgepad.setPlatformBuyFeePercent(5);
+        forgepad.setPlatformBuyFeeBps(500);
 
         vm.expectRevert();
-        forgepad.setPlatformSellFeePercent(5);
+        forgepad.setPlatformSellFeeBps(500);
 
         vm.expectRevert();
         forgepad.setFeeAddress(addr1);
@@ -1157,7 +1185,7 @@ contract ForgepadTest is Test {
         forgepad.setCreateTokenFeeAmount(0.01 ether);
 
         vm.expectRevert();
-        forgepad.setTokenOwnerFeePercent(1);
+        forgepad.setTokenOwnerFeeBps(100);
 
         vm.expectRevert();
         forgepad.setTokenOwnerLPFee(0.1 ether);
@@ -1189,22 +1217,22 @@ contract ForgepadTest is Test {
         console.log("=== TEST 11b: Fee limit validation ===");
 
         vm.expectRevert("Buy fee cannot exceed 10%");
-        forgepad.setPlatformBuyFeePercent(11);
+        forgepad.setPlatformBuyFeeBps(1001);
 
         vm.expectRevert("Sell fee cannot exceed 10%");
-        forgepad.setPlatformSellFeePercent(11);
+        forgepad.setPlatformSellFeeBps(1001);
 
         vm.expectRevert("Fee cannot exceed 10%");
-        forgepad.setTokenOwnerFeePercent(11);
+        forgepad.setTokenOwnerFeeBps(1001);
 
         // Valid fee changes should succeed
-        forgepad.setPlatformBuyFeePercent(10);
-        assertEq(forgepad.PLATFORM_BUY_FEE_PERCENT(), 10, "buy fee set");
-        forgepad.setPlatformBuyFeePercent(3); // restore
+        forgepad.setPlatformBuyFeeBps(1000);
+        assertEq(forgepad.PLATFORM_BUY_FEE_BPS(), 1000, "buy fee set");
+        forgepad.setPlatformBuyFeeBps(300); // restore
 
-        forgepad.setPlatformSellFeePercent(10);
-        assertEq(forgepad.PLATFORM_SELL_FEE_PERCENT(), 10, "sell fee set");
-        forgepad.setPlatformSellFeePercent(3); // restore
+        forgepad.setPlatformSellFeeBps(1000);
+        assertEq(forgepad.PLATFORM_SELL_FEE_BPS(), 1000, "sell fee set");
+        forgepad.setPlatformSellFeeBps(300); // restore
 
         console.log("Fee limits enforced correctly");
     }
@@ -2153,6 +2181,298 @@ contract ForgepadTest is Test {
 
         // Same invariant as V2 (test_17) and V3 (test_21): opens at target price.
         assertApproxEqRel(fdv, target, 0.02e18, "V4 FDV != target mcap (price gap)");
+    }
+
+    // ================================================================
+    //  25. LP FEE ROUTING AT GRADUATION
+    // ================================================================
+
+    /// @notice platformLPFee must go to the project fee address and tokenOwnerLPFee
+    ///         to the token creator (not a blind 50/50 split).
+    function test_25_LPFeeRoutedToFeeAddress() public {
+        console.log("=== TEST 25: LP fees routed to designated recipients ===");
+
+        // Zero trading fees so only the graduation LP-fee split moves balances.
+        forgepad.setPlatformBuyFeeBps(0);
+        forgepad.setTokenOwnerFeeBps(0);
+        forgepad.setPlatformLPFee(0.1 ether);
+        forgepad.setTokenOwnerLPFee(0.05 ether);
+
+        address creator = address(this); // _create is called by this test contract
+        address t = _create("LPFee", "LPF", 1);
+
+        uint256 feeBefore = FEE_WALLET.balance;
+        uint256 creatorBefore = creator.balance;
+
+        for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+        require(_pool(t).launched, "did not graduate");
+
+        uint256 feeGain = FEE_WALLET.balance - feeBefore;
+        uint256 creatorGain = creator.balance - creatorBefore;
+        console.log("feeAddress gained (wei):", feeGain);
+        console.log("creator gained    (wei):", creatorGain);
+
+        // FEE_WALLET is not the LM margin recipient, so its only inflow is platformLPFee.
+        assertEq(feeGain, 0.1 ether, "platformLPFee must go to fee address");
+        // Creator gets tokenOwnerLPFee (+ negligible LM margin dust, hence >=).
+        assertGe(creatorGain, 0.05 ether, "tokenOwnerLPFee must go to creator");
+        assertLt(creatorGain, 0.06 ether, "creator gets no more than its LP fee + dust");
+    }
+
+    // ================================================================
+    //  26-28. MIGRATION FRONT-RUNNING DEFENSES
+    // ================================================================
+
+    // 2^96 == 1:1 price, wildly off any real token/ETH price -> outside tolerance.
+    uint160 constant HOSTILE_SQRT_PRICE = 79228162514264337593543950336;
+
+    /// @dev Buy 0.1 ETH increments until MCAP reaches pctBps/10000 of target,
+    ///      stopping before graduation.
+    function _driveTo(address t, uint256 pctBps) internal {
+        uint256 target = forgepad.TARGET_MARKET_CAP_USD();
+        for (uint256 i = 0; i < 3000; i++) {
+            if (_pool(t).launched) break;
+            if (forgepad.getTokenVirtualMarketCap(t) >= (target * pctBps) / 10000)
+                break;
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+    }
+
+    /// @notice V2: a pre-seeded / donated pair must NOT brick graduation.
+    function test_26_V2GraduationSurvivesPreSeededPair() public {
+        console.log("=== TEST 26: V2 survives pre-seeded pair ===");
+        address t = _create("PreSeed", "PSD", 1);
+        address weth = router.WETH();
+
+        // Attacker: create pair, donate dust WETH, sync -> one-sided reserves.
+        address pair = IUniswapV2Factory(router.factory()).createPair(t, weth);
+        IWETHMinimal(weth).deposit{value: 0.01 ether}();
+        IWETHMinimal(weth).transfer(pair, 0.01 ether);
+        IV2PairMinimal(pair).sync();
+
+        // Graduation must still succeed (was a permanent brick before the fix).
+        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(_pool(t).launched, "graduated despite pre-seeded pair");
+
+        uint256 fdv = _v2FdvUsd(t, forgepad.getETHPriceByUSD());
+        console.log("V2 FDV after grief:", fdv / 1e18);
+        assertApproxEqRel(
+            fdv,
+            forgepad.TARGET_MARKET_CAP_USD(),
+            0.03e18,
+            "V2 opens at target despite grief"
+        );
+    }
+
+    /// @notice V3: hostile pre-init blocks graduation (no drain); owner recovers via V2.
+    function test_27_V3HostilePreInitBlockedThenRecovered() public {
+        console.log("=== TEST 27: V3 hostile pre-init blocked + recovered ===");
+        address t = _create("V3Grief", "V3GR", 2);
+        address weth = router.WETH();
+
+        // Attacker pre-creates + initializes the V3 pool at a 1:1 (hostile) price.
+        address pool = IUniswapV3Factory(V3_FACTORY).createPool(t, weth, V3_FEE);
+        IUniswapV3Pool(pool).initialize(HOSTILE_SQRT_PRICE);
+
+        _driveTo(t, 8000); // to 80% of target, no graduation yet
+        assertFalse(_pool(t).launched, "not launched while driving");
+
+        // The graduation-crossing buy must revert (drain into hostile pool prevented).
+        vm.prank(addr1);
+        vm.expectRevert("V3 pool price mismatch");
+        forgepad.swapExactETHForTokens{value: 1 ether}(
+            t,
+            1 ether,
+            0,
+            block.timestamp
+        );
+        assertFalse(_pool(t).launched, "still not launched (drain prevented)");
+
+        // Owner recovery: reroute to brick-proof V2, then graduate cleanly.
+        forgepad.recoverPoolType(t, 1);
+        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(_pool(t).launched, "recovered + graduated via V2");
+        assertApproxEqRel(
+            _v2FdvUsd(t, forgepad.getETHPriceByUSD()),
+            forgepad.TARGET_MARKET_CAP_USD(),
+            0.03e18,
+            "recovered pool opens at target"
+        );
+    }
+
+    /// @notice V4: hostile pre-init blocks graduation; owner recovers via V2.
+    function test_28_V4HostilePreInitBlockedThenRecovered() public {
+        console.log("=== TEST 28: V4 hostile pre-init blocked + recovered ===");
+        address t = _create("V4Grief", "V4GR", 3);
+
+        // Attacker initializes the V4 pool at a hostile price.
+        IPoolManager(V4_POOL_MGR).initialize(_v4PoolKey(t), HOSTILE_SQRT_PRICE);
+
+        _driveTo(t, 8000);
+        assertFalse(_pool(t).launched, "not launched while driving");
+
+        vm.prank(addr1);
+        vm.expectRevert("V4 pool price mismatch");
+        forgepad.swapExactETHForTokens{value: 1 ether}(
+            t,
+            1 ether,
+            0,
+            block.timestamp
+        );
+        assertFalse(_pool(t).launched, "still not launched (drain prevented)");
+
+        forgepad.recoverPoolType(t, 1);
+        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(_pool(t).launched, "recovered + graduated via V2");
+        assertApproxEqRel(
+            _v2FdvUsd(t, forgepad.getETHPriceByUSD()),
+            forgepad.TARGET_MARKET_CAP_USD(),
+            0.03e18,
+            "recovered pool opens at target"
+        );
+    }
+
+    /// @notice A buy whose platform fee rounds to 1 wei (feeHalf==0) must not revert.
+    function test_29_DustFeeBuyDoesNotRevert() public {
+        console.log("=== TEST 29: dust fee (1 wei) buy does not revert ===");
+        address t = _create("Dust", "DUST", 1);
+        // buyFee = 100 wei * 100 bps / 10000 = 1 wei -> feeHalf == 0
+        vm.prank(addr1);
+        forgepad.swapExactETHForTokens{value: 100}(t, 100, 0, block.timestamp);
+        assertGt(IERC20(t).balanceOf(addr1), 0, "received tokens on dust buy");
+    }
+
+    /// @notice recoverPoolType is owner-gated and validates inputs.
+    function test_30_RecoverPoolTypeAccessControl() public {
+        console.log("=== TEST 30: recoverPoolType access control ===");
+        address t = _create("Rec", "REC", 2);
+
+        vm.prank(addr1);
+        vm.expectRevert();
+        forgepad.recoverPoolType(t, 1);
+
+        vm.expectRevert("Invalid pool type");
+        forgepad.recoverPoolType(t, 4);
+
+        vm.expectRevert("Pool does not exist");
+        forgepad.recoverPoolType(address(0xdead), 1);
+
+        forgepad.recoverPoolType(t, 1);
+        assertEq(_pool(t).poolType, 1, "poolType updated by owner");
+    }
+
+    // ================================================================
+    //  31-33. LP / POSITION IS ALWAYS BURNED (no one can pull liquidity)
+    // ================================================================
+
+    address constant DEAD = 0x000000000000000000000000000000000000dEaD;
+
+    /// @notice V2 LP tokens go to the burn address; no controllable party holds any.
+    function test_31_V2LiquidityBurned() public {
+        console.log("=== TEST 31: V2 LP burned ===");
+        address t = _create("BurnV2", "BV2", 1);
+        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.1 ether}(
+                t,
+                0.1 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(_pool(t).launched, "graduated");
+
+        address pair = IUniswapV2Factory(router.factory()).getPair(
+            t,
+            router.WETH()
+        );
+        uint256 supply = IERC20(pair).totalSupply();
+        assertGt(supply, 0, "LP minted");
+        assertGt(IERC20(pair).balanceOf(DEAD), 0, "LP held at burn address");
+        // Nobody controllable holds LP.
+        assertEq(IERC20(pair).balanceOf(address(liquidityManager)), 0, "LM=0");
+        assertEq(IERC20(pair).balanceOf(address(forgepad)), 0, "forgepad=0");
+        assertEq(IERC20(pair).balanceOf(address(this)), 0, "creator=0");
+        assertEq(IERC20(pair).balanceOf(addr1), 0, "buyer=0");
+        console.log("V2 LP totalSupply :", supply);
+        console.log("V2 LP at 0xdead   :", IERC20(pair).balanceOf(DEAD));
+    }
+
+    /// @notice V3 position NFT is minted to the burn address; LM/forgepad hold none.
+    function test_32_V3PositionBurned() public {
+        console.log("=== TEST 32: V3 position NFT burned ===");
+        uint256 deadBefore = IERC20(V3_POS_MGR).balanceOf(DEAD);
+        address t = _graduateV3("BurnV3", "BV3");
+        assertEq(
+            IERC20(V3_POS_MGR).balanceOf(DEAD),
+            deadBefore + 1,
+            "V3 position NFT at burn address"
+        );
+        assertEq(
+            IERC20(V3_POS_MGR).balanceOf(address(liquidityManager)),
+            0,
+            "LM holds no position"
+        );
+        assertEq(
+            IERC20(V3_POS_MGR).balanceOf(address(forgepad)),
+            0,
+            "forgepad holds no position"
+        );
+    }
+
+    /// @notice V4 position NFT is minted to the burn address; LM holds none.
+    function test_33_V4PositionBurned() public {
+        console.log("=== TEST 33: V4 position NFT burned ===");
+        uint256 deadBefore = IERC20(V4_POS_MGR).balanceOf(DEAD);
+        address t = _graduateV4("BurnV4", "BV4");
+        assertEq(
+            IERC20(V4_POS_MGR).balanceOf(DEAD),
+            deadBefore + 1,
+            "V4 position NFT at burn address"
+        );
+        assertEq(
+            IERC20(V4_POS_MGR).balanceOf(address(liquidityManager)),
+            0,
+            "LM holds no position"
+        );
     }
 
     receive() external payable {}

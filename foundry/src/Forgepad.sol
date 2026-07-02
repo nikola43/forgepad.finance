@@ -40,11 +40,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    // uint256 public constant TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
-    uint256 public constant TARGET_MARKET_CAP_USD = 25_000 * 1e18; // Graduation at ~$25K virtual MCAP
+    uint256 public constant TARGET_MARKET_CAP_USD = 20_000 * 1e18; // Graduation at ~$20K virtual MCAP
     uint256 public constant VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
-    uint256 public constant VIRTUAL_TOKEN_INITIAL =
-        1_073_000_000 * 1e18; // Virtual tokens for pricing curve
+    uint256 public constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18; // Virtual tokens for pricing curve
     uint256 public constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
 
     struct PoolInfo {
@@ -70,22 +68,23 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     address public distributorAddress;
 
     uint256 public CREATE_TOKEN_FEE_AMOUNT = 0.001 ether; // ~Pump.fun creation fee equivalent
-    uint256 public TOKEN_OWNER_FEE_PERCENT = 0; // Optional (set to 0 for pure Pump.fun; can be 0.3 via setter)
-    uint256 public PLATFORM_BUY_FEE_PERCENT = 1; // Platform portion (~0.95% in Pump.fun)
-    uint256 public PLATFORM_SELL_FEE_PERCENT = 1;
+    // Fees in basis points (1 bps = 0.01%), same DIVISOR basis as MAX_BUY/SELL_PERCENT
+    uint256 public TOKEN_OWNER_FEE_BPS = 0; // Optional (e.g. 30 = 0.3%)
+    uint256 public PLATFORM_BUY_FEE_BPS = 100; // 1%
+    uint256 public PLATFORM_SELL_FEE_BPS = 100; // 1%
     uint256 public platformLPFee = 0.1 ether;
     uint256 public tokenOwnerLPFee = 0 ether;
     uint256 public firstBuyFeeUSD = 0;
-
-    uint256 public MAX_BUY_PERCENT = 10_000; // 100%
-    uint256 public MAX_SELL_PERCENT = 10_000; // 100%
-
-    uint256 public tokenCount;
 
     // Circuit breakers (same safety as Pump.fun)
     uint256 public constant MAX_PRICE_IMPACT = 4_500; // 45% max impact
     uint256 public constant MIN_LIQUIDITY = 1e15;
     uint256 private constant DIVISOR = 10_000;
+
+    uint256 public MAX_BUY_PERCENT = DIVISOR; // 100%
+    uint256 public MAX_SELL_PERCENT = DIVISOR; // 100%
+
+    uint256 public tokenCount;
 
     // Timelock for emergency withdrawals
     uint256 public constant EMERGENCY_TIMELOCK = 24 hours;
@@ -181,15 +180,14 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 amountIn,
         uint256 reserveIn,
         uint256 reserveOut,
-        uint256 feePercent
+        uint256 feeBps
     ) internal pure returns (uint256) {
         require(amountIn > 0, "Insufficient input");
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
 
-        uint256 feeBP = feePercent * 100;
-        require(feeBP < DIVISOR, "Fee too high");
+        require(feeBps < DIVISOR, "Fee too high");
 
-        uint256 amountInWithFee = _mul(amountIn, DIVISOR - feeBP) / DIVISOR;
+        uint256 amountInWithFee = _mul(amountIn, DIVISOR - feeBps) / DIVISOR;
         uint256 numerator = _mul(amountInWithFee, reserveOut);
         uint256 denominator = reserveIn + amountInWithFee;
         return _div(numerator, denominator);
@@ -199,19 +197,18 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 amountOut,
         uint256 reserveIn,
         uint256 reserveOut,
-        uint256 feePercent
+        uint256 feeBps
     ) internal pure returns (uint256) {
         require(amountOut > 0 && amountOut < reserveOut, "Invalid output");
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
 
-        uint256 feeBP = feePercent * 100;
-        require(feeBP < DIVISOR, "Fee too high");
+        require(feeBps < DIVISOR, "Fee too high");
 
         uint256 numerator = _mul(reserveIn, amountOut);
         uint256 denominator = reserveOut - amountOut;
         uint256 amountInBeforeFee = _div(numerator, denominator) + 1;
 
-        return _mul(amountInBeforeFee, DIVISOR) / (DIVISOR - feeBP);
+        return _mul(amountInBeforeFee, DIVISOR) / (DIVISOR - feeBps);
     }
 
     function checkPriceImpact(
@@ -233,10 +230,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 deadline
     ) external payable whenNotPaused nonReentrant returns (address) {
         require(deadline >= block.timestamp, "Swap expired");
+        require(poolType >= 1 && poolType <= 3, "Invalid pool type");
 
-        address newToken = address(
-            new Token(name, symbol, TOTAL_SUPPLY)
-        );
+        address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
 
         uint256 firstBuyFee = buyAmount > 0 ? getFirstBuyFee(newToken) : 0;
         require(
@@ -293,20 +289,19 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         require(!tokenPools[token].launched, "Pool has been already launched");
         PoolInfo storage pool = tokenPools[token];
 
-        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
-            TOKEN_OWNER_FEE_PERCENT;
+        uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
         uint256 amountOut = getAmountOut(
             buyAmount,
             pool.virtualEthReserve,
             pool.virtualTokenReserve,
-            totalFeePercent
+            totalFeeBps
         );
         require(amountOut >= minAmountOut, "Slippage limit exceeded");
 
         checkPriceImpact(amountOut, pool.virtualTokenReserve);
 
-        uint256 buyFee = _mul(buyAmount, PLATFORM_BUY_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = _mul(buyAmount, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 buyFee = _mul(buyAmount, PLATFORM_BUY_FEE_BPS) / DIVISOR;
+        uint256 tokenOwnerFee = _mul(buyAmount, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountIn = buyAmount - buyFee - tokenOwnerFee;
 
         // Cap amountOut to real token reserve to prevent underflow
@@ -325,7 +320,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
         if (buyFee > 0) {
             uint256 feeHalf = buyFee / 2;
-            _transferETH(feeAddress, feeHalf);
+            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
             _transferETH(distributorAddress, buyFee - feeHalf);
         }
 
@@ -341,20 +336,19 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         require(!tokenPools[token].launched, "Pool has been already launched");
         PoolInfo storage pool = tokenPools[token];
 
-        uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
-            TOKEN_OWNER_FEE_PERCENT;
+        uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
         uint256 amountIn = getAmountIn(
             buyAmount,
             pool.virtualEthReserve,
             pool.virtualTokenReserve,
-            totalFeePercent
+            totalFeeBps
         );
         require(amountIn <= maxAmountIn, "Exceeds maximum input");
 
         checkPriceImpact(buyAmount, pool.virtualTokenReserve);
 
-        uint256 buyFee = _mul(amountIn, PLATFORM_BUY_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = _mul(amountIn, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 buyFee = _mul(amountIn, PLATFORM_BUY_FEE_BPS) / DIVISOR;
+        uint256 tokenOwnerFee = _mul(amountIn, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountIn = amountIn - buyFee - tokenOwnerFee;
 
         // Cap buyAmount to real token reserve to prevent underflow
@@ -372,7 +366,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
         if (buyFee > 0) {
             uint256 feeHalf = buyFee / 2;
-            _transferETH(feeAddress, feeHalf);
+            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
             _transferETH(distributorAddress, buyFee - feeHalf);
         }
 
@@ -401,8 +395,8 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         // Protect against virtual > real ETH (Pump.fun safety)
         if (grossOut > pool.ethReserve) grossOut = pool.ethReserve;
 
-        uint256 sellFee = _mul(grossOut, PLATFORM_SELL_FEE_PERCENT) / 100;
-        uint256 tokenOwnerFee = _mul(grossOut, TOKEN_OWNER_FEE_PERCENT) / 100;
+        uint256 sellFee = _mul(grossOut, PLATFORM_SELL_FEE_BPS) / DIVISOR;
+        uint256 tokenOwnerFee = _mul(grossOut, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountOut = grossOut - sellFee - tokenOwnerFee;
 
         require(netAmountOut >= minAmountOut, "Slippage limit exceeded");
@@ -420,7 +414,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
         if (sellFee > 0) {
             uint256 feeHalf = sellFee / 2;
-            _transferETH(feeAddress, feeHalf);
+            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
             _transferETH(distributorAddress, sellFee - feeHalf);
         }
 
@@ -565,9 +559,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             return 0;
 
         return
-            (getETHPriceByUSD() *
-                TOTAL_SUPPLY *
-                pool.virtualEthReserve) /
+            (getETHPriceByUSD() * TOTAL_SUPPLY * pool.virtualEthReserve) /
             pool.virtualTokenReserve /
             1e18;
     }
@@ -583,13 +575,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         PoolInfo storage pool = tokenPools[token];
         if (pool.virtualTokenReserve == 0) return 10000; // 100%
 
-        uint256 tokensSold = VIRTUAL_TOKEN_INITIAL -
-            pool.virtualTokenReserve;
-        uint256 maxSellable = VIRTUAL_TOKEN_INITIAL -
-            REAL_TOKEN_INITIAL;
+        uint256 tokensSold = VIRTUAL_TOKEN_INITIAL - pool.virtualTokenReserve;
+        uint256 maxSellable = VIRTUAL_TOKEN_INITIAL - REAL_TOKEN_INITIAL;
 
         if (maxSellable == 0) return 0;
-        progressPercent = _mul(tokensSold, 10_000) / maxSellable;
+        progressPercent = _mul(tokensSold, DIVISOR) / maxSellable;
     }
 
     function _checkAndAddLiquidity(address token) internal {
@@ -627,11 +617,16 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             IERC20(token).safeTransfer(burnAddress, remainingTokens);
         }
 
-        // Distribute remaining ETH (half to creator, half to platform)
+        // Distribute the reserved LP fees to their designated recipients:
+        // platformLPFee -> project fee address, tokenOwnerLPFee -> token creator.
+        // remainingEthReserve is either 0 or exactly platformLPFee + tokenOwnerLPFee.
         if (remainingEthReserve > 0) {
-            uint256 ownerShare = remainingEthReserve / 2;
-            _transferETH(poolOwner, ownerShare);
-            _transferETH(feeAddress, remainingEthReserve - ownerShare);
+            uint256 ownerFee = tokenOwnerLPFee > remainingEthReserve
+                ? remainingEthReserve
+                : tokenOwnerLPFee;
+            uint256 platformFee = remainingEthReserve - ownerFee;
+            if (ownerFee > 0) _transferETH(poolOwner, ownerFee);
+            if (platformFee > 0) _transferETH(feeAddress, platformFee);
         }
 
         emit TokenLaunched(token, block.timestamp);
@@ -721,9 +716,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== ADMIN FUNCTIONS ====================
-    function setTokenOwnerFeePercent(uint256 feePercent) external onlyOwner {
-        require(feePercent <= 10, "Fee cannot exceed 10%");
-        TOKEN_OWNER_FEE_PERCENT = feePercent;
+    function setTokenOwnerFeeBps(uint256 bps) external onlyOwner {
+        require(bps <= 1000, "Fee cannot exceed 10%");
+        TOKEN_OWNER_FEE_BPS = bps;
     }
 
     function setCreateTokenFeeAmount(uint256 feeAmount) external onlyOwner {
@@ -752,14 +747,14 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         MAX_SELL_PERCENT = percent;
     }
 
-    function setPlatformBuyFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10, "Buy fee cannot exceed 10%");
-        PLATFORM_BUY_FEE_PERCENT = percent;
+    function setPlatformBuyFeeBps(uint256 bps) external onlyOwner {
+        require(bps <= 1000, "Buy fee cannot exceed 10%");
+        PLATFORM_BUY_FEE_BPS = bps;
     }
 
-    function setPlatformSellFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 10, "Sell fee cannot exceed 10%");
-        PLATFORM_SELL_FEE_PERCENT = percent;
+    function setPlatformSellFeeBps(uint256 bps) external onlyOwner {
+        require(bps <= 1000, "Sell fee cannot exceed 10%");
+        PLATFORM_SELL_FEE_BPS = bps;
     }
 
     function setFeeAddress(address newFeeAddress) external onlyOwner {
@@ -795,8 +790,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function executeLiquidityManagerChange() external onlyOwner {
         require(pendingLiquidityManager != address(0), "No pending change");
         require(
-            block.timestamp >=
-                liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
+            block.timestamp >= liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
             "Timelock not expired"
         );
         liquidityManager = IForgepadLiquidityManager(pendingLiquidityManager);
@@ -808,6 +802,20 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function cancelLiquidityManagerChange() external onlyOwner {
         pendingLiquidityManager = address(0);
         liquidityManagerChangeTime = 0;
+    }
+
+    /// @notice Recovery: reroute a not-yet-launched token to another DEX version.
+    /// @dev If a griefer pre-initializes the target DEX pool at a hostile price,
+    ///      graduation aborts (funds safe, but the token is stuck). The owner can
+    ///      move it to a clean path (e.g. V2, which is brick-proof) and finalize.
+    function recoverPoolType(
+        address token,
+        uint8 newPoolType
+    ) external onlyOwner {
+        require(tokenPools[token].token != address(0), "Pool does not exist");
+        require(!tokenPools[token].launched, "Already launched");
+        require(newPoolType >= 1 && newPoolType <= 3, "Invalid pool type");
+        tokenPools[token].poolType = newPoolType;
     }
 
     function requestEmergencyWithdrawETH(uint256 amount) external onlyOwner {
@@ -914,13 +922,12 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         require(!pool.launched, "Pool has been launched");
 
         if (isETHInput) {
-            uint256 totalFeePercent = PLATFORM_BUY_FEE_PERCENT +
-                TOKEN_OWNER_FEE_PERCENT;
+            uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
             amountOut = getAmountOut(
                 amountIn,
                 pool.virtualEthReserve,
                 pool.virtualTokenReserve,
-                totalFeePercent
+                totalFeeBps
             );
             priceImpact = _mul(amountOut, DIVISOR) / pool.virtualTokenReserve;
         } else {
@@ -930,9 +937,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
                 pool.virtualEthReserve,
                 0
             );
-            uint256 sellFee = _mul(grossOut, PLATFORM_SELL_FEE_PERCENT) / 100;
-            uint256 tokenOwnerFee = _mul(grossOut, TOKEN_OWNER_FEE_PERCENT) /
-                100;
+            uint256 sellFee = _mul(grossOut, PLATFORM_SELL_FEE_BPS) / DIVISOR;
+            uint256 tokenOwnerFee = _mul(grossOut, TOKEN_OWNER_FEE_BPS) /
+                DIVISOR;
             amountOut = grossOut - sellFee - tokenOwnerFee;
             priceImpact = _mul(grossOut, DIVISOR) / pool.virtualEthReserve;
         }
@@ -954,7 +961,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         targetMarketCap = TARGET_MARKET_CAP_USD;
 
         if (targetMarketCap > 0) {
-            progressPercent = _mul(currentMarketCap, 10_000) / targetMarketCap;
+            progressPercent = _mul(currentMarketCap, DIVISOR) / targetMarketCap;
         }
 
         canLaunch = currentMarketCap >= targetMarketCap;
