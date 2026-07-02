@@ -16,8 +16,21 @@ import {
 import {
     IUniswapV2Pair
 } from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {
+    IUniswapV3Factory
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {StateLibrary} from "../src/v4-core/libraries/StateLibrary.sol";
+import {IPoolManager} from "../src/v4-core/interfaces/IPoolManager.sol";
+import {PoolKey} from "../src/v4-core/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "../src/v4-core/types/PoolId.sol";
+import {Currency} from "../src/v4-core/types/Currency.sol";
+import {IHooks} from "../src/v4-core/interfaces/IHooks.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ForgepadTest is Test {
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
+
     Forgepad public forgepad;
     ForgepadLiquidityManager public liquidityManager;
     IForgepad public iForgepad;
@@ -43,12 +56,16 @@ contract ForgepadTest is Test {
     address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
     address constant DIST_ADDR = 0xF2917a81fF74406fbCf01c507057e101Db8f2F12;
 
+    // Uniswap V3 factory + fee tier used by ForgepadLiquidityManager (POOL_FEE = 100)
+    address constant V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+    uint24 constant V3_FEE = 100;
+
     // Bonding curve constants (mirrored for test assertions)
     uint256 constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
     uint256 constant VIRTUAL_ETH_INITIAL = 2.5 ether;
     uint256 constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18;
     uint256 constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18;
-    uint256 constant TARGET_MCAP_USD = 10_000 * 1e18;
+    uint256 TARGET_MCAP_USD; // read from the contract in setUp so tests track the live target
 
     IUniswapV2Router02 constant router =
         IUniswapV2Router02(UNISWAP_V2_ROUTER);
@@ -86,6 +103,7 @@ contract ForgepadTest is Test {
             DIST_ADDR
         );
         iForgepad = IForgepad(address(forgepad));
+        TARGET_MCAP_USD = forgepad.TARGET_MARKET_CAP_USD();
 
         liquidityManager.setAuthorizedCaller(address(forgepad), true);
 
@@ -1151,7 +1169,7 @@ contract ForgepadTest is Test {
         forgepad.setFirstBuyFee(100);
 
         vm.expectRevert();
-        forgepad.setLiquidityManager(addr1);
+        forgepad.requestLiquidityManagerChange(addr1);
 
         vm.expectRevert();
         forgepad.pause();
@@ -1201,7 +1219,7 @@ contract ForgepadTest is Test {
         forgepad.setDistributorAddress(address(0));
 
         vm.expectRevert("Liquidity manager cannot be zero");
-        forgepad.setLiquidityManager(address(0));
+        forgepad.requestLiquidityManagerChange(address(0));
 
         // Valid address changes
         forgepad.setFeeAddress(addr3);
@@ -1346,6 +1364,56 @@ contract ForgepadTest is Test {
         forgepad.emergencyWithdrawTokens(t, 1e18);
 
         console.log("Emergency token withdraw correctly blocked for active pool");
+    }
+
+    function test_11i_LiquidityManagerTimelock() public {
+        console.log("=== TEST 11i: Liquidity manager change timelock ===");
+        address newManager = makeAddr("newManager");
+
+        // Cannot execute without a pending request
+        vm.expectRevert("No pending change");
+        forgepad.executeLiquidityManagerChange();
+
+        // Request the change
+        forgepad.requestLiquidityManagerChange(newManager);
+        assertEq(
+            forgepad.pendingLiquidityManager(),
+            newManager,
+            "pending set"
+        );
+        // Not applied yet
+        assertTrue(
+            address(forgepad.liquidityManager()) != newManager,
+            "not applied before timelock"
+        );
+
+        // Cannot execute before timelock expires
+        vm.expectRevert("Timelock not expired");
+        forgepad.executeLiquidityManagerChange();
+
+        // Warp past the 24h timelock and execute
+        vm.warp(block.timestamp + 24 hours + 1);
+        forgepad.executeLiquidityManagerChange();
+        assertEq(
+            address(forgepad.liquidityManager()),
+            newManager,
+            "manager updated after timelock"
+        );
+        assertEq(
+            forgepad.pendingLiquidityManager(),
+            address(0),
+            "pending cleared"
+        );
+
+        // Cancel path: request then cancel blocks execution
+        address another = makeAddr("another");
+        forgepad.requestLiquidityManagerChange(another);
+        forgepad.cancelLiquidityManagerChange();
+        vm.warp(block.timestamp + 24 hours + 1);
+        vm.expectRevert("No pending change");
+        forgepad.executeLiquidityManagerChange();
+
+        console.log("Liquidity manager timelock + cancel work");
     }
 
     // ================================================================
@@ -1704,6 +1772,387 @@ contract ForgepadTest is Test {
         uint256 ethUSD = forgepad.getETHPriceByUSD();
         assertTrue(ethUSD > 0, "ETH price > 0");
         console.log("ETH/USD:", ethUSD / 1e18);
+    }
+
+    // ================================================================
+    //  17. PRICE GAP AFTER MIGRATION TO UNISWAP V2 LP
+    // ================================================================
+
+    /// @dev Read the WETH/token V2 pair reserves and spot price (ETH-wei per token, 1e18-scaled)
+    function _v2Reserves(address t)
+        internal
+        view
+        returns (uint256 ethRes, uint256 tokRes, uint256 price)
+    {
+        address weth = router.WETH();
+        address pair = IUniswapV2Factory(router.factory()).getPair(t, weth);
+        require(pair != address(0), "V2 pair missing");
+        (uint112 r0, uint112 r1, ) = IUniswapV2Pair(pair).getReserves();
+        if (IUniswapV2Pair(pair).token0() == weth) {
+            (ethRes, tokRes) = (uint256(r0), uint256(r1));
+        } else {
+            (ethRes, tokRes) = (uint256(r1), uint256(r0));
+        }
+        price = (ethRes * 1e18) / tokRes;
+    }
+
+    /// @dev Fully-diluted valuation of the V2 pool in USD (mirrors getTokenVirtualMarketCap)
+    function _v2FdvUsd(address t, uint256 ethPriceUSD)
+        internal
+        view
+        returns (uint256)
+    {
+        (uint256 ethRes, uint256 tokRes, ) = _v2Reserves(t);
+        return (ethPriceUSD * TOTAL_SUPPLY * ethRes) / tokRes / 1e18;
+    }
+
+    function _absGapBps(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 hi = a > b ? a : b;
+        uint256 lo = a > b ? b : a;
+        return hi == 0 ? 0 : ((hi - lo) * 10_000) / hi;
+    }
+
+    /// @notice The V2 pool must be seeded at exactly the target market cap.
+    /// @dev This is the migration's core price invariant: the LP price is pinned
+    ///      to TARGET_MCAP_USD, not left to the (possibly overshot) curve state.
+    ///      A wrong migration price would show up here as a large FDV deviation.
+    function test_17_V2PoolSeededAtTargetMcap() public {
+        console.log("=== TEST 17: V2 pool seeded at target market cap ===");
+        address t = _create("MigTarget", "MTGT", 1);
+        uint256 ethPriceUSD = forgepad.getETHPriceByUSD();
+
+        for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.05 ether}(
+                t,
+                0.05 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(_pool(t).launched, "token graduated");
+
+        uint256 fdv = _v2FdvUsd(t, ethPriceUSD);
+        console.log("Target MCAP USD :", TARGET_MCAP_USD / 1e18);
+        console.log("V2 pool FDV USD :", fdv / 1e18);
+        console.log("Gap (bps)       :", _absGapBps(fdv, TARGET_MCAP_USD));
+
+        // Pinned to target within 1% (only integer-division + 2% router slippage floor).
+        assertApproxEqRel(fdv, TARGET_MCAP_USD, 0.01e18, "V2 FDV != target mcap");
+    }
+
+    /// @notice No price gap for a fresh trader: the last on-curve quote and the
+    ///         first V2 quote must line up when graduation is approached in small steps.
+    function test_18_NoPriceGap_CarefulGraduation() public {
+        console.log("=== TEST 18: No price gap (careful graduation) ===");
+        address t = _create("NoGap", "NOGAP", 1);
+
+        // Degenerate only if ETH is so expensive the curve starts above target.
+        if (forgepad.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
+            console.log("ETH price starts curve above target; skipping.");
+            return;
+        }
+
+        uint256 lastCurvePrice;
+        uint256 lastMcap;
+        bool launched;
+        for (uint256 i = 0; i < 2000; i++) {
+            if (_pool(t).launched) {
+                launched = true;
+                break;
+            }
+            lastCurvePrice = forgepad.getVirtualPrice(t);
+            lastMcap = forgepad.getTokenVirtualMarketCap(t);
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.01 ether}(
+                t,
+                0.01 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertTrue(launched, "token graduated");
+
+        (, , uint256 v2Price) = _v2Reserves(t);
+        uint256 gapBps = _absGapBps(lastCurvePrice, v2Price);
+
+        console.log("Last curve MCAP :", lastMcap / 1e18);
+        console.log("Last curve price:", lastCurvePrice);
+        console.log("V2 open price   :", v2Price);
+        console.log("Price gap (bps) :", gapBps);
+
+        // A correct migration keeps the two within one small buy-step of each other.
+        // A migration price bug would blow this to hundreds/thousands of bps.
+        assertLt(gapBps, 300, "price gap exceeds 3%");
+    }
+
+    /// @notice Even when a single large buy overshoots the target, the V2 pool is
+    ///         still seeded at the target price (the overshoot only overcharges the
+    ///         graduating buyer on the curve; it does not corrupt the DEX open price).
+    function test_19_OvershootStillPinsV2ToTarget() public {
+        console.log("=== TEST 19: Large final buy overshoot still pins V2 ===");
+        address t = _create("Overshoot", "OVSH", 1);
+        uint256 ethPriceUSD = forgepad.getETHPriceByUSD();
+
+        if (forgepad.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
+            console.log("ETH price starts curve above target; skipping.");
+            return;
+        }
+
+        // Creep up to just under the target with tiny buys.
+        for (uint256 i = 0; i < 2000; i++) {
+            uint256 mcap = forgepad.getTokenVirtualMarketCap(t);
+            if (_pool(t).launched) break;
+            if (mcap >= (TARGET_MCAP_USD * 95) / 100) break;
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.01 ether}(
+                t,
+                0.01 ether,
+                0,
+                block.timestamp
+            );
+        }
+        assertFalse(_pool(t).launched, "should not be launched yet");
+
+        // One deliberately oversized buy that blows through the target.
+        uint256 curvePriceBefore = forgepad.getVirtualPrice(t);
+        uint256 balBefore = IERC20(t).balanceOf(addr2);
+        uint256 maxBuy = (_pool(t).virtualEthReserve * forgepad.MAX_BUY_PERCENT()) /
+            10_000;
+        uint256 bigBuy = maxBuy > 1 ether ? 1 ether : maxBuy;
+
+        vm.prank(addr2);
+        forgepad.swapExactETHForTokens{value: bigBuy}(
+            t,
+            bigBuy,
+            0,
+            block.timestamp
+        );
+        assertTrue(_pool(t).launched, "graduated on oversized buy");
+
+        uint256 tokensBought = IERC20(t).balanceOf(addr2) - balBefore;
+        uint256 buyerEffPrice = (bigBuy * 1e18) / tokensBought;
+        (, , uint256 v2Price) = _v2Reserves(t);
+        uint256 fdv = _v2FdvUsd(t, ethPriceUSD);
+
+        console.log("Curve price pre-buy :", curvePriceBefore);
+        console.log("Buyer effective px  :", buyerEffPrice);
+        console.log("V2 open price       :", v2Price);
+        console.log("V2 FDV USD          :", fdv / 1e18);
+        console.log("Graduating-buyer overpay vs V2 (bps):", _absGapBps(buyerEffPrice, v2Price));
+
+        // Invariant: the DEX still opens at the target price regardless of overshoot.
+        assertApproxEqRel(fdv, TARGET_MCAP_USD, 0.01e18, "V2 FDV != target despite overshoot");
+    }
+
+    // ================================================================
+    //  20. PRICE GAP AFTER MIGRATION TO UNISWAP V3 POOL
+    // ================================================================
+
+    /// @dev Read the V3 pool's ERC20 balances (= reserves for a fresh full-range mint)
+    ///      and spot price (ETH-wei per token, 1e18-scaled).
+    function _v3Reserves(address t)
+        internal
+        view
+        returns (uint256 ethRes, uint256 tokRes, uint256 price)
+    {
+        address weth = router.WETH();
+        address pool = IUniswapV3Factory(V3_FACTORY).getPool(t, weth, V3_FEE);
+        require(pool != address(0), "V3 pool missing");
+        ethRes = IERC20(weth).balanceOf(pool);
+        tokRes = IERC20(t).balanceOf(pool);
+        require(tokRes > 0, "no V3 token liquidity");
+        price = (ethRes * 1e18) / tokRes;
+    }
+
+    function _v3FdvUsd(address t, uint256 ethPriceUSD)
+        internal
+        view
+        returns (uint256)
+    {
+        (uint256 ethRes, uint256 tokRes, ) = _v3Reserves(t);
+        return (ethPriceUSD * TOTAL_SUPPLY * ethRes) / tokRes / 1e18;
+    }
+
+    /// @dev Drive a poolType-2 token to graduation.
+    function _graduateV3(string memory name, string memory sym)
+        internal
+        returns (address t)
+    {
+        t = _create(name, sym, 2); // poolType 2 = Uniswap V3
+        for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.05 ether}(
+                t,
+                0.05 ether,
+                0,
+                block.timestamp
+            );
+        }
+        require(_pool(t).launched, "V3 token did not graduate");
+    }
+
+    /// @notice V3 migration must actually create a funded pool and clear the curve.
+    function test_20_V3MigrationCreatesFundedPool() public {
+        console.log("=== TEST 20: V3 migration creates a funded pool ===");
+        address t = _graduateV3("V3Mig", "V3M");
+
+        // Curve fully cleared
+        IForgepad.PoolInfo memory p = _pool(t);
+        assertEq(p.ethReserve, 0, "curve ETH cleared");
+        assertEq(p.tokenReserve, 0, "curve token cleared");
+        assertEq(p.virtualEthReserve, 0, "vETH cleared");
+        assertEq(p.virtualTokenReserve, 0, "vToken cleared");
+        assertTrue(Token(t).launched(), "token launched");
+
+        (uint256 ethRes, uint256 tokRes, uint256 price) = _v3Reserves(t);
+        console.log("V3 ETH liquidity  :", ethRes);
+        console.log("V3 token liquidity:", tokRes / 1e18);
+        console.log("V3 spot price     :", price);
+        assertTrue(ethRes > 0, "ETH in V3 pool");
+        assertTrue(tokRes > 0, "tokens in V3 pool");
+    }
+
+    /// @notice V3 pool must open at the target market cap — i.e. at the same price
+    ///         the bonding curve graduated at, with no price gap.
+    function test_21_NoPriceGap_V3Migration() public {
+        console.log("=== TEST 21: No price gap after V3 migration ===");
+        uint256 ethPriceUSD = forgepad.getETHPriceByUSD();
+        address t = _graduateV3("V3Gap", "V3G");
+
+        uint256 fdv = _v3FdvUsd(t, ethPriceUSD);
+        (, , uint256 v3Price) = _v3Reserves(t);
+
+        console.log("Target MCAP USD :", TARGET_MCAP_USD / 1e18);
+        console.log("V3 pool FDV USD :", fdv / 1e18);
+        console.log("V3 open price   :", v3Price);
+        console.log("FDV gap (bps)   :", _absGapBps(fdv, TARGET_MCAP_USD));
+
+        // Same invariant enforced for V2 in test_17: the DEX opens at the target price.
+        assertApproxEqRel(fdv, TARGET_MCAP_USD, 0.02e18, "V3 FDV != target mcap (price gap)");
+    }
+
+    /// @notice V2 and V3 graduations of the same target must open at the same price.
+    function test_22_V2AndV3OpenAtSamePrice() public {
+        console.log("=== TEST 22: V2 vs V3 open price parity ===");
+
+        address tV2 = _create("ParityV2", "PV2", 1);
+        for (uint256 i = 0; i < 1000 && !_pool(tV2).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.05 ether}(
+                tV2,
+                0.05 ether,
+                0,
+                block.timestamp
+            );
+        }
+        require(_pool(tV2).launched, "V2 did not graduate");
+
+        address tV3 = _graduateV3("ParityV3", "PV3");
+
+        (, , uint256 v2Price) = _v2Reserves(tV2);
+        (, , uint256 v3Price) = _v3Reserves(tV3);
+        uint256 gapBps = _absGapBps(v2Price, v3Price);
+
+        console.log("V2 open price:", v2Price);
+        console.log("V3 open price:", v3Price);
+        console.log("V2 vs V3 gap (bps):", gapBps);
+
+        assertLt(gapBps, 300, "V2 and V3 open prices diverge > 3%");
+    }
+
+    // ================================================================
+    //  23. PRICE GAP AFTER MIGRATION TO UNISWAP V4 POOL
+    // ================================================================
+
+    function _v4PoolKey(address t) internal view returns (PoolKey memory key) {
+        address weth = router.WETH();
+        (address c0, address c1) = t < weth ? (t, weth) : (weth, t);
+        key = PoolKey({
+            currency0: Currency.wrap(c0),
+            currency1: Currency.wrap(c1),
+            fee: V3_FEE, // POOL_FEE = 100
+            tickSpacing: int24(60), // TICK_SPACING
+            hooks: IHooks(address(0))
+        });
+    }
+
+    /// @dev V4 spot price (ETH-wei per token, 1e18-scaled) read from the pool's slot0.
+    function _v4PriceScaled(address t) internal view returns (uint256) {
+        (uint160 sp, , , ) = IPoolManager(V4_POOL_MGR).getSlot0(
+            _v4PoolKey(t).toId()
+        );
+        require(sp > 0, "V4 pool not initialized");
+        uint256 Q96 = 0x1000000000000000000000000;
+        // token1 per token0, 1e18-scaled (mulDiv avoids sqrtP^2 overflow)
+        uint256 priceX = Math.mulDiv(
+            Math.mulDiv(uint256(sp), uint256(sp), Q96),
+            1e18,
+            Q96
+        );
+        // Normalize to ETH-per-token regardless of currency ordering
+        return t < router.WETH() ? priceX : (1e36 / priceX);
+    }
+
+    function _v4FdvUsd(address t, uint256 ethPriceUSD)
+        internal
+        view
+        returns (uint256)
+    {
+        return (ethPriceUSD * TOTAL_SUPPLY * _v4PriceScaled(t)) / 1e36;
+    }
+
+    function _graduateV4(string memory name, string memory sym)
+        internal
+        returns (address t)
+    {
+        t = _create(name, sym, 3); // poolType 3 = Uniswap V4
+        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            forgepad.swapExactETHForTokens{value: 0.05 ether}(
+                t,
+                0.05 ether,
+                0,
+                block.timestamp
+            );
+        }
+        require(_pool(t).launched, "V4 token did not graduate");
+    }
+
+    /// @notice V4 migration must succeed (tick alignment) and fund a real pool.
+    function test_23_V4MigrationCreatesFundedPool() public {
+        console.log("=== TEST 23: V4 migration creates a funded pool ===");
+        address t = _graduateV4("V4Mig", "V4M");
+
+        IForgepad.PoolInfo memory p = _pool(t);
+        assertEq(p.ethReserve, 0, "curve ETH cleared");
+        assertEq(p.virtualEthReserve, 0, "vETH cleared");
+        assertTrue(Token(t).launched(), "token launched");
+
+        // Fresh token → its only V4 holder is the PoolManager singleton.
+        uint256 tokInPool = IERC20(t).balanceOf(V4_POOL_MGR);
+        uint256 price = _v4PriceScaled(t);
+        console.log("V4 token liquidity:", tokInPool / 1e18);
+        console.log("V4 spot price     :", price);
+        assertTrue(tokInPool > 0, "tokens in V4 pool");
+        assertTrue(price > 0, "V4 pool initialized");
+    }
+
+    /// @notice V4 pool must open at the target market cap — no price gap.
+    function test_24_NoPriceGap_V4Migration() public {
+        console.log("=== TEST 24: No price gap after V4 migration ===");
+        uint256 ethPriceUSD = forgepad.getETHPriceByUSD();
+        uint256 target = forgepad.TARGET_MARKET_CAP_USD();
+        address t = _graduateV4("V4Gap", "V4G");
+
+        uint256 fdv = _v4FdvUsd(t, ethPriceUSD);
+        console.log("Target MCAP USD :", target / 1e18);
+        console.log("V4 pool FDV USD :", fdv / 1e18);
+        console.log("V4 open price   :", _v4PriceScaled(t));
+        console.log("FDV gap (bps)   :", _absGapBps(fdv, target));
+
+        // Same invariant as V2 (test_17) and V3 (test_21): opens at target price.
+        assertApproxEqRel(fdv, target, 0.02e18, "V4 FDV != target mcap (price gap)");
     }
 
     receive() external payable {}

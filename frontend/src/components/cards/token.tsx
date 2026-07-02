@@ -45,7 +45,7 @@ const StyledCard = styled(Box)`
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(255, 166, 0, 0.4), rgba(139, 92, 246, 0.3));
+    background: linear-gradient(135deg, rgba(209, 255, 26, 0.4), rgba(139, 92, 246, 0.3));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -69,10 +69,10 @@ const StyledCard = styled(Box)`
 
   &:hover {
     transform: translateY(-4px);
-    border-color: rgba(255, 166, 0, 0.2);
+    border-color: rgba(209, 255, 26, 0.2);
     box-shadow:
       0 12px 32px rgba(0, 0, 0, 0.4),
-      0 0 40px rgba(255, 166, 0, 0.06);
+      0 0 40px rgba(209, 255, 26, 0.06);
     background: rgba(16, 16, 24, 0.8);
 
     &::before {
@@ -108,8 +108,8 @@ const Progress = styled('div') <{ value: number }>`
     top: 0;
     bottom: 0;
     width: ${({ value }) => value}%;
-    background: linear-gradient(90deg, #FFA600 0%, #FFD700 100%);
-    box-shadow: 0 0 12px rgba(255, 166, 0, 0.4);
+    background: linear-gradient(90deg, #d1ff1a 0%, #e4ff66 100%);
+    box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
     transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     border-radius: 100px;
   }
@@ -183,9 +183,9 @@ function TokenCard({ token, mode, trendIndex, ...props }: any) {
           {token.launchedAt && <span className="badge-graduated">Graduated 🎓</span>}
           {Number(token.progress ?? 0) > 70 && !token.launchedAt && <span className="badge-trending">🔥 Hot</span>}
           {trendIndex != null && trendIndex <= 2 && (
-            <Typography fontSize={10} fontWeight={700} color="#FFD700" sx={{
-              background: 'rgba(255, 215, 0, 0.1)',
-              border: '1px solid rgba(255, 215, 0, 0.2)',
+            <Typography fontSize={10} fontWeight={700} color="#e4ff66" sx={{
+              background: 'rgba(228, 255, 102, 0.1)',
+              border: '1px solid rgba(228, 255, 102, 0.2)',
               borderRadius: '100px',
               px: 1,
               py: 0.25,

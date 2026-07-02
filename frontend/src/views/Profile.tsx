@@ -42,7 +42,7 @@ const StatBox = styled(Box)<{ clickable?: number }>`
     ${({ clickable }) => clickable ? `
         &:hover {
             background: rgba(255, 255, 255, 0.06);
-            border-color: rgba(255, 166, 0, 0.2);
+            border-color: rgba(209, 255, 26, 0.2);
         }
     ` : ''}
 `
@@ -55,7 +55,7 @@ const StyledTab = styled(Tab)`
     color: #64748B;
     min-height: 40px;
     &.Mui-selected {
-        color: #FFA600;
+        color: #d1ff1a;
     }
 `
 
@@ -71,7 +71,7 @@ const ItemCard = styled(Box)`
     transition: all 0.2s ease;
     &:hover {
         background: rgba(255, 255, 255, 0.06);
-        border-color: rgba(255, 166, 0, 0.2);
+        border-color: rgba(209, 255, 26, 0.2);
     }
 `
 
@@ -114,11 +114,11 @@ const FollowButton = styled(Button)<{ following?: number }>`
             color: #EF4444;
         }
     ` : `
-        background: linear-gradient(135deg, #FFA600, #FFD700);
+        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
         color: #0a0a0f;
         border: none;
         &:hover {
-            box-shadow: 0 4px 16px rgba(255, 166, 0, 0.3);
+            box-shadow: 0 4px 16px rgba(209, 255, 26, 0.3);
         }
     `}
 `
@@ -145,7 +145,7 @@ const ProgressBar = styled('div')<{ value: number }>`
         display: block;
         height: 100%;
         width: ${({ value }) => Math.min(100, value)}%;
-        background: linear-gradient(90deg, #FFA600, #FFD700);
+        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
         border-radius: 100px;
     }
 `
@@ -330,9 +330,9 @@ export default function Profile() {
     return (
         <PageBox>
             <Box sx={{
-                background: 'linear-gradient(180deg, rgba(255,166,0,0.06) 0%, transparent 100%)',
+                background: 'linear-gradient(180deg, rgba(209,255,26,0.06) 0%, transparent 100%)',
                 borderRadius: '24px',
-                border: '1px solid rgba(255,166,0,0.08)',
+                border: '1px solid rgba(209,255,26,0.08)',
                 p: { xs: 3, sm: 4 },
                 mb: 3,
                 position: 'relative',
@@ -345,7 +345,7 @@ export default function Profile() {
                     transform: 'translateX(-50%)',
                     width: '300px',
                     height: '300px',
-                    background: 'radial-gradient(circle, rgba(255,166,0,0.08) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(209,255,26,0.08) 0%, transparent 70%)',
                     pointerEvents: 'none',
                 }
             }}>
@@ -354,7 +354,7 @@ export default function Profile() {
                     <AvatarWrapper onClick={isOwnProfile ? () => fileInputRef.current?.click() : undefined}>
                         <Avatar
                             src={profilePic}
-                            sx={{ width: isMobile ? 80 : 100, height: isMobile ? 80 : 100, border: '2px solid rgba(255,166,0,0.3)' }}
+                            sx={{ width: isMobile ? 80 : 100, height: isMobile ? 80 : 100, border: '2px solid rgba(209,255,26,0.3)' }}
                         />
                         {isOwnProfile && (
                             <AvatarOverlay className="avatar-overlay">
@@ -399,7 +399,7 @@ export default function Profile() {
                                         variant="contained"
                                         disabled={saving}
                                         onClick={saveProfile}
-                                        sx={{ borderRadius: '10px', textTransform: 'none', background: '#FFA600', color: '#0a0a0f', fontWeight: 600, '&:hover': { background: '#FFD700' } }}
+                                        sx={{ borderRadius: '10px', textTransform: 'none', background: '#d1ff1a', color: '#0a0a0f', fontWeight: 600, '&:hover': { background: '#e4ff66' } }}
                                     >
                                         {saving ? <CircularProgress size={16} sx={{ color: '#0a0a0f' }} /> : 'Save'}
                                     </Button>
@@ -419,7 +419,7 @@ export default function Profile() {
                                         {user?.username?.trim() || shortAddr}
                                     </Typography>
                                     {isOwnProfile && (
-                                        <IconButton size="small" onClick={startEdit} sx={{ color: '#64748B', '&:hover': { color: '#FFA600' } }}>
+                                        <IconButton size="small" onClick={startEdit} sx={{ color: '#64748B', '&:hover': { color: '#d1ff1a' } }}>
                                             <EditIcon fontSize="small" />
                                         </IconButton>
                                     )}
@@ -477,8 +477,8 @@ export default function Profile() {
                         transition: 'all 0.2s ease',
                         '&:hover': {
                             transform: 'translateY(-2px)',
-                            borderColor: 'rgba(255,166,0,0.3)',
-                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                            borderColor: 'rgba(209,255,26,0.3)',
+                            boxShadow: '0 4px 16px rgba(209,255,26,0.1)',
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
@@ -490,8 +490,8 @@ export default function Profile() {
                         transition: 'all 0.2s ease',
                         '&:hover': {
                             transform: 'translateY(-2px)',
-                            borderColor: 'rgba(255,166,0,0.3)',
-                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                            borderColor: 'rgba(209,255,26,0.3)',
+                            boxShadow: '0 4px 16px rgba(209,255,26,0.1)',
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
@@ -503,8 +503,8 @@ export default function Profile() {
                         transition: 'all 0.2s ease',
                         '&:hover': {
                             transform: 'translateY(-2px)',
-                            borderColor: 'rgba(255,166,0,0.3)',
-                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                            borderColor: 'rgba(209,255,26,0.3)',
+                            boxShadow: '0 4px 16px rgba(209,255,26,0.1)',
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
@@ -516,8 +516,8 @@ export default function Profile() {
                         transition: 'all 0.2s ease',
                         '&:hover': {
                             transform: 'translateY(-2px)',
-                            borderColor: 'rgba(255,166,0,0.3)',
-                            boxShadow: '0 4px 16px rgba(255,166,0,0.1)',
+                            borderColor: 'rgba(209,255,26,0.3)',
+                            boxShadow: '0 4px 16px rgba(209,255,26,0.1)',
                         }
                     }}>
                         <Typography fontSize={20} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif">
@@ -535,7 +535,7 @@ export default function Profile() {
                     onChange={(_, v) => setTab(v)}
                     variant={isMobile ? "scrollable" : "standard"}
                     scrollButtons="auto"
-                    sx={{ '& .MuiTabs-indicator': { background: '#FFA600' }, minHeight: 40 }}
+                    sx={{ '& .MuiTabs-indicator': { background: '#d1ff1a' }, minHeight: 40 }}
                 >
                     <StyledTab label={`Created (${profile?.tokens?.length ?? 0})`} />
                     <StyledTab label={`Holdings (${profile?.helds?.length ?? 0})`} />
@@ -562,7 +562,7 @@ export default function Profile() {
                                                         <img src={`/networks/${token.network}.svg`} height={14} alt="" />
                                                     </Box>
                                                     <Box display="flex" alignItems="center" gap={2} mt={0.5}>
-                                                        <Typography fontSize={12} color="#FFD700" fontWeight={600}>MC: ${priceFormatter(token.marketcap, 2)}</Typography>
+                                                        <Typography fontSize={12} color="#e4ff66" fontWeight={600}>MC: ${priceFormatter(token.marketcap, 2)}</Typography>
                                                         {token.volume > 0 && (
                                                             <Typography fontSize={11} color="#64748B">Vol: ${priceFormatter(token.volume, 2, true, true)}</Typography>
                                                         )}
@@ -613,7 +613,7 @@ export default function Profile() {
                                                 </Box>
                                                 <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.3} flexShrink={0}>
                                                     {(held.token?.marketcap ?? held.marketcap) > 0 && (
-                                                        <Typography fontSize={12} color="#FFD700" fontWeight={600}>
+                                                        <Typography fontSize={12} color="#e4ff66" fontWeight={600}>
                                                             MC ${priceFormatter(held.token?.marketcap ?? held.marketcap, 2)}
                                                         </Typography>
                                                     )}
@@ -634,7 +634,7 @@ export default function Profile() {
                                     <ItemCard key={reply.id}>
                                         <Box flex={1} minWidth={0}>
                                             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                                                <Typography fontSize={11} color="#FFA600" fontWeight={500}>
+                                                <Typography fontSize={11} color="#d1ff1a" fontWeight={500}>
                                                     {reply.tokenAddress ? `${reply.tokenAddress.slice(0, 6)}...${reply.tokenAddress.slice(-4)}` : 'Token'}
                                                 </Typography>
                                                 <Typography fontSize={11} color="#475569">

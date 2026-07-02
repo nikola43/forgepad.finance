@@ -91,8 +91,8 @@ const Progress = styled('div') <{ value: number }>`
         top: 0;
         bottom: 0;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #FFA600, #FFD700);
-        box-shadow: 0 0 12px rgba(255, 166, 0, 0.4);
+        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
+        box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -102,10 +102,10 @@ const Progress = styled('div') <{ value: number }>`
         }
         @keyframes graduation-glow {
             0%, 100% {
-                box-shadow: 0 0 12px rgba(255, 166, 0, 0.4);
+                box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
             }
             50% {
-                box-shadow: 0 0 24px rgba(255, 215, 0, 0.8), 0 0 48px rgba(255, 166, 0, 0.4);
+                box-shadow: 0 0 24px rgba(228, 255, 102, 0.8), 0 0 48px rgba(209, 255, 26, 0.4);
             }
         }
     ` : ''}
@@ -127,7 +127,7 @@ const SmallButton = styled(Button)`
         transition: all 0.2s ease;
         &:hover {
             background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 166, 0, 0.2);
+            border-color: rgba(209, 255, 26, 0.2);
             color: white;
         }
     }
@@ -185,7 +185,7 @@ const CurrencyInput = styled(Box)`
   gap: 8px;
   transition: border-color 0.2s ease;
   &:focus-within {
-    border-color: rgba(255, 166, 0, 0.3);
+    border-color: rgba(209, 255, 26, 0.3);
   }
   & span.balance {
     align-self: flex-end;
@@ -254,7 +254,7 @@ const SocialLink = styled(Link)`
   transition: all 0.2s ease;
   &:hover {
     background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 166, 0, 0.2);
+    border-color: rgba(209, 255, 26, 0.2);
     color: white;
   }
   ${({ theme }) => theme.breakpoints.down("sm")} {
@@ -287,7 +287,7 @@ const ChatMessages = styled(Box)`
     flex-direction: column;
     gap: 12px;
     &::-webkit-scrollbar { width: 4px; }
-    &::-webkit-scrollbar-thumb { background: rgba(255, 166, 0, 0.2); border-radius: 10px; }
+    &::-webkit-scrollbar-thumb { background: rgba(209, 255, 26, 0.2); border-radius: 10px; }
 `
 
 const ChatBubble = styled(Box)<{ depth?: number }>`
@@ -325,7 +325,7 @@ const ChatInputBox = styled(Box)`
         max-height: 100px;
         transition: border-color 0.2s ease;
         &:focus {
-            border-color: rgba(255, 166, 0, 0.3);
+            border-color: rgba(209, 255, 26, 0.3);
         }
         &::placeholder {
             color: #64748B;
@@ -335,7 +335,7 @@ const ChatInputBox = styled(Box)`
 
 const ChatSendButton = styled(IconButton)`
     &.MuiIconButton-root {
-        background: linear-gradient(135deg, #FFA600, #FFD700);
+        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
         border-radius: 10px;
         width: 40px;
         height: 40px;
@@ -343,7 +343,7 @@ const ChatSendButton = styled(IconButton)`
         transition: all 0.2s ease;
         &:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 166, 0, 0.3);
+            box-shadow: 0 4px 12px rgba(209, 255, 26, 0.3);
         }
         &.Mui-disabled {
             background: rgba(255, 255, 255, 0.06);
@@ -357,11 +357,11 @@ const ReplyBadge = styled(Box)`
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(255, 166, 0, 0.08);
-    border: 1px solid rgba(255, 166, 0, 0.15);
+    background: rgba(209, 255, 26, 0.08);
+    border: 1px solid rgba(209, 255, 26, 0.15);
     border-radius: 8px;
     font-size: 12px;
-    color: #FFA600;
+    color: #d1ff1a;
     margin: 0 16px;
 `
 
@@ -466,7 +466,7 @@ const SwapBox = styled(Box)`
     transition: all 0.2s ease;
     &.medium:hover {
       background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 166, 0, 0.2);
+      border-color: rgba(209, 255, 26, 0.2);
       color: white;
     }
   }
@@ -676,15 +676,15 @@ const SwapContent = ({
                     display: 'flex',
                     gap: 1,
                     alignItems: 'center',
-                    background: priceImpact > 15 ? 'rgba(239,68,68,0.08)' : 'rgba(255,166,0,0.08)',
-                    border: `1px solid ${priceImpact > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(255,166,0,0.15)'}`,
+                    background: priceImpact > 15 ? 'rgba(239,68,68,0.08)' : 'rgba(209,255,26,0.08)',
+                    border: `1px solid ${priceImpact > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(209,255,26,0.15)'}`,
                     borderRadius: '8px',
                     p: '6px 10px',
                     mt: 1,
                     width: '100%',
                     boxSizing: 'border-box',
                 }}>
-                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#FFA600'} fontWeight={500}>
+                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#d1ff1a'} fontWeight={500}>
                         {'\u26A0\uFE0F'} Price impact: ~{priceImpact.toFixed(1)}%
                     </Typography>
                 </Box>
@@ -1001,7 +1001,7 @@ export default function Token() {
                 <span style={{ fontWeight: 600 }}>{type === 'sell' ? 'Sell' : 'Buy'} successful</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                    <a style={{ textDecoration: 'none', color: '#FFA600', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
+                    <a style={{ textDecoration: 'none', color: '#d1ff1a', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
                 </div>
             </div>,
             { duration: 8000 }
@@ -1164,7 +1164,7 @@ export default function Token() {
                                     </Box>
                                 </Box>
                                 <Box display="flex" gap="8px" alignItems="baseline">
-                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#FFA600"}>
+                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#d1ff1a"}>
                                         {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                                     </Typography>
                                     <Typography fontSize={12} color="white">Past 15m</Typography>
@@ -1357,7 +1357,7 @@ export default function Token() {
                                     <Link href={`${DEX_LINKS[selectedDex]}${id}`} target="_blank" style={{ textDecoration: 'none' }}>
                                         <Button variant="text" color="warning" sx={{ borderColor: 'transparent', display: "flex", alignItems: "center", justifyContent: "center", height: 'fit-content', width: '100%' }}>
                                             Trade {detailData?.tokenSymbol} on {selectedDex}
-                                            <LinkIcon sx={{ color: "#e19428", height: 16 }} />
+                                            <LinkIcon sx={{ color: "#bce128", height: 16 }} />
                                         </Button>
                                     </Link>
                                 }
@@ -1438,7 +1438,7 @@ export default function Token() {
                                     <ChatMessages ref={chatMessagesRef}>
                                         {chatLoading ? (
                                             <Box display="flex" justifyContent="center" py={4}>
-                                                <CircularProgress size={24} sx={{ color: '#FFA600' }} />
+                                                <CircularProgress size={24} sx={{ color: '#d1ff1a' }} />
                                             </Box>
                                         ) : threadedChats.length === 0 ? (
                                             <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1}>
@@ -1487,7 +1487,7 @@ export default function Token() {
                                                 Replying to {chatReplyTo.replyAddress?.slice(0, 6)}...{chatReplyTo.replyAddress?.slice(-4)}
                                             </Typography>
                                             <IconButton size="small" onClick={() => setChatReplyTo(null)} sx={{ padding: '2px' }}>
-                                                <CloseIcon sx={{ fontSize: 14, color: '#FFA600' }} />
+                                                <CloseIcon sx={{ fontSize: 14, color: '#d1ff1a' }} />
                                             </IconButton>
                                         </ReplyBadge>
                                     )}

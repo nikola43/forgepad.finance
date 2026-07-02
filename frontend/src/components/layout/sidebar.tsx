@@ -124,7 +124,7 @@ const Button = styled.button`
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #FFA600, #FFD700);
+  background: linear-gradient(135deg, #d1ff1a, #e4ff66);
   border: none;
   outline: none;
   border-radius: 10px;
@@ -139,7 +139,7 @@ const Button = styled.button`
 
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(255, 166, 0, 0.25);
+    box-shadow: 0 4px 16px rgba(209, 255, 26, 0.25);
   }
 
   &:active {
@@ -184,7 +184,7 @@ const CloseButton = styled.button`
 
     &:hover {
         background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 166, 0, 0.3);
+        border-color: rgba(209, 255, 26, 0.3);
     }
 `
 
@@ -230,7 +230,7 @@ export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: ()
         : <Box display="flex" justifyContent="space-between" alignItems="center">
           <img src="/images/forge3.png" width={431} height={22} alt="" />
           <CloseButton onClick={onClose}>
-              <CloseIcon style={{ color: "#FF9D00" }} />
+              <CloseIcon style={{ color: "#d1ff1a" }} />
           </CloseButton>
         </Box>
       }

@@ -108,7 +108,7 @@ const appKit = createAppKit({
   enableWalletGuide: false,
   defaultAccountTypes: { eip155: "eoa", solana: "eoa" },
   themeVariables: {
-    "--w3m-accent": "#FFA600",
+    "--w3m-accent": "#d1ff1a",
     "--w3m-border-radius-master": "2px",
   },
 });

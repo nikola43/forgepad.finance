@@ -56,11 +56,11 @@ const Title = styled(Typography)`
   letter-spacing: -0.03em;
   background: linear-gradient(
     135deg,
-    #FFD700 0%,
-    #FFA600 25%,
-    #FFE55C 50%,
-    #FFA600 75%,
-    #FFD700 100%
+    #e4ff66 0%,
+    #d1ff1a 25%,
+    #edff8f 50%,
+    #d1ff1a 75%,
+    #e4ff66 100%
   );
   background-size: 200% 200%;
   animation: gradientShift 4s ease infinite;
@@ -68,7 +68,7 @@ const Title = styled(Typography)`
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-fill-color: transparent;
-  text-shadow: 0 0 80px rgba(255, 166, 0, 0.3);
+  text-shadow: 0 0 80px rgba(209, 255, 26, 0.3);
 
   @keyframes gradientShift {
     0%, 100% { background-position: 0% 50%; }
@@ -93,13 +93,13 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
     transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05), inset 0 1px 2px rgba(255, 255, 255, 0.5)",
     "&:focus": {
-      borderColor: "#FFA600",
+      borderColor: "#d1ff1a",
       backgroundColor: "#FFF",
-      boxShadow: "0 8px 24px rgba(255, 166, 0, 0.15), 0 0 0 4px rgba(255, 166, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.8)",
+      boxShadow: "0 8px 24px rgba(209, 255, 26, 0.15), 0 0 0 4px rgba(209, 255, 26, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.8)",
       transform: "translateY(-1px)",
     },
     "&:hover": {
-      borderColor: "rgba(255, 166, 0, 0.4)",
+      borderColor: "rgba(209, 255, 26, 0.4)",
       backgroundColor: "#FFF",
       boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08), inset 0 1px 2px rgba(255, 255, 255, 0.6)",
     },
@@ -171,20 +171,20 @@ const AvatarWrapper = styled(Box)`
       0 8px 24px rgba(0, 0, 0, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
     &:hover {
-      border-color: rgba(255, 166, 0, 0.5);
+      border-color: rgba(209, 255, 26, 0.5);
       box-shadow:
-        0 12px 32px rgba(255, 166, 0, 0.3),
-        0 0 40px rgba(255, 166, 0, 0.2),
+        0 12px 32px rgba(209, 255, 26, 0.3),
+        0 0 40px rgba(209, 255, 26, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
       transform: scale(1.05);
     }
   }
 
   &.dragover .MuiAvatar-root {
-    border-color: rgba(255, 166, 0, 0.7);
+    border-color: rgba(209, 255, 26, 0.7);
     box-shadow:
-      0 12px 32px rgba(255, 166, 0, 0.4),
-      0 0 60px rgba(255, 166, 0, 0.3),
+      0 12px 32px rgba(209, 255, 26, 0.4),
+      0 0 60px rgba(209, 255, 26, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
     transform: scale(1.03);
   }
@@ -217,14 +217,14 @@ const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
   border-radius: 16px;
   background: ${({ checked }) =>
     checked
-      ? "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)"
+      ? "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)"
       : "rgba(255, 255, 255, 0.04)"
   };
   backdrop-filter: blur(20px);
   color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
   border: 2px solid ${({ checked }) =>
     checked
-      ? "rgba(255, 166, 0, 0.5)"
+      ? "rgba(209, 255, 26, 0.5)"
       : "rgba(255, 255, 255, 0.08)"
   };
   display: flex;
@@ -240,27 +240,27 @@ const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: ${({ checked }) =>
     checked
-      ? "0 8px 24px rgba(255, 166, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+      ? "0 8px 24px rgba(209, 255, 26, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
       : "0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)"
   };
 
   &:hover {
     background: ${({ checked }) =>
       checked
-        ? "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)"
+        ? "linear-gradient(135deg, #daff47 0%, #edff8f 100%)"
         : "rgba(255, 255, 255, 0.08)"
     };
     color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
     transform: translateY(-3px) scale(1.02);
     box-shadow: ${({ checked }) =>
       checked
-        ? "0 12px 32px rgba(255, 166, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)"
+        ? "0 12px 32px rgba(209, 255, 26, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)"
         : "0 8px 20px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06)"
     };
     border-color: ${({ checked }) =>
       checked
-        ? "rgba(255, 166, 0, 0.6)"
-        : "rgba(255, 166, 0, 0.3)"
+        ? "rgba(209, 255, 26, 0.6)"
+        : "rgba(209, 255, 26, 0.3)"
     };
   }
 
@@ -833,19 +833,19 @@ export default function Create() {
         {address ? (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+              background: "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
               fontWeight: 700,
               fontSize: "16px",
               textTransform: "none",
-              boxShadow: "0 4px 12px rgba(255, 166, 0, 0.3)",
+              boxShadow: "0 4px 12px rgba(209, 255, 26, 0.3)",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
-                background: "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                background: "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
                 transform: "translateY(-2px)",
-                boxShadow: "0 8px 20px rgba(255, 166, 0, 0.4)",
+                boxShadow: "0 8px 20px rgba(209, 255, 26, 0.4)",
               },
               "&:active": {
                 transform: "translateY(0px)",
@@ -859,19 +859,19 @@ export default function Create() {
         ) : (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+              background: "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
               fontWeight: 700,
               fontSize: "16px",
               textTransform: "none",
-              boxShadow: "0 4px 12px rgba(255, 166, 0, 0.3)",
+              boxShadow: "0 4px 12px rgba(209, 255, 26, 0.3)",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
-                background: "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                background: "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
                 transform: "translateY(-2px)",
-                boxShadow: "0 8px 20px rgba(255, 166, 0, 0.4)",
+                boxShadow: "0 8px 20px rgba(209, 255, 26, 0.4)",
               },
               "&:active": {
                 transform: "translateY(0px)",
@@ -966,8 +966,8 @@ export default function Create() {
             fullWidth
             sx={{
               background: isLoading || !!error
-                ? "rgba(255, 166, 0, 0.3)"
-                : "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+                ? "rgba(209, 255, 26, 0.3)"
+                : "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
               color: "black",
               padding: "14px 24px",
               borderRadius: "12px",
@@ -976,16 +976,16 @@ export default function Create() {
               textTransform: "none",
               boxShadow: isLoading || !!error
                 ? "none"
-                : "0 4px 12px rgba(255, 166, 0, 0.3)",
+                : "0 4px 12px rgba(209, 255, 26, 0.3)",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
                 background: isLoading || !!error
-                  ? "rgba(255, 166, 0, 0.3)"
-                  : "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                  ? "rgba(209, 255, 26, 0.3)"
+                  : "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
                 transform: isLoading || !!error ? "none" : "translateY(-2px)",
                 boxShadow: isLoading || !!error
                   ? "none"
-                  : "0 8px 20px rgba(255, 166, 0, 0.4)",
+                  : "0 8px 20px rgba(209, 255, 26, 0.4)",
               },
               "&:active": {
                 transform: isLoading || !!error ? "none" : "translateY(0px)",
@@ -1041,7 +1041,7 @@ export default function Create() {
         )}
         <DialogTitle sx={{ pb: 1.5, pt: 2.5, px: 4 }}>
           <Box display="flex" alignItems="center" gap={1}>
-            <Typography fontSize={20} component="span" sx={{ color: "#FFD700" }}>
+            <Typography fontSize={20} component="span" sx={{ color: "#e4ff66" }}>
               ✓
             </Typography>
             <Typography fontSize={20} fontWeight={600}>Token Created Successfully!</Typography>
@@ -1143,8 +1143,8 @@ export default function Create() {
             }
             sx={{
               background: waitingForDeploy || !createdTokenData?.tokenAddress
-                ? "rgba(255, 166, 0, 0.3)"
-                : "linear-gradient(135deg, #FFA600 0%, #FFD700 100%)",
+                ? "rgba(209, 255, 26, 0.3)"
+                : "linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%)",
               color: "black",
               py: 2.5,
               fontSize: 18,
@@ -1153,18 +1153,18 @@ export default function Create() {
               borderRadius: "12px",
               boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
                 ? "none"
-                : "0 4px 12px rgba(255, 166, 0, 0.3)",
+                : "0 4px 12px rgba(209, 255, 26, 0.3)",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
                 background: waitingForDeploy || !createdTokenData?.tokenAddress
-                  ? "rgba(255, 166, 0, 0.3)"
-                  : "linear-gradient(135deg, #FFB733 0%, #FFE55C 100%)",
+                  ? "rgba(209, 255, 26, 0.3)"
+                  : "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
                 transform: waitingForDeploy || !createdTokenData?.tokenAddress
                   ? "none"
                   : "translateY(-2px)",
                 boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
                   ? "none"
-                  : "0 8px 20px rgba(255, 166, 0, 0.4)",
+                  : "0 8px 20px rgba(209, 255, 26, 0.4)",
               },
               "&:active": {
                 transform: waitingForDeploy || !createdTokenData?.tokenAddress

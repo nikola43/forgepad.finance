@@ -36,15 +36,15 @@ export function ScrollToTopButton() {
           zIndex: 50,
           width: 44,
           height: 44,
-          background: 'rgba(255, 166, 0, 0.15)',
+          background: 'rgba(209, 255, 26, 0.15)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255, 166, 0, 0.25)',
-          color: '#FFA600',
+          border: '1px solid rgba(209, 255, 26, 0.25)',
+          color: '#d1ff1a',
           transition: 'all 0.25s ease',
           '&:hover': {
-            background: 'rgba(255, 166, 0, 0.25)',
+            background: 'rgba(209, 255, 26, 0.25)',
             transform: 'translateY(-3px)',
-            boxShadow: '0 8px 24px rgba(255, 166, 0, 0.2)',
+            boxShadow: '0 8px 24px rgba(209, 255, 26, 0.2)',
           },
         }}
       >

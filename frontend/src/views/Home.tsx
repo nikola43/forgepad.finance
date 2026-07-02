@@ -43,10 +43,10 @@ const CreateButton = styled(Link)`
     text-decoration: none;
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     &:hover {
-        border-color: rgba(255, 166, 0, 0.3);
-        background: rgba(255, 166, 0, 0.05);
+        border-color: rgba(209, 255, 26, 0.3);
+        background: rgba(209, 255, 26, 0.05);
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(255, 166, 0, 0.1);
+        box-shadow: 0 8px 24px rgba(209, 255, 26, 0.1);
     }
     ${({ theme }) => theme.breakpoints.down(800)} {
         font-size: 20px;
@@ -64,7 +64,7 @@ const SearchToken = styled(TextField)`
         transition: all 0.2s ease;
 
         &:hover, &.Mui-focused {
-            border-color: rgba(255, 166, 0, 0.25);
+            border-color: rgba(209, 255, 26, 0.25);
             background: rgba(255, 255, 255, 0.05);
         }
 
@@ -87,7 +87,7 @@ const SearchButton = styled('button')`
     text-decoration: none;
     transition: all 0.2s ease;
     &:hover {
-        border-color: rgba(255, 166, 0, 0.25);
+        border-color: rgba(209, 255, 26, 0.25);
         color: white;
         background: rgba(255, 255, 255, 0.06);
     }
@@ -96,8 +96,8 @@ const SearchButton = styled('button')`
 const KingCard = styled(Box)`
     position: relative;
     border-radius: 20px;
-    background: linear-gradient(135deg, rgba(255, 166, 0, 0.08) 0%, rgba(139, 92, 246, 0.06) 50%, rgba(255, 166, 0, 0.04) 100%);
-    border: 1px solid rgba(255, 166, 0, 0.2);
+    background: linear-gradient(135deg, rgba(209, 255, 26, 0.08) 0%, rgba(139, 92, 246, 0.06) 50%, rgba(209, 255, 26, 0.04) 100%);
+    border: 1px solid rgba(209, 255, 26, 0.2);
     padding: 24px;
     display: flex;
     align-items: center;
@@ -111,7 +111,7 @@ const KingCard = styled(Box)`
         inset: 0;
         border-radius: inherit;
         padding: 1px;
-        background: linear-gradient(135deg, rgba(255, 166, 0, 0.5), rgba(255, 215, 0, 0.3), rgba(139, 92, 246, 0.2));
+        background: linear-gradient(135deg, rgba(209, 255, 26, 0.5), rgba(228, 255, 102, 0.3), rgba(139, 92, 246, 0.2));
         -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         -webkit-mask-composite: xor;
         mask-composite: exclude;
@@ -120,8 +120,8 @@ const KingCard = styled(Box)`
     }
     &:hover {
         transform: translateY(-3px);
-        border-color: rgba(255, 166, 0, 0.4);
-        box-shadow: 0 12px 40px rgba(255, 166, 0, 0.12), 0 0 60px rgba(255, 166, 0, 0.06);
+        border-color: rgba(209, 255, 26, 0.4);
+        box-shadow: 0 12px 40px rgba(209, 255, 26, 0.12), 0 0 60px rgba(209, 255, 26, 0.06);
         &::before { opacity: 1; }
     }
     ${({ theme }) => theme.breakpoints.down(800)} {
@@ -136,7 +136,7 @@ const KingCrown = styled(Box)`
     gap: 8px;
     & .crown {
         font-size: 24px;
-        filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+        filter: drop-shadow(0 0 8px rgba(228, 255, 102, 0.5));
     }
     ${({ theme }) => theme.breakpoints.down(800)} {
         & .crown { font-size: 18px; }
@@ -155,8 +155,8 @@ const KingProgress = styled('div')<{ value: number }>`
         display: block;
         height: 100%;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #FFA600, #FFD700);
-        box-shadow: 0 0 8px rgba(255, 166, 0, 0.4);
+        background: linear-gradient(90deg, #d1ff1a, #e4ff66);
+        box-shadow: 0 0 8px rgba(209, 255, 26, 0.4);
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -180,9 +180,9 @@ const QuickBuyButton = styled('button')<{ loading?: number }>`
     pointer-events: ${({ loading }) => loading ? 'none' : 'auto'};
     opacity: ${({ loading }) => loading ? 0.6 : 1};
     &:hover {
-        background: rgba(255, 166, 0, 0.1);
-        border-color: rgba(255, 166, 0, 0.3);
-        color: #FFD700;
+        background: rgba(209, 255, 26, 0.1);
+        border-color: rgba(209, 255, 26, 0.3);
+        color: #e4ff66;
     }
     &:active {
         transform: scale(0.96);
@@ -205,8 +205,8 @@ const CardGrid = styled(Box) <{ min: number, space: number }>`
 const GraduatingSection = styled(Box)`
     position: relative;
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(255, 100, 0, 0.05) 0%, rgba(13, 13, 20, 0.8) 40%, rgba(255, 166, 0, 0.03) 100%);
-    border: 1px solid rgba(255, 100, 0, 0.15);
+    background: linear-gradient(135deg, rgba(168, 212, 0, 0.05) 0%, rgba(13, 13, 20, 0.8) 40%, rgba(209, 255, 26, 0.03) 100%);
+    border: 1px solid rgba(168, 212, 0, 0.15);
     padding: 20px;
     overflow: hidden;
     &::before {
@@ -214,8 +214,8 @@ const GraduatingSection = styled(Box)`
         position: absolute;
         inset: 0;
         border-radius: inherit;
-        background: radial-gradient(ellipse at 30% 0%, rgba(255, 100, 0, 0.1) 0%, transparent 50%),
-                    radial-gradient(ellipse at 70% 100%, rgba(255, 166, 0, 0.06) 0%, transparent 50%);
+        background: radial-gradient(ellipse at 30% 0%, rgba(168, 212, 0, 0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 100%, rgba(209, 255, 26, 0.06) 0%, transparent 50%);
         pointer-events: none;
     }
     &::after {
@@ -225,7 +225,7 @@ const GraduatingSection = styled(Box)`
         left: 0;
         right: 0;
         height: 2px;
-        background: linear-gradient(90deg, transparent, rgba(255, 140, 0, 0.6), rgba(255, 200, 0, 0.8), rgba(255, 140, 0, 0.6), transparent);
+        background: linear-gradient(90deg, transparent, rgba(196, 239, 14, 0.6), rgba(228, 255, 102, 0.8), rgba(196, 239, 14, 0.6), transparent);
         background-size: 200% 100%;
         animation: graduating-border-glow 3s ease-in-out infinite;
         border-radius: 16px 16px 0 0;
@@ -239,7 +239,7 @@ const GraduatingSection = styled(Box)`
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         &:hover {
             transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 8px 32px rgba(255, 140, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(196, 239, 14, 0.2);
         }
     }
     .graduation-card:nth-child(1) { animation-delay: 0s; }
@@ -256,7 +256,7 @@ const GraduatingSection = styled(Box)`
 const SectionDivider = () => (
     <Box sx={{
         height: '1px',
-        background: 'linear-gradient(90deg, transparent, rgba(255,166,0,0.15), transparent)',
+        background: 'linear-gradient(90deg, transparent, rgba(209,255,26,0.15), transparent)',
         my: 3
     }} />
 );
@@ -311,7 +311,7 @@ export default function Home() {
                     <span style={{ fontWeight: 600 }}>Buy successful</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                        <a style={{ textDecoration: 'none', color: '#FFA600', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
+                        <a style={{ textDecoration: 'none', color: '#d1ff1a', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
                     </div>
                 </div>,
                 { duration: 8000 }
@@ -440,7 +440,7 @@ export default function Home() {
                             <Box display="flex" alignItems="center" gap="16px" mt={1} flexWrap="wrap">
                                 <Box>
                                     <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Market Cap</Typography>
-                                    <Typography fontSize={20} fontWeight={700} color="#FFD700" fontFamily="'Space Grotesk', sans-serif">
+                                    <Typography fontSize={20} fontWeight={700} color="#e4ff66" fontFamily="'Space Grotesk', sans-serif">
                                         ${priceFormatter(king.marketcap, 2)}
                                     </Typography>
                                 </Box>
@@ -505,7 +505,7 @@ export default function Home() {
                                 loading={quickBuyLoading === amt ? 1 : 0}
                                 onClick={(e) => { e.stopPropagation(); handleQuickBuy(amt, amt) }}
                             >
-                                {quickBuyLoading === amt && <CircularProgress size={12} sx={{ color: '#FFD700' }} />}
+                                {quickBuyLoading === amt && <CircularProgress size={12} sx={{ color: '#e4ff66' }} />}
                                 {amt} BNB
                             </QuickBuyButton>
                         ))}
@@ -520,7 +520,7 @@ export default function Home() {
                                 }
                             }}
                         >
-                            {quickBuyLoading === 'max' && <CircularProgress size={12} sx={{ color: '#FFD700' }} />}
+                            {quickBuyLoading === 'max' && <CircularProgress size={12} sx={{ color: '#e4ff66' }} />}
                             MAX
                         </QuickBuyButton>
                     </Box>
@@ -567,18 +567,18 @@ export default function Home() {
                         <Box sx={{
                             fontSize: 16, lineHeight: 1,
                             animation: 'pulse 2s ease-in-out infinite',
-                            filter: 'drop-shadow(0 0 4px rgba(255,100,0,0.5))',
+                            filter: 'drop-shadow(0 0 4px rgba(168,212,0,0.5))',
                         }}>🔥</Box>
                         <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
                             About to Graduate
                         </Typography>
                         <Box sx={{
                             display: 'flex', alignItems: 'center', gap: 1, ml: 'auto',
-                            background: 'rgba(255,140,0,0.08)', borderRadius: '8px', px: 1.5, py: 0.5,
-                            border: '1px solid rgba(255,140,0,0.15)',
+                            background: 'rgba(196,239,14,0.08)', borderRadius: '8px', px: 1.5, py: 0.5,
+                            border: '1px solid rgba(196,239,14,0.15)',
                         }}>
-                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#FF8C00', boxShadow: '0 0 8px #FF8C00', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                            <Typography fontSize={11} color="#FFA600" fontWeight={600}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#c4ef0e', boxShadow: '0 0 8px #c4ef0e', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                            <Typography fontSize={11} color="#d1ff1a" fontWeight={600}>
                                 Progress &gt; 70%
                             </Typography>
                         </Box>
@@ -593,7 +593,7 @@ export default function Home() {
                                 justifyContent: filteredGraduatingTokens.length <= 3 ? 'center' : 'flex-start',
                                 '&::-webkit-scrollbar': { height: 4 },
                                 '&::-webkit-scrollbar-track': { background: 'transparent' },
-                                '&::-webkit-scrollbar-thumb': { background: 'rgba(255,166,0,0.3)', borderRadius: 2 },
+                                '&::-webkit-scrollbar-thumb': { background: 'rgba(209,255,26,0.3)', borderRadius: 2 },
                             }}
                         >
                             {filteredGraduatingTokens.map((item: any) => (
@@ -609,9 +609,9 @@ export default function Home() {
                                         left: 0,
                                         height: '3px',
                                         width: `${Math.min(99, Number(item.progress ?? 0))}%`,
-                                        background: 'linear-gradient(90deg, #FF6400, #FFD700)',
+                                        background: 'linear-gradient(90deg, #a8d400, #e4ff66)',
                                         borderRadius: '0 3px 3px 0',
-                                        boxShadow: '0 0 12px rgba(255,200,0,0.4)',
+                                        boxShadow: '0 0 12px rgba(228,255,102,0.4)',
                                         transition: 'width 1s ease-out',
                                     }
                                 }}>
@@ -627,19 +627,19 @@ export default function Home() {
 
             {/* All Tokens Section Header with Sort/Filter */}
             <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center" flexWrap="wrap">
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#FFA600', boxShadow: '0 0 8px #FFA600' }} />
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#d1ff1a', boxShadow: '0 0 8px #d1ff1a' }} />
                 <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
                     All Tokens
                 </Typography>
                 <Box display="flex" gap="8px" ml="auto" flexWrap="wrap">
-                    <ComboBox label="Sort" border="1px solid #FF9D00" values={{
+                    <ComboBox label="Sort" border="1px solid #c4ef0e" values={{
                         bump: 'Trending',
                         marketcap: 'Market cap',
                         creationTime: 'Creation time',
                         volume: 'Trading volume',
                         // progress: 'Progress'
                     }} value={orderType} onChange={setOrderType} />
-                    <ComboBox label="Network" border="1px solid #FF9D00" values={{
+                    <ComboBox label="Network" border="1px solid #c4ef0e" values={{
                         all: 'All',
                         ...(
                             chains?.reduce((networks, c) => ({

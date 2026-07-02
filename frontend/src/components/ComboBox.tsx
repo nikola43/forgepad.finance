@@ -16,7 +16,7 @@ const ComboBoxRoot = styled(Box)`
     cursor: pointer;
     transition: all 0.2s ease;
     &:hover {
-      border-color: rgba(255, 166, 0, 0.25);
+      border-color: rgba(209, 255, 26, 0.25);
       background: rgba(255, 255, 255, 0.06);
     }
   }

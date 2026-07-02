@@ -91,8 +91,8 @@ export function KingCardSkeleton() {
   return (
     <Box sx={{
       borderRadius: '20px',
-      background: 'linear-gradient(135deg, rgba(255,166,0,0.04) 0%, rgba(139,92,246,0.03) 50%, rgba(255,166,0,0.02) 100%)',
-      border: '1px solid rgba(255,166,0,0.1)',
+      background: 'linear-gradient(135deg, rgba(209,255,26,0.04) 0%, rgba(139,92,246,0.03) 50%, rgba(209,255,26,0.02) 100%)',
+      border: '1px solid rgba(209,255,26,0.1)',
       p: '24px',
       display: 'flex',
       alignItems: 'center',

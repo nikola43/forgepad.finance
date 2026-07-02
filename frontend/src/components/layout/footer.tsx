@@ -18,7 +18,7 @@ const FooterWrapper = styled.footer`
         left: 10%;
         right: 10%;
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(255, 166, 0, 0.2), transparent);
+        background: linear-gradient(90deg, transparent, rgba(209, 255, 26, 0.2), transparent);
     }
 `
 
@@ -55,7 +55,7 @@ const Brand = styled.div`
         font-family: 'Space Grotesk', sans-serif;
         font-size: 20px;
         font-weight: 700;
-        background: linear-gradient(135deg, #FFA600, #FFD700);
+        background: linear-gradient(135deg, #d1ff1a, #e4ff66);
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -101,7 +101,7 @@ const LinkGroup = styled.div`
         text-decoration: none;
         transition: color 0.2s ease;
         &:hover {
-            color: #FFA600;
+            color: #d1ff1a;
         }
     }
 `
@@ -123,10 +123,10 @@ const SocialLinks = styled.div`
         transition: all 0.25s ease;
 
         &:hover {
-            background: rgba(255, 166, 0, 0.1);
-            border-color: rgba(255, 166, 0, 0.25);
+            background: rgba(209, 255, 26, 0.1);
+            border-color: rgba(209, 255, 26, 0.25);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 166, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(209, 255, 26, 0.15);
         }
     }
 `

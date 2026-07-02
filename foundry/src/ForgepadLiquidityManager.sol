@@ -645,7 +645,8 @@ contract ForgepadLiquidityManager is
             amount1Desired
         );
 
-        (int24 tickLower, int24 tickUpper) = getFullRangeTicks(POOL_FEE);
+        // V4 pool uses TICK_SPACING, so full-range ticks must align to it.
+        (int24 tickLower, int24 tickUpper) = _fullRangeTicks(TICK_SPACING);
 
         // Converts token amounts to liquidity units
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
@@ -748,8 +749,15 @@ contract ForgepadLiquidityManager is
     function getFullRangeTicks(
         uint24 fee
     ) public pure returns (int24 tickLower, int24 tickUpper) {
-        int24 tickSpacing = getTickSpacing(fee);
+        return _fullRangeTicks(getTickSpacing(fee));
+    }
 
+    /// @dev Full-range ticks aligned to an explicit tick spacing. V4 sets its
+    ///      tick spacing independently of the fee tier, so it must align ticks to
+    ///      that spacing rather than the fee-derived one (or the mint reverts).
+    function _fullRangeTicks(
+        int24 tickSpacing
+    ) internal pure returns (int24 tickLower, int24 tickUpper) {
         // Calculate nearest valid ticks for full range
         tickLower = (MIN_TICK / tickSpacing) * tickSpacing;
         tickUpper = (MAX_TICK / tickSpacing) * tickSpacing;

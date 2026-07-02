@@ -144,7 +144,7 @@ const Banner = styled.div`
 const StyledButton = styled.button`
     height: 40px;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #FFA600 0%, #FFD700 100%);
+    background: linear-gradient(135deg, #d1ff1a 0%, #e4ff66 100%);
     border: none;
     border-radius: 10px;
     color: #0a0a0f;
@@ -160,7 +160,7 @@ const StyledButton = styled.button`
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     &:hover {
         transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(255, 166, 0, 0.3);
+        box-shadow: 0 4px 16px rgba(209, 255, 26, 0.3);
     }
     &:active {
         transform: translateY(0);
@@ -257,7 +257,7 @@ const SearchToken = styled(TextField)`
         }
 
         &:hover, &.Mui-focused {
-            border-color: rgba(255, 166, 0, 0.3);
+            border-color: rgba(209, 255, 26, 0.3);
             background: rgba(255, 255, 255, 0.06);
         }
 
@@ -461,7 +461,7 @@ export default function Header() {
         return <>
             <HeaderBox p="6px 8px" style={{ border: 'none' }}>
                 <Link href="/">
-                    <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" />
+                    <img src="/images/forge2.png" width={54} height={54} style={{ border: "1px solid #d1ff1a", borderRadius: "4px" }} alt="" />
                 </Link>
                 <Link href="/forge" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')} style={{ height: "40px" }}>
@@ -717,7 +717,7 @@ export default function Header() {
                             position: 'absolute',
                             top: 8,
                             right: 8,
-                            background: 'linear-gradient(135deg, #FFA600, #FFD700)',
+                            background: 'linear-gradient(135deg, #d1ff1a, #e4ff66)',
                             color: '#0a0a0f',
                             borderRadius: '100px',
                             px: 1,
@@ -732,7 +732,7 @@ export default function Header() {
                         </BadgePulse>
                     )}
                     <Link href="/forge">
-                        <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #FFA600", borderRadius: "4px" }} alt="" className="logo" />
+                        <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #d1ff1a", borderRadius: "4px" }} alt="" className="logo" />
                     </Link>
                 </Box>
                 {

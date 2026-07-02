@@ -39,13 +39,13 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
-    uint256 public constant PUMP_FUN_TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    // uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
-    uint256 public constant PUMP_FUN_TARGET_MARKET_CAP_USD = 10_000 * 1e18; // Graduation at ~$10K virtual MCAP
-    uint256 public constant PUMP_FUN_VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
-    uint256 public constant PUMP_FUN_VIRTUAL_TOKEN_INITIAL =
+    uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
+    // uint256 public constant TARGET_MARKET_CAP_USD = 69_000 * 1e18; // Graduation at ~$69k virtual MCAP
+    uint256 public constant TARGET_MARKET_CAP_USD = 25_000 * 1e18; // Graduation at ~$25K virtual MCAP
+    uint256 public constant VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
+    uint256 public constant VIRTUAL_TOKEN_INITIAL =
         1_073_000_000 * 1e18; // Virtual tokens for pricing curve
-    uint256 public constant PUMP_FUN_REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
+    uint256 public constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
 
     struct PoolInfo {
         uint256 ethReserve; // REAL ETH in contract (used for LP)
@@ -73,7 +73,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     uint256 public TOKEN_OWNER_FEE_PERCENT = 0; // Optional (set to 0 for pure Pump.fun; can be 0.3 via setter)
     uint256 public PLATFORM_BUY_FEE_PERCENT = 1; // Platform portion (~0.95% in Pump.fun)
     uint256 public PLATFORM_SELL_FEE_PERCENT = 1;
-    uint256 public platformLPFee = 0.5 ether;
+    uint256 public platformLPFee = 0.1 ether;
     uint256 public tokenOwnerLPFee = 0 ether;
     uint256 public firstBuyFeeUSD = 0;
 
@@ -91,6 +91,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     uint256 public constant EMERGENCY_TIMELOCK = 24 hours;
     uint256 public emergencyWithdrawRequestTime;
     uint256 public emergencyWithdrawAmount;
+
+    // Timelock for liquidity manager changes (graduation ETH flows here, so an
+    // instant swap would let the owner drain the next graduation)
+    address public pendingLiquidityManager;
+    uint256 public liquidityManagerChangeTime;
 
     // ==================== EVENTS ====================
     event TokenCreated(
@@ -129,6 +134,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     event TokenLaunched(address token, uint256 date);
     event EmergencyWithdrawRequested(uint256 amount, uint256 executeAfter);
     event EmergencyWithdrawExecuted(uint256 amount);
+    event LiquidityManagerChangeRequested(
+        address newManager,
+        uint256 executeAfter
+    );
+    event LiquidityManagerChanged(address newManager);
 
     receive() external payable {}
 
@@ -225,7 +235,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         require(deadline >= block.timestamp, "Swap expired");
 
         address newToken = address(
-            new Token(name, symbol, PUMP_FUN_TOTAL_SUPPLY)
+            new Token(name, symbol, TOTAL_SUPPLY)
         );
 
         uint256 firstBuyFee = buyAmount > 0 ? getFirstBuyFee(newToken) : 0;
@@ -237,9 +247,9 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         // Initialize exactly like Pump.fun: virtual curve + real reserves
         tokenPools[newToken] = PoolInfo({
             ethReserve: 0,
-            tokenReserve: PUMP_FUN_REAL_TOKEN_INITIAL,
-            virtualEthReserve: PUMP_FUN_VIRTUAL_ETH_INITIAL,
-            virtualTokenReserve: PUMP_FUN_VIRTUAL_TOKEN_INITIAL,
+            tokenReserve: REAL_TOKEN_INITIAL,
+            virtualEthReserve: VIRTUAL_ETH_INITIAL,
+            virtualTokenReserve: VIRTUAL_TOKEN_INITIAL,
             token: newToken,
             owner: msg.sender,
             poolType: poolType,
@@ -556,7 +566,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         return
             (getETHPriceByUSD() *
-                PUMP_FUN_TOTAL_SUPPLY *
+                TOTAL_SUPPLY *
                 pool.virtualEthReserve) /
             pool.virtualTokenReserve /
             1e18;
@@ -573,10 +583,10 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         PoolInfo storage pool = tokenPools[token];
         if (pool.virtualTokenReserve == 0) return 10000; // 100%
 
-        uint256 tokensSold = PUMP_FUN_VIRTUAL_TOKEN_INITIAL -
+        uint256 tokensSold = VIRTUAL_TOKEN_INITIAL -
             pool.virtualTokenReserve;
-        uint256 maxSellable = PUMP_FUN_VIRTUAL_TOKEN_INITIAL -
-            PUMP_FUN_REAL_TOKEN_INITIAL;
+        uint256 maxSellable = VIRTUAL_TOKEN_INITIAL -
+            REAL_TOKEN_INITIAL;
 
         if (maxSellable == 0) return 0;
         progressPercent = _mul(tokensSold, 10_000) / maxSellable;
@@ -585,7 +595,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
     function _checkAndAddLiquidity(address token) internal {
         PoolInfo storage pool = tokenPools[token];
 
-        if (getTokenVirtualMarketCap(token) < PUMP_FUN_TARGET_MARKET_CAP_USD) {
+        if (getTokenVirtualMarketCap(token) < TARGET_MARKET_CAP_USD) {
             return;
         }
 
@@ -599,6 +609,15 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
 
         // Use actual contract balance — real reserve may be depleted near graduation
         uint256 tokenAmountForLP = IERC20(token).balanceOf(address(this));
+        uint256 remainingEthReserve = pool.ethReserve - ethAmountForLP;
+        address poolOwner = pool.owner;
+
+        // Effects before interactions: clear reserves up front. poolType/owner
+        // stay intact for _addLiquidity, which reads token balance, not reserves.
+        pool.ethReserve = 0;
+        pool.tokenReserve = 0;
+        pool.virtualEthReserve = 0;
+        pool.virtualTokenReserve = 0;
 
         _addLiquidity(token, ethAmountForLP, tokenAmountForLP);
 
@@ -609,18 +628,11 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         }
 
         // Distribute remaining ETH (half to creator, half to platform)
-        uint256 remainingEthReserve = pool.ethReserve - ethAmountForLP;
         if (remainingEthReserve > 0) {
             uint256 ownerShare = remainingEthReserve / 2;
-            _transferETH(pool.owner, ownerShare);
+            _transferETH(poolOwner, ownerShare);
             _transferETH(feeAddress, remainingEthReserve - ownerShare);
         }
-
-        // Clear pool reserves
-        pool.ethReserve = 0;
-        pool.tokenReserve = 0;
-        pool.virtualEthReserve = 0;
-        pool.virtualTokenReserve = 0;
 
         emit TokenLaunched(token, block.timestamp);
     }
@@ -630,11 +642,12 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         uint256 ethAmount,
         uint256 tokenAmount
     ) internal {
-        IERC20(token).approve(address(liquidityManager), tokenAmount);
-
         PoolInfo memory pool = tokenPools[token];
+        uint256 ethPriceUSD = getETHPriceByUSD();
 
         if (pool.poolType == 1) {
+            // V2 recomputes the LP token amount internally against the target.
+            IERC20(token).approve(address(liquidityManager), tokenAmount);
             liquidityManager.addLiquidityV2WithTargetMarketCap{
                 value: ethAmount
             }(
@@ -642,20 +655,36 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
                 tokenAmount,
                 ethAmount,
                 burnAddress,
-                PUMP_FUN_TARGET_MARKET_CAP_USD,
-                getETHPriceByUSD()
+                TARGET_MARKET_CAP_USD,
+                ethPriceUSD
             );
         } else if (pool.poolType == 2) {
+            // V3/V4 derive the pool price from the amounts we hand them, so we
+            // must pin the token amount to the target here (or the pool would
+            // open far below the curve graduation price). Excess tokens are
+            // burned by the caller after this returns.
+            uint256 tokenForLP = _tokensForTargetMcap(
+                ethAmount,
+                tokenAmount,
+                ethPriceUSD
+            );
+            IERC20(token).approve(address(liquidityManager), tokenForLP);
             liquidityManager.addLiquidityV3{value: ethAmount}(
                 token,
-                tokenAmount,
+                tokenForLP,
                 ethAmount,
                 burnAddress
             );
         } else if (pool.poolType == 3) {
+            uint256 tokenForLP = _tokensForTargetMcap(
+                ethAmount,
+                tokenAmount,
+                ethPriceUSD
+            );
+            IERC20(token).approve(address(liquidityManager), tokenForLP);
             liquidityManager.addLiquidityV4{value: ethAmount}(
                 token,
-                tokenAmount,
+                tokenForLP,
                 ethAmount,
                 burnAddress
             );
@@ -669,6 +698,19 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
             tokenAmount,
             IERC20(token).totalSupply()
         );
+    }
+
+    /// @dev Tokens to pair with `ethAmount` so the DEX pool opens at the target
+    ///      market cap — i.e. the same price the bonding curve graduated at, so
+    ///      there is no price gap on migration. Mirrors the V2 target math.
+    function _tokensForTargetMcap(
+        uint256 ethAmount,
+        uint256 availableTokens,
+        uint256 ethPriceUSD
+    ) internal pure returns (uint256) {
+        uint256 required = (ethAmount * TOTAL_SUPPLY) / 1e18;
+        required = (required * ethPriceUSD) / TARGET_MARKET_CAP_USD;
+        return required < availableTokens ? required : availableTokens;
     }
 
     function _transferETH(address to, uint256 amount) internal {
@@ -735,16 +777,37 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         distributorAddress = newDistributorAddress;
     }
 
-    function setLiquidityManager(
+    function requestLiquidityManagerChange(
         address newLiquidityManagerAddress
     ) external onlyOwner {
         require(
             newLiquidityManagerAddress != address(0),
             "Liquidity manager cannot be zero"
         );
-        liquidityManager = IForgepadLiquidityManager(
-            newLiquidityManagerAddress
+        pendingLiquidityManager = newLiquidityManagerAddress;
+        liquidityManagerChangeTime = block.timestamp;
+        emit LiquidityManagerChangeRequested(
+            newLiquidityManagerAddress,
+            block.timestamp + EMERGENCY_TIMELOCK
         );
+    }
+
+    function executeLiquidityManagerChange() external onlyOwner {
+        require(pendingLiquidityManager != address(0), "No pending change");
+        require(
+            block.timestamp >=
+                liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
+            "Timelock not expired"
+        );
+        liquidityManager = IForgepadLiquidityManager(pendingLiquidityManager);
+        emit LiquidityManagerChanged(pendingLiquidityManager);
+        pendingLiquidityManager = address(0);
+        liquidityManagerChangeTime = 0;
+    }
+
+    function cancelLiquidityManagerChange() external onlyOwner {
+        pendingLiquidityManager = address(0);
+        liquidityManagerChangeTime = 0;
     }
 
     function requestEmergencyWithdrawETH(uint256 amount) external onlyOwner {
@@ -888,7 +951,7 @@ contract Forgepad is ReentrancyGuard, Ownable, Pausable {
         )
     {
         currentMarketCap = getTokenVirtualMarketCap(token);
-        targetMarketCap = PUMP_FUN_TARGET_MARKET_CAP_USD;
+        targetMarketCap = TARGET_MARKET_CAP_USD;
 
         if (targetMarketCap > 0) {
             progressPercent = _mul(currentMarketCap, 10_000) / targetMarketCap;

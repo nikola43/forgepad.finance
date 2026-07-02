@@ -54,30 +54,30 @@ const fragmentShader = `
     float n2 = snoise(uv * 3.0 - t * 0.3 + 10.0) * 0.5 + 0.5;
     float n3 = snoise(uv * 0.8 + t * 0.2 + vec2(5.0, 3.0)) * 0.5 + 0.5;
 
-    // Color palette: deep dark, warm orange, subtle purple
+    // Color palette: deep dark, lime accent, subtle purple
     vec3 darkBase = vec3(0.024, 0.024, 0.039);
-    vec3 warmOrange = vec3(1.0, 0.65, 0.0);
+    vec3 limeAccent = vec3(0.82, 1.0, 0.102);
     vec3 deepPurple = vec3(0.545, 0.36, 0.965);
-    vec3 gold = vec3(1.0, 0.84, 0.0);
+    vec3 limeLight = vec3(0.894, 1.0, 0.4);
 
     // Mix colors based on noise layers
     vec3 color = darkBase;
 
-    // Orange glow - top left area
-    float orangeMask = smoothstep(0.55, 0.85, n1) * smoothstep(0.3, 0.0, length(uv - vec2(0.15, 0.85)));
-    color += warmOrange * orangeMask * 0.12;
+    // Lime glow - top left area
+    float limeMask = smoothstep(0.55, 0.85, n1) * smoothstep(0.3, 0.0, length(uv - vec2(0.15, 0.85)));
+    color += limeAccent * limeMask * 0.12;
 
     // Purple glow - right area
     float purpleMask = smoothstep(0.5, 0.8, n2) * smoothstep(0.4, 0.0, length(uv - vec2(0.9, 0.6)));
     color += deepPurple * purpleMask * 0.08;
 
-    // Gold accent - center top
-    float goldMask = smoothstep(0.6, 0.9, n3) * smoothstep(0.35, 0.0, length(uv - vec2(0.5, 0.9)));
-    color += gold * goldMask * 0.06;
+    // Light lime accent - center top
+    float limeLightMask = smoothstep(0.6, 0.9, n3) * smoothstep(0.35, 0.0, length(uv - vec2(0.5, 0.9)));
+    color += limeLight * limeLightMask * 0.06;
 
     // Subtle center glow
     float centerGlow = smoothstep(0.7, 0.0, length(uv - vec2(0.5, 0.5))) * 0.015;
-    color += warmOrange * centerGlow;
+    color += limeAccent * centerGlow;
 
     // Vignette
     float vignette = smoothstep(0.0, 0.7, length(uv - vec2(0.5)));

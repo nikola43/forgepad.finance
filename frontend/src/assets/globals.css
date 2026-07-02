@@ -5,9 +5,9 @@
   --bg-secondary: #0d0d14;
   --bg-card: rgba(14, 14, 22, 0.7);
   --bg-surface: rgba(255, 255, 255, 0.03);
-  --accent: #FFA600;
-  --accent-light: #FFD700;
-  --accent-glow: rgba(255, 166, 0, 0.15);
+  --accent: #d1ff1a;
+  --accent-light: #e4ff66;
+  --accent-glow: rgba(209, 255, 26, 0.15);
   --purple: #8B5CF6;
   --purple-glow: rgba(139, 92, 246, 0.15);
   --green: #10B981;
@@ -16,7 +16,7 @@
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
   --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 166, 0, 0.25);
+  --border-hover: rgba(209, 255, 26, 0.25);
   --glass: rgba(255, 255, 255, 0.02);
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -35,9 +35,9 @@
 body {
   background: var(--bg-primary);
   background-image:
-    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(255, 166, 0, 0.06) 0px, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(209, 255, 26, 0.06) 0px, transparent 60%),
     radial-gradient(ellipse 60% 80% at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 60%),
-    radial-gradient(ellipse 50% 50% at 50% 100%, rgba(255, 166, 0, 0.04) 0px, transparent 60%);
+    radial-gradient(ellipse 50% 50% at 50% 100%, rgba(209, 255, 26, 0.04) 0px, transparent 60%);
   background-attachment: fixed;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
@@ -55,7 +55,7 @@ a, button, input, select, textarea {
 }
 
 ::selection {
-  background: rgba(255, 166, 0, 0.3);
+  background: rgba(209, 255, 26, 0.3);
   color: white;
 }
 
@@ -75,12 +75,12 @@ a, button, input, select, textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 166, 0, 0.3);
+  background: rgba(209, 255, 26, 0.3);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 166, 0, 0.5);
+  background: rgba(209, 255, 26, 0.5);
 }
 
 @font-face {
@@ -144,7 +144,7 @@ main .tradingview-widget-copyright {
 
 .MuiDialog-root .MuiDialog-paper {
   border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-lg), 0 0 80px rgba(255, 166, 0, 0.05);
+  box-shadow: var(--shadow-lg), 0 0 80px rgba(209, 255, 26, 0.05);
   background: rgba(10, 10, 16, 0.95);
   backdrop-filter: blur(40px) saturate(150%);
   border: 1px solid var(--border);
@@ -198,7 +198,7 @@ main .tradingview-widget-copyright {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
   color: #0a0a0f;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
-  box-shadow: 0 4px 16px rgba(255, 166, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(209, 255, 26, 0.2);
   text-transform: none;
   font-size: 15px;
   border-radius: var(--radius-lg);
@@ -225,10 +225,10 @@ main .tradingview-widget-copyright {
 }
 
 .MuiButton-root.MuiButton-colorPrimary:hover {
-  background: linear-gradient(135deg, #FFB733 0%, #FFE55C 100%);
+  background: linear-gradient(135deg, #daff47 0%, #edff8f 100%);
   color: #0a0a0f;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(255, 166, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(209, 255, 26, 0.3);
 }
 
 .MuiButton-root.MuiButton-colorPrimary:active {
@@ -371,9 +371,9 @@ main .tradingview-widget-copyright {
 }
 
 .Toastify__toast--info {
-  background: rgba(255, 166, 0, 0.12) !important;
-  border-color: rgba(255, 166, 0, 0.2);
-  box-shadow: 0 8px 24px rgba(255, 166, 0, 0.1);
+  background: rgba(209, 255, 26, 0.12) !important;
+  border-color: rgba(209, 255, 26, 0.2);
+  box-shadow: 0 8px 24px rgba(209, 255, 26, 0.1);
 }
 
 .Toastify__progress-bar {
@@ -607,7 +607,7 @@ body::before {
 }
 
 .gradient-text-animated {
-  background: linear-gradient(135deg, #FFA600, #FFD700, #FFA600, #FFD700);
+  background: linear-gradient(135deg, #d1ff1a, #e4ff66, #d1ff1a, #e4ff66);
   background-size: 300% 300%;
   background-clip: text;
   -webkit-background-clip: text;
@@ -647,8 +647,8 @@ body::before {
 
 /* Bonding curve glow when near graduation */
 @keyframes graduation-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(255, 166, 0, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(255, 166, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.2); }
+  0%, 100% { box-shadow: 0 0 8px rgba(209, 255, 26, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(209, 255, 26, 0.6), 0 0 40px rgba(228, 255, 102, 0.2); }
 }
 .graduation-glow {
   animation: graduation-glow 2s ease-in-out infinite;
@@ -684,7 +684,7 @@ body::before {
 }
 
 .badge-trending {
-  background: linear-gradient(135deg, #FFA600, #FFD700);
+  background: linear-gradient(135deg, #d1ff1a, #e4ff66);
   color: #0a0a0f;
   font-size: 10px;
   font-weight: 700;
@@ -716,7 +716,7 @@ body::before {
   background-image: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 166, 0, 0.06) 40%,
+    rgba(209, 255, 26, 0.06) 40%,
     rgba(255, 255, 255, 0.04) 80%
   ) !important;
   background-size: 400% 100% !important;
