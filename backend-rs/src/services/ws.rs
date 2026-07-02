@@ -27,25 +27,21 @@ pub fn create_socketio(state: Arc<AppState>) -> SocketIoLayer {
 
         socket.on(
             "SubAdd",
-            |socket: SocketRef, Data(payload): Data<SubAddPayload>, state: SioState<Arc<AppState>>| async move {
+            |socket: SocketRef, Data(payload): Data<SubAddPayload>, _state: SioState<Arc<AppState>>| async move {
                 tracing::debug!("SubAdd: {}", payload.address);
-                let _ = socket.join(payload.address.clone());
-                state
-                    .ws_subs
-                    .entry(payload.address)
-                    .or_default()
-                    .insert(socket.id.as_str().parse().unwrap_or(0));
+                // Room membership (join/leave) is the source of truth for
+                // subscriptions. The previous ws_subs bookkeeping keyed on a
+                // parsed socket id that always resolved to 0, so it was dead
+                // code and has been removed.
+                let _ = socket.join(payload.address);
             },
         );
 
         socket.on(
             "SubRemove",
-            |socket: SocketRef, Data(payload): Data<SubRemovePayload>, state: SioState<Arc<AppState>>| async move {
+            |socket: SocketRef, Data(payload): Data<SubRemovePayload>, _state: SioState<Arc<AppState>>| async move {
                 tracing::debug!("SubRemove: {}", payload.address);
-                let _ = socket.leave(payload.address.clone());
-                if let Some(mut subs) = state.ws_subs.get_mut(&payload.address) {
-                    subs.remove(&socket.id.as_str().parse().unwrap_or(0));
-                }
+                let _ = socket.leave(payload.address);
             },
         );
 
@@ -61,7 +57,17 @@ pub fn create_socketio(state: Arc<AppState>) -> SocketIoLayer {
     let state_clone = state.clone();
     tokio::spawn(async move {
         let mut rx = state_clone.ws_tx.subscribe();
-        while let Ok(event) = rx.recv().await {
+        // TODO: broadcast channel capacity is defined in lib.rs
+        // (AppState::new -> broadcast::channel(1024)). Increase it there if
+        // lagging becomes frequent under load.
+        loop {
+            let event = match rx.recv().await {
+                Ok(event) => event,
+                // Slow consumer: skip dropped messages instead of dying.
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                // Sender dropped / channel closed: stop the forwarder.
+                Err(_) => break,
+            };
             match &event {
                 WsEvent::Trade {
                     token_address,

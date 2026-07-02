@@ -452,9 +452,19 @@ contract ArrowpadLiquidityManager is
             pairAddress = factory.createPair(token, weth);
         }
 
-        IWETH(weth).deposit{value: ethAmountToLP}();
+        // Absorb any WETH donated to the deterministic pair address before this
+        // first-mint: reduce our own deposit by the donation so the pool's total
+        // WETH stays == ethAmountToLP and it still opens exactly at the target
+        // price (a donor can no longer skew the launch price — they just gift the
+        // ETH to the project/LP). If the donation already exceeds the target we
+        // deposit nothing; the griefer has simply overpaid into the burned LP.
+        uint256 donated = IERC20(weth).balanceOf(pairAddress);
+        uint256 wethToDeposit = ethAmountToLP > donated ? ethAmountToLP - donated : 0;
+        if (wethToDeposit > 0) {
+            IWETH(weth).deposit{value: wethToDeposit}();
+            IERC20(weth).safeTransfer(pairAddress, wethToDeposit);
+        }
         IERC20(token).safeTransfer(pairAddress, tokenAmountToLP);
-        IERC20(weth).safeTransfer(pairAddress, ethAmountToLP);
         IUniswapV2Pair(pairAddress).mint(recipient);
 
         // Transfer any remaining tokens to dead address
@@ -853,7 +863,10 @@ contract ArrowpadLiquidityManager is
 
         // Calculate sqrt(price) * 2^96
         uint256 sqrtPrice = _sqrt(price * 1e18);
-        sqrtPriceX96 = uint160((sqrtPrice * Q96) / 1e18);
+        uint256 result = (sqrtPrice * Q96) / 1e18;
+        // Revert instead of silently truncating on the uint160 cast (wrong price).
+        if (result > type(uint160).max) revert SqrtPriceOverflow();
+        sqrtPriceX96 = uint160(result);
     }
 
     /**

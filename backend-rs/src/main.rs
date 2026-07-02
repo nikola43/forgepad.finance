@@ -5,6 +5,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 use forgepad_backend::config::{chains, database, redis};
+use forgepad_backend::middleware::rate_limit;
 use forgepad_backend::services::{self, ws};
 use forgepad_backend::AppState;
 
@@ -37,8 +38,8 @@ async fn main() -> anyhow::Result<()> {
     // Chain configs
     let chain_configs = chains::default_chains();
 
-    // API key
-    let api_key = std::env::var("API_KEY").unwrap_or_else(|_| "default-api-key".to_string());
+    // API key (fail-closed: refuse to start without it)
+    let api_key = std::env::var("API_KEY").expect("API_KEY must be set");
 
     // Create app state
     let state = AppState::new(db_pool, redis_client, chain_configs.clone(), api_key).await;
@@ -60,20 +61,38 @@ async fn main() -> anyhow::Result<()> {
         .collect();
 
     let cors = if origins.is_empty() {
-        CorsLayer::new().allow_origin(Any)
+        // Fail-closed: never fall back to `Any` for the origin. Use a safe
+        // localhost default when no valid origins are configured.
+        CorsLayer::new()
+            .allow_origin(axum::http::HeaderValue::from_static("http://localhost:3000"))
     } else {
         CorsLayer::new().allow_origin(origins)
     }
     .allow_methods(Any)
-    .allow_headers(Any);
+    .allow_headers(Any)
+    .allow_credentials(false);
 
     let socketio = ws::create_socketio(state.clone());
+
+    // Per-IP rate limiter (shared via request extensions)
+    let limiter = rate_limit::create_rate_limiter();
 
     // Build router
     let app = forgepad_backend::routes::create_router(state)
         .layer(socketio)
         .layer(cors)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        // Send X-Content-Type-Options: nosniff on every response
+        .layer(tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+            axum::http::header::X_CONTENT_TYPE_OPTIONS,
+            axum::http::HeaderValue::from_static("nosniff"),
+        ))
+        // Make the limiter available to the rate-limit middleware, then enforce
+        // it. Extension is added before the middleware so it is the outer layer
+        // and the limiter is present in request extensions when the middleware
+        // runs.
+        .layer(axum::Extension(limiter))
+        .layer(axum::middleware::from_fn(rate_limit::rate_limit_middleware));
 
     // Bind and serve
     let port: u16 = std::env::var("PORT")
@@ -84,7 +103,12 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Listening on {addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    // ConnectInfo is required by the rate-limit middleware, so serve with it.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

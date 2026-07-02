@@ -73,14 +73,18 @@ CREATE TABLE trades (
     token_amount NUMERIC(78, 18) NOT NULL,
     token_price NUMERIC(78, 18) NOT NULL DEFAULT 0,
     eth_price NUMERIC(78, 18) NOT NULL DEFAULT 0,
-    tx_hash VARCHAR(66) NOT NULL UNIQUE,
+    tx_hash VARCHAR(66) NOT NULL,
     traded_at BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    log_index BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_trades_token ON trades(token_id);
 CREATE INDEX idx_trades_swapper ON trades(swapper_id);
 CREATE INDEX idx_trades_traded_at ON trades(traded_at DESC);
+-- Idempotency key: a (tx_hash, log_index) pair uniquely identifies one on-chain
+-- swap event, so replays/reorgs are deduped instead of double-counted.
+CREATE UNIQUE INDEX trades_txhash_logindex_key ON trades(tx_hash, log_index);
 
 -- ============================================================
 -- Chats (FK → tokens, users, self-ref for threading)

@@ -15,9 +15,12 @@ use std::sync::Arc;
 
 pub type KeyedRateLimiter = RateLimiter<IpAddr, DashMapStateStore<IpAddr>, DefaultClock>;
 
-/// Create a keyed rate limiter: approximately 100 requests per 15 minutes per IP.
+/// Create a keyed rate limiter: ~120 requests per minute per IP, burst 120.
+///
+/// Sized for a typical web app that fires many API calls per page load.
 pub fn create_rate_limiter() -> Arc<KeyedRateLimiter> {
-    let quota = Quota::per_minute(NonZeroU32::new(7).unwrap());
+    let quota = Quota::per_minute(NonZeroU32::new(120).unwrap())
+        .allow_burst(NonZeroU32::new(120).unwrap());
     Arc::new(RateLimiter::dashmap(quota))
 }
 
@@ -48,14 +51,16 @@ pub async fn rate_limit_middleware(
     }
 }
 
-/// Extract the client IP from `x-forwarded-for` header or fall back to the
-/// connected socket address.
+/// Extract the client IP for rate-limit keying. Uses the RIGHTMOST
+/// `x-forwarded-for` entry (the hop appended by our own trusted reverse proxy),
+/// not the leftmost — the leftmost is fully client-controlled and would let an
+/// attacker rotate it per request to evade the limit. Falls back to the socket peer.
 fn extract_ip(request: &Request<Body>, fallback: SocketAddr) -> IpAddr {
     request
         .headers()
         .get("x-forwarded-for")
         .and_then(|val| val.to_str().ok())
-        .and_then(|s| s.split(',').next())
+        .and_then(|s| s.split(',').last())
         .and_then(|s| s.trim().parse::<IpAddr>().ok())
         .unwrap_or_else(|| fallback.ip())
 }

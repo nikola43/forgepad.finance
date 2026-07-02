@@ -68,6 +68,148 @@ pub fn verify_signature(
     Ok(recovered.eq_ignore_ascii_case(expected_address))
 }
 
+/// How long a signed message stays valid. Replaying a signature older than this
+/// (e.g. one captured months ago) is rejected.
+pub const SIGNATURE_MAX_AGE_MS: i64 = 10 * 60 * 1000; // 10 minutes
+/// Allowance for client/server clock skew when the timestamp is slightly ahead.
+const SIGNATURE_FUTURE_SKEW_MS: i64 = 60 * 1000; // 1 minute
+
+/// Extract the millisecond UNIX timestamp the frontend appends to every signed
+/// message (the last run of 10+ digits, e.g. the trailing `${Date.now()}`).
+fn extract_timestamp_ms(message: &str) -> Option<i64> {
+    let bytes = message.as_bytes();
+    let mut end = bytes.len();
+    // scan from the end for the last maximal digit run
+    while end > 0 {
+        if bytes[end - 1].is_ascii_digit() {
+            let mut start = end;
+            while start > 0 && bytes[start - 1].is_ascii_digit() {
+                start -= 1;
+            }
+            let run = &message[start..end];
+            if run.len() >= 10 {
+                return run.parse::<i64>().ok();
+            }
+            end = start;
+        } else {
+            end -= 1;
+        }
+    }
+    None
+}
+
+/// Recover the signer and enforce anti-replay: the message must (optionally) begin
+/// with `required_prefix` (binds the signature to a specific action) and must carry
+/// a fresh trailing timestamp. Returns the recovered lowercase address.
+///
+/// This defeats long-lived replay (an old captured signature no longer works) and
+/// cross-action reuse (a "Register" signature can't drive "Update profile").
+/// It does NOT dedup reuse within the freshness window — for that, add a
+/// server-issued single-use nonce store (Redis/DB) keyed by signature.
+pub fn recover_fresh(
+    message: &str,
+    signature: &str,
+    required_prefix: Option<&str>,
+    now_ms: i64,
+) -> Result<String, AppError> {
+    if let Some(prefix) = required_prefix {
+        if !message.starts_with(prefix) {
+            return Err(AppError::Unauthorized(
+                "Signed message does not match the requested action".to_string(),
+            ));
+        }
+    }
+
+    let ts = extract_timestamp_ms(message).ok_or_else(|| {
+        AppError::Unauthorized("Signed message missing timestamp".to_string())
+    })?;
+
+    let age = now_ms - ts;
+    if age > SIGNATURE_MAX_AGE_MS {
+        return Err(AppError::Unauthorized("Signature expired".to_string()));
+    }
+    if age < -SIGNATURE_FUTURE_SKEW_MS {
+        return Err(AppError::Unauthorized("Signature timestamp in the future".to_string()));
+    }
+
+    recover_address(message, signature)
+}
+
+/// Full signed-action verification: freshness + action-binding (`recover_fresh`)
+/// PLUS single-use enforcement — the signature is recorded in Redis for its
+/// validity window so it cannot be replayed even within the freshness window.
+///
+/// Fail-open on Redis errors: if Redis is unreachable we still return the
+/// freshness/binding-verified address, so an infra blip never locks users out;
+/// replay is then bounded only by the (short) freshness window.
+pub async fn verify_signed_action(
+    state: &crate::AppState,
+    message: &str,
+    signature: &str,
+    required_prefix: Option<&str>,
+) -> Result<String, AppError> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let recovered = recover_fresh(message, signature, required_prefix, now_ms)?;
+
+    // Key the single-use nonce on the MESSAGE hash, not the raw signature. ECDSA
+    // is malleable — (r, s) and (r, n−s) recover the same signer — so keying on the
+    // signature bytes would let a mutated copy slip past with a fresh key. The
+    // message embeds a unique timestamp, so it's the stable single-use identity.
+    let mut hasher = Keccak256::new();
+    hasher.update(message.as_bytes());
+    let key = format!("sig_nonce:{}", hex::encode(hasher.finalize()));
+    let ttl_secs = (SIGNATURE_MAX_AGE_MS / 1000) + 60;
+
+    match state.redis.get_multiplexed_async_connection().await {
+        Ok(mut conn) => {
+            // SET key 1 NX EX ttl -> Some on first use, None if it already exists.
+            let res: Result<Option<String>, redis::RedisError> = redis::cmd("SET")
+                .arg(&key)
+                .arg(1)
+                .arg("NX")
+                .arg("EX")
+                .arg(ttl_secs)
+                .query_async(&mut conn)
+                .await;
+            match res {
+                Ok(Some(_)) => {}
+                Ok(None) => {
+                    return Err(AppError::Unauthorized(
+                        "Signature already used".to_string(),
+                    ))
+                }
+                Err(e) => tracing::warn!("Redis nonce check failed (fail-open): {e}"),
+            }
+        }
+        Err(e) => tracing::warn!("Redis unavailable for nonce check (fail-open): {e}"),
+    }
+
+    Ok(recovered)
+}
+
+#[cfg(test)]
+mod anti_replay_tests {
+    use super::*;
+
+    #[test]
+    fn extracts_trailing_ms_timestamp() {
+        assert_eq!(extract_timestamp_ms("Update profile\n0xabc\n1730000000000"), Some(1730000000000));
+        assert_eq!(extract_timestamp_ms("Upload avatar 0xabc 1730000000000"), Some(1730000000000));
+        assert_eq!(extract_timestamp_ms("no timestamp here"), None);
+        assert_eq!(extract_timestamp_ms("short 12345"), None); // < 10 digits
+    }
+
+    #[test]
+    fn rejects_stale_and_wrong_prefix() {
+        let now = 1_730_000_600_001i64; // > 10min after ts below
+        // stale timestamp
+        assert!(recover_fresh("Update profile\n1730000000000", "0x00", None, now).is_err());
+        // wrong action prefix (fails before recovery)
+        let fresh = format!("Register on Arrowpad\n{}", now);
+        assert!(recover_fresh(&fresh, "0x00", Some("Update profile"), now).is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

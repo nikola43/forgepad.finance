@@ -459,6 +459,15 @@ export default function Home() {
 
     return (
         <PageBox>
+            {/* SEO: crawlable heading + intro (visually hidden, no layout impact) */}
+            <div style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
+                <h1>ArrowPad — Launch and Trade Tokens on Robinhood Chain</h1>
+                <p>
+                    ArrowPad is the token launchpad for Robinhood Chain. Create a memecoin in seconds on a fair
+                    bonding curve, trade instantly with low 1% fees, and automatically graduate liquidity to Uniswap.
+                    The pump.fun of Robinhood Chain.
+                </p>
+            </div>
             {/* King of the Hill Section */}
             {king === undefined ? (
                 <Box my={2}>

@@ -811,7 +811,7 @@ export default function Token() {
         try {
             const provider = new BrowserProvider(evmProvider)
             const signer = await provider.getSigner()
-            const msg = `Post comment on ${id}`
+            const msg = `Post comment on ${id}\n${Date.now()}`
             const signature = await signer.signMessage(msg)
 
             await axios.post(`${API_ENDPOINT}/chats/reply`, {

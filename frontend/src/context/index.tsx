@@ -81,8 +81,8 @@ const queryClient = new QueryClient();
 // const metadata = {
 //   name: 'ArrowPad',
 //   description: 'ArrowPad Finance',
-//   url: 'https://arrowpad.finance', // origin must match your domain & subdomain
-//   icons: ['https://arrowpad.finance/favicon.ico']
+//   url: 'https://arrowpad.io', // origin must match your domain & subdomain
+//   icons: ['https://arrowpad.io/favicon.ico']
 // }
 
 interface Chain {

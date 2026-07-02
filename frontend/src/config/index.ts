@@ -12,5 +12,5 @@ export const FILE_ENDPOINT = process.env.NEXT_PUBLIC_FILE_URL || `${API_ENDPOINT
 
 export const FORGE_TELEGRAM_URL = "https://t.me/arrowpad"
 export const FORGE_TWITTER_URL = "https://x.com/arrowpad"
-export const FORGE_WEBSITE_URL = "https://arrowpad.finance"
+export const FORGE_WEBSITE_URL = "https://arrowpad.io"
 

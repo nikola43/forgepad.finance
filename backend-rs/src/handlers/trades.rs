@@ -239,6 +239,10 @@ pub async fn get_chart_data(
 
     // Parse resolution from interval string (e.g. "5m", "1d", "1w")
     let resolution = parse_resolution(&params.interval)?;
+    // Guard against divide-by-zero panics downstream (e.g. interval "0").
+    if resolution <= 0 {
+        return Err(AppError::BadRequest("Invalid interval".to_string()));
+    }
 
     // Find token
     let token: Token = tokens::table

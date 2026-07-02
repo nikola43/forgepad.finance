@@ -36,24 +36,34 @@ contract ArrowpadAdvancedTest is Test {
     // address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
     // address constant DIST_ADDR = 0xF2917a81fF74406fbCf01c507057e101Db8f2F12;
 
-    address constant UNISWAP_V2_ROUTER =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    address constant V3_POS_MGR = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
-    address constant V4_POOL_MGR = 0x000000000004444c5dc75cB358380D2e3dE08A90;
-    address constant UNIVERSAL_ROUTER =
-        0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af;
-    address constant V4_POS_MGR = 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e;
+    // DEX/oracle addresses: default Ethereum mainnet, env-overridable (see Arrowpad.t.sol).
+    address UNISWAP_V2_ROUTER;
+    address V3_FACTORY;
+    address V3_POS_MGR;
+    address V4_POOL_MGR;
+    address UNIVERSAL_ROUTER;
+    address V4_POS_MGR;
     address constant PERMIT2_ADDR = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-    // Chainlink ETH/USD on Ethereum
-    address constant DATA_FEED = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    // Chainlink ETH/USD
+    address DATA_FEED;
 
     // Your same custom addresses (unchanged)
     address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
     address constant DIST_ADDR = 0xF2917a81fF74406fbCf01c507057e101Db8f2F12;
 
     function setUp() public {
-        vm.createSelectFork("https://ethereum-rpc.publicnode.com");
+        vm.createSelectFork(
+            vm.envOr("FORK_URL", string("https://ethereum-rpc.publicnode.com"))
+        );
+
+        UNISWAP_V2_ROUTER = vm.envOr("V2_ROUTER", 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        V3_FACTORY = vm.envOr("V3_FACTORY", 0x1F98431c8aD98523631AE4a59f267346ea31F984);
+        V3_POS_MGR = vm.envOr("V3_POS_MGR", 0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+        V4_POOL_MGR = vm.envOr("V4_POOL_MGR", 0x000000000004444c5dc75cB358380D2e3dE08A90);
+        UNIVERSAL_ROUTER = vm.envOr("UNIVERSAL_ROUTER", 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af);
+        V4_POS_MGR = vm.envOr("V4_POS_MGR", 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
+        DATA_FEED = vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
         addr1 = makeAddr("addr1");
         addr2 = makeAddr("addr2");
@@ -66,7 +76,7 @@ contract ArrowpadAdvancedTest is Test {
 
         liquidityManager = new ArrowpadLiquidityManager(
             UNISWAP_V2_ROUTER,
-            0x1F98431c8aD98523631AE4a59f267346ea31F984, // V3 Factory
+            V3_FACTORY,
             V3_POS_MGR,
             V4_POOL_MGR,
             UNIVERSAL_ROUTER,

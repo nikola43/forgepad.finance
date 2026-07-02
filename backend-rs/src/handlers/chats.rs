@@ -6,7 +6,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::errors::{AppError, AppResult};
-use crate::middleware::auth::recover_address;
+use crate::middleware::auth::verify_signed_action;
 use crate::models::*;
 use crate::schema::*;
 use crate::AppState;
@@ -134,8 +134,14 @@ pub async fn reply(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ReplyBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    // Verify signature
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    // Verify signature (fresh + single-use + bound to the comment action)
+    let recovered = verify_signed_action(
+        &state,
+        &body.msg,
+        &body.signature,
+        Some("Post comment on"),
+    )
+    .await?;
 
     // Validate comment
     if body.comment.is_empty() {
@@ -163,10 +169,7 @@ pub async fn reply(
 
     // Find the author user by recovered address
     let author: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = LOWER('{}')",
-            recovered.replace('\'', "")
-        )))
+        .filter(users::address.eq(recovered.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?

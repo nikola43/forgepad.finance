@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::errors::{AppError, AppResult};
-use crate::middleware::auth::recover_address;
+use crate::middleware::auth::verify_signed_action;
 use crate::models::*;
 use crate::schema::*;
 use crate::AppState;
@@ -128,10 +128,7 @@ pub async fn get_user_info(
     let addr = params.user_address.to_lowercase();
 
     let user: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr))
         .first(&mut conn)
         .await
         .optional()?
@@ -159,7 +156,13 @@ pub async fn create_user(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateUserBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    let recovered = verify_signed_action(
+        &state,
+        &body.msg,
+        &body.signature,
+        Some("Register on Arrowpad"),
+    )
+    .await?;
 
     validate_eth_address(&recovered)?;
 
@@ -169,10 +172,7 @@ pub async fn create_user(
 
     // Upsert user: try to find existing, otherwise insert
     let existing: Option<User> = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first(&mut conn)
         .await
         .optional()?;
@@ -366,10 +366,7 @@ pub async fn get_user_profile(
     let addr_lower = address.to_lowercase();
 
     let user: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first(&mut conn)
         .await
         .optional()?
@@ -508,10 +505,7 @@ pub async fn get_followings(
     let addr_lower = address.to_lowercase();
 
     let user: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first(&mut conn)
         .await
         .optional()?
@@ -575,15 +569,12 @@ pub async fn follow_user(
     Path(address): Path<String>,
     Json(body): Json<SignatureBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some("follow ")).await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     let follower: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = LOWER('{}')",
-            recovered.replace('\'', "")
-        )))
+        .filter(users::address.eq(recovered.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?
@@ -591,10 +582,7 @@ pub async fn follow_user(
 
     let addr_lower = address.to_lowercase();
     let followee: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first(&mut conn)
         .await
         .optional()?
@@ -638,15 +626,12 @@ pub async fn unfollow_user(
     Path(address): Path<String>,
     Json(body): Json<SignatureBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some("unfollow ")).await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     let follower: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = LOWER('{}')",
-            recovered.replace('\'', "")
-        )))
+        .filter(users::address.eq(recovered.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?
@@ -654,10 +639,7 @@ pub async fn unfollow_user(
 
     let addr_lower = address.to_lowercase();
     let followee: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first(&mut conn)
         .await
         .optional()?
@@ -686,28 +668,37 @@ pub async fn update_user(
     State(state): State<Arc<AppState>>,
     Json(body): Json<UpdateUserBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    let recovered = verify_signed_action(
+        &state,
+        &body.msg,
+        &body.signature,
+        Some("Update profile"),
+    )
+    .await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     let user: User = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = LOWER('{}')",
-            recovered.replace('\'', "")
-        )))
+        .filter(users::address.eq(recovered.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    // Check 24h cooldown on profile updates
-    let hours_since_update = Utc::now()
-        .signed_duration_since(user.updated_at)
-        .num_hours();
+    // Cooldown on profile updates, in hours. Default 0 = disabled.
+    // Override with PROFILE_UPDATE_COOLDOWN_HOURS to re-enable anti-spam.
+    let cooldown_hours: i64 = std::env::var("PROFILE_UPDATE_COOLDOWN_HOURS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
-    if hours_since_update < 24 {
-        let _remaining = 24 - hours_since_update;
-        return Err(AppError::RateLimited);
+    if cooldown_hours > 0 {
+        let hours_since_update = Utc::now()
+            .signed_duration_since(user.updated_at)
+            .num_hours();
+        if hours_since_update < cooldown_hours {
+            return Err(AppError::RateLimited);
+        }
     }
 
     let updated_user = diesel::update(users::table.filter(users::id.eq(user.id)))
@@ -805,10 +796,25 @@ pub async fn upload_avatar(
     let (data, _content_type, original_name) =
         file_data.ok_or_else(|| AppError::BadRequest("No avatar file uploaded".into()))?;
 
-    // Verify signature
-    let recovered = recover_address(&msg, &signature)?;
+    // Verify signature (fresh + single-use + bound to the avatar-upload action)
+    let recovered = verify_signed_action(
+        &state,
+        &msg,
+        &signature,
+        Some("Upload avatar"),
+    )
+    .await?;
 
-    let ext = original_name.rsplit('.').next().unwrap_or("png");
+    // Cap size and derive type from the actual bytes (never the client-declared
+    // content-type or filename) to prevent oversized uploads and stored XSS.
+    const MAX_AVATAR: usize = 5 * 1024 * 1024; // 5MB
+    if data.len() > MAX_AVATAR {
+        return Err(AppError::BadRequest("Avatar too large (max 5MB)".into()));
+    }
+    let (ext, content_type) = crate::handlers::tokens::sniff_image(&data).ok_or_else(|| {
+        AppError::BadRequest("Only image files are allowed (jpeg, png, gif, webp)".into())
+    })?;
+    let _ = &original_name; // filename is untrusted; derived ext used instead
     let filename = format!("avatar-{}.{}", uuid::Uuid::new_v4(), ext);
 
     let public_url = if let Some(ref s3) = state.s3_client {
@@ -816,7 +822,7 @@ pub async fn upload_avatar(
             .bucket(&state.s3_bucket)
             .key(&filename)
             .body(data.clone().into())
-            .content_type(&_content_type)
+            .content_type(content_type)
             .send()
             .await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("S3 upload failed: {e}")))?;
@@ -840,10 +846,7 @@ pub async fn upload_avatar(
     // so the avatar attaches to the real user row instead of creating a duplicate.
     let addr_lower = recovered.to_lowercase();
     let user: Option<User> = users::table
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(address) = '{}'",
-            addr_lower.replace('\'', "")
-        )))
+        .filter(users::address.eq(&addr_lower))
         .first::<User>(&mut conn)
         .await
         .optional()?;
@@ -898,11 +901,11 @@ pub async fn top_holders(
         format!("t.traded_at <= {to_ts}"),
     ];
 
+    let mut network_bind: Option<String> = None;
     if let Some(ref network) = params.network {
-        where_parts.push(format!(
-            "tok.network = '{}'",
-            network.replace('\'', "")
-        ));
+        // Bound parameter — never interpolate the raw value.
+        where_parts.push("tok.network = $1".to_string());
+        network_bind = Some(network.clone());
     }
 
     let where_clause = where_parts.join(" AND ");
@@ -931,9 +934,15 @@ pub async fn top_holders(
          LIMIT {limit}"
     );
 
-    let rows: Vec<TopRow> = diesel::sql_query(&query)
-        .load(&mut conn)
-        .await?;
+    let rows: Vec<TopRow> = match network_bind {
+        Some(net) => {
+            diesel::sql_query(&query)
+                .bind::<Text, _>(net)
+                .load(&mut conn)
+                .await?
+        }
+        None => diesel::sql_query(&query).load(&mut conn).await?,
+    };
 
     let entries: Vec<TopHolderEntry> = rows
         .into_iter()

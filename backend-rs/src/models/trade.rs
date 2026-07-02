@@ -22,6 +22,7 @@ pub struct Trade {
     pub tx_hash: String,
     pub traded_at: i64,
     pub created_at: DateTime<Utc>,
+    pub log_index: i64,
 }
 
 /// Insertable struct for recording new trades.
@@ -37,6 +38,7 @@ pub struct NewTrade {
     pub eth_price: BigDecimal,
     pub tx_hash: String,
     pub traded_at: i64,
+    pub log_index: i64,
 }
 
 /// Response DTO sent to the frontend (joined with token + user data).

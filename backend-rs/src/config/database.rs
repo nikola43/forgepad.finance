@@ -42,7 +42,11 @@ fn establish_tls_connection(
     async move {
         let mut builder = openssl::ssl::SslConnector::builder(openssl::ssl::SslMethod::tls())
             .map_err(|e| diesel::ConnectionError::BadConnection(e.to_string()))?;
-        builder.set_verify(openssl::ssl::SslVerifyMode::NONE);
+        // Verify the server certificate against the system's default CA roots.
+        builder
+            .set_default_verify_paths()
+            .map_err(|e| diesel::ConnectionError::BadConnection(e.to_string()))?;
+        builder.set_verify(openssl::ssl::SslVerifyMode::PEER);
         let tls = postgres_openssl::MakeTlsConnector::new(builder.build());
 
         let (client, connection) = tokio_postgres::connect(&url, tls)

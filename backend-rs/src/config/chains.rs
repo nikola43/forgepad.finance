@@ -50,7 +50,7 @@ pub fn default_chains() -> Vec<ChainConfig> {
             ),
             explorer_url: std::env::var("ROBINHOOD_EXPLORER_URL")
                 .unwrap_or_else(|_| "https://explorer.mainnet.chain.robinhood.com".to_string()),
-            contract_address: "0x955b9e7809Ee9bdD4C6cD0D07cA9cb6ECAF47a8F".to_string(),
+            contract_address: "0x7faDE3d4Ed92661Ad16437f6774E107785286189".to_string(),
             abi,
             virtual_eth_amount: 2.5,
             virtual_token_amount: 1_073_000_000.0,

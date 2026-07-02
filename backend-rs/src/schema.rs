@@ -164,6 +164,7 @@ diesel::table! {
         tx_hash -> Varchar,
         traded_at -> Int8,
         created_at -> Timestamptz,
+        log_index -> Int8,
     }
 }
 

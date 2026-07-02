@@ -170,7 +170,7 @@ export default function Footer() {
                 <Brand>
                     <span className="brand-name">Arrowpad</span>
                     <span className="brand-tagline">
-                        Launch tokens with fair bonding curves. Trade instantly, graduate to DEX.
+                        The token launchpad for Robinhood Chain. Launch on a fair bonding curve, trade instantly, and graduate to Uniswap.
                     </span>
                     <SocialLinks>
                         <Link href={FORGE_TELEGRAM_URL} target="_blank">
@@ -199,7 +199,7 @@ export default function Footer() {
 
             <FooterBottom>
                 <span className="copyright">&copy; {new Date().getFullYear()} Arrowpad. All rights reserved.</span>
-                <span className="built-with">Built with <span className="heart">&hearts;</span> on Robinhood</span>
+                <span className="built-with">Built with <span className="heart">&hearts;</span> on Robinhood Chain</span>
             </FooterBottom>
         </FooterInner>
     </FooterWrapper>

@@ -58,7 +58,11 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
     // ==================== STATE VARIABLES ====================
     IArrowpadLiquidityManager public liquidityManager;
-    AggregatorV3Interface internal priceFeed;
+    // Immutable Chainlink ETH/USD feed — read automatically (view call) on every
+    // trade/mcap query. No owner, backend, or transaction is ever needed to read it,
+    // and it cannot be changed after deployment (fully trustless).
+    AggregatorV3Interface internal immutable priceFeed;
+    uint8 private immutable priceFeedDecimals;
 
     mapping(address => PoolInfo) public tokenPools;
     mapping(address => uint256) private tokenTrades;
@@ -159,6 +163,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         );
 
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
+        priceFeedDecimals = priceFeed.decimals();
         liquidityManager = IArrowpadLiquidityManager(_liquidityManagerAddress);
         feeAddress = _feeAddress;
         distributorAddress = _distributorAddress;
@@ -317,12 +322,8 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         IERC20(token).safeTransfer(msg.sender, amountOut);
 
-        if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
-        if (buyFee > 0) {
-            uint256 feeHalf = buyFee / 2;
-            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
-            _transferETH(distributorAddress, buyFee - feeHalf);
-        }
+        _payTokenOwnerFee(pool.owner, tokenOwnerFee);
+        _payPlatformFee(buyFee);
 
         _emitBuy(token, netAmountIn, amountOut);
         _checkAndAddLiquidity(token);
@@ -337,6 +338,14 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         PoolInfo storage pool = tokenPools[token];
 
         uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
+
+        // Cap the requested output to what the curve can actually deliver BEFORE
+        // pricing it. Otherwise amountIn is computed for the full request but only
+        // the capped amount is transferred — the buyer overpays with no refund.
+        if (buyAmount > pool.tokenReserve) {
+            buyAmount = pool.tokenReserve;
+        }
+
         uint256 amountIn = getAmountIn(
             buyAmount,
             pool.virtualEthReserve,
@@ -351,11 +360,6 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         uint256 tokenOwnerFee = _mul(amountIn, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountIn = amountIn - buyFee - tokenOwnerFee;
 
-        // Cap buyAmount to real token reserve to prevent underflow
-        if (buyAmount > pool.tokenReserve) {
-            buyAmount = pool.tokenReserve;
-        }
-
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= buyAmount;
         pool.virtualEthReserve += netAmountIn;
@@ -363,12 +367,8 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         IERC20(token).safeTransfer(msg.sender, buyAmount);
 
-        if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
-        if (buyFee > 0) {
-            uint256 feeHalf = buyFee / 2;
-            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
-            _transferETH(distributorAddress, buyFee - feeHalf);
-        }
+        _payTokenOwnerFee(pool.owner, tokenOwnerFee);
+        _payPlatformFee(buyFee);
 
         _emitBuy(token, amountIn, buyAmount);
         _checkAndAddLiquidity(token);
@@ -411,12 +411,8 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         IERC20(token).safeTransferFrom(msg.sender, address(this), sellAmount);
         _transferETH(msg.sender, netAmountOut);
 
-        if (tokenOwnerFee > 0) _transferETH(pool.owner, tokenOwnerFee);
-        if (sellFee > 0) {
-            uint256 feeHalf = sellFee / 2;
-            if (feeHalf > 0) _transferETH(feeAddress, feeHalf);
-            _transferETH(distributorAddress, sellFee - feeHalf);
-        }
+        _payTokenOwnerFee(pool.owner, tokenOwnerFee);
+        _payPlatformFee(sellFee);
 
         _emitSell(token, netAmountOut, sellAmount);
     }
@@ -429,7 +425,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             ethIn,
             tokensOut,
             getVirtualPrice(token),
-            getETHPriceByUSD(),
+            _rawEthPrice(),
             getTokenVirtualMarketCap(token),
             block.timestamp
         );
@@ -446,7 +442,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             ethOut,
             tokensIn,
             getVirtualPrice(token),
-            getETHPriceByUSD(),
+            _rawEthPrice(),
             getTokenVirtualMarketCap(token),
             block.timestamp
         );
@@ -476,7 +472,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             _transferETH(msg.sender, msg.value - buyAmount - firstBuyFee);
         }
         if (firstBuyFee > 0) {
-            _transferETH(feeAddress, firstBuyFee);
+            _transferETHTolerant(feeAddress, firstBuyFee);
         }
     }
 
@@ -510,7 +506,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             _transferETH(msg.sender, msg.value - amountIn - firstBuyFee);
         }
         if (firstBuyFee > 0) {
-            _transferETH(feeAddress, firstBuyFee);
+            _transferETHTolerant(feeAddress, firstBuyFee);
         }
     }
 
@@ -532,16 +528,41 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== PRICE AND MARKET CAP FUNCTIONS ====================
+    /// @dev ETH/USD normalized to 18 decimals, or 0 if the feed is unavailable,
+    ///      stale (>1h), non-positive, or from an incomplete round. NEVER reverts —
+    ///      so trades (buy/sell events, mcap) can't be frozen by an oracle outage.
+    function _rawEthPrice() internal view returns (uint256) {
+        try priceFeed.latestRoundData() returns (
+            uint80 roundId,
+            int256 price,
+            uint256,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) {
+            if (price <= 0) return 0;
+            if (answeredInRound < roundId) return 0; // incomplete round
+            if (updatedAt == 0 || block.timestamp - updatedAt > 3600) return 0;
+            uint8 dec = priceFeedDecimals;
+            if (dec <= 18) return uint256(price) * (10 ** (18 - dec));
+            return uint256(price) / (10 ** (dec - 18));
+        } catch {
+            return 0;
+        }
+    }
+
+    /// @notice ETH/USD normalized to 18 decimals. Reverts if unavailable — used
+    ///         only where a real price is mandatory (graduation LP sizing).
     function getETHPriceByUSD() public view returns (uint256) {
-        (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
-        require(price > 0, "Invalid price");
-        require(block.timestamp - updatedAt <= 3600, "Stale price feed");
-        return uint256(price) * 1e10; // Normalize to 18 decimals
+        uint256 p = _rawEthPrice();
+        require(p > 0, "Invalid or stale price feed");
+        return p;
     }
 
     function getFirstBuyFee(address token) public view returns (uint256) {
         if (firstBuyFeeUSD == 0 || tokenTrades[token] >= 3) return 0;
-        return _mul(firstBuyFeeUSD, 1 ether) / getETHPriceByUSD();
+        uint256 p = _rawEthPrice();
+        if (p == 0) return 0; // oracle down -> skip first-buy fee rather than brick the buy
+        return _mul(firstBuyFeeUSD, 1 ether) / p;
     }
 
     function getVirtualPrice(address token) public view returns (uint256) {
@@ -559,7 +580,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             return 0;
 
         return
-            (getETHPriceByUSD() * TOTAL_SUPPLY * pool.virtualEthReserve) /
+            (_rawEthPrice() * TOTAL_SUPPLY * pool.virtualEthReserve) /
             pool.virtualTokenReserve /
             1e18;
     }
@@ -625,8 +646,11 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
                 ? remainingEthReserve
                 : tokenOwnerLPFee;
             uint256 platformFee = remainingEthReserve - ownerFee;
-            if (ownerFee > 0) _transferETH(poolOwner, ownerFee);
-            if (platformFee > 0) _transferETH(feeAddress, platformFee);
+            if (ownerFee > 0) {
+                if (!_transferETHTolerant(poolOwner, ownerFee))
+                    _transferETHTolerant(feeAddress, ownerFee);
+            }
+            if (platformFee > 0) _transferETHTolerant(feeAddress, platformFee);
         }
 
         emit TokenLaunched(token, block.timestamp);
@@ -637,23 +661,12 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         uint256 ethAmount,
         uint256 tokenAmount
     ) internal {
-        PoolInfo memory pool = tokenPools[token];
+        uint8 pt = tokenPools[token].poolType;
         uint256 ethPriceUSD = getETHPriceByUSD();
 
-        if (pool.poolType == 1) {
-            // V2 recomputes the LP token amount internally against the target.
-            IERC20(token).approve(address(liquidityManager), tokenAmount);
-            liquidityManager.addLiquidityV2WithTargetMarketCap{
-                value: ethAmount
-            }(
-                token,
-                tokenAmount,
-                ethAmount,
-                burnAddress,
-                TARGET_MARKET_CAP_USD,
-                ethPriceUSD
-            );
-        } else if (pool.poolType == 2) {
+        if (pt == 1) {
+            _addLiquidityV2(token, ethAmount, tokenAmount, ethPriceUSD);
+        } else if (pt == 2) {
             // V3/V4 derive the pool price from the amounts we hand them, so we
             // must pin the token amount to the target here (or the pool would
             // open far below the curve graduation price). Excess tokens are
@@ -664,25 +677,40 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
                 ethPriceUSD
             );
             IERC20(token).approve(address(liquidityManager), tokenForLP);
-            liquidityManager.addLiquidityV3{value: ethAmount}(
-                token,
-                tokenForLP,
-                ethAmount,
-                burnAddress
-            );
-        } else if (pool.poolType == 3) {
+            try
+                liquidityManager.addLiquidityV3{value: ethAmount}(
+                    token,
+                    tokenForLP,
+                    ethAmount,
+                    burnAddress
+                )
+            {} catch {
+                // A griefer pre-initialized the V3 pool at a hostile price, so the
+                // tolerance check reverts. Fall back to the brick-proof V2 first-mint
+                // path instead of freezing graduation (and reverting the buyer's tx).
+                IERC20(token).approve(address(liquidityManager), 0);
+                tokenPools[token].poolType = 1;
+                _addLiquidityV2(token, ethAmount, tokenAmount, ethPriceUSD);
+            }
+        } else if (pt == 3) {
             uint256 tokenForLP = _tokensForTargetMcap(
                 ethAmount,
                 tokenAmount,
                 ethPriceUSD
             );
             IERC20(token).approve(address(liquidityManager), tokenForLP);
-            liquidityManager.addLiquidityV4{value: ethAmount}(
-                token,
-                tokenForLP,
-                ethAmount,
-                burnAddress
-            );
+            try
+                liquidityManager.addLiquidityV4{value: ethAmount}(
+                    token,
+                    tokenForLP,
+                    ethAmount,
+                    burnAddress
+                )
+            {} catch {
+                IERC20(token).approve(address(liquidityManager), 0);
+                tokenPools[token].poolType = 1;
+                _addLiquidityV2(token, ethAmount, tokenAmount, ethPriceUSD);
+            }
         } else {
             revert("Unsupported pool type");
         }
@@ -692,6 +720,27 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
             ethAmount,
             tokenAmount,
             IERC20(token).totalSupply()
+        );
+    }
+
+    /// @dev V2 first-mint graduation. Brick-proof: the pair is seeded directly (not
+    ///      via the router), the token is transfer-gated pre-launch so nobody can
+    ///      seed token-side liquidity, and any donated WETH is absorbed to keep the
+    ///      opening price at target. Used both as the V2 path and the V3/V4 fallback.
+    function _addLiquidityV2(
+        address token,
+        uint256 ethAmount,
+        uint256 tokenAmount,
+        uint256 ethPriceUSD
+    ) private {
+        IERC20(token).approve(address(liquidityManager), tokenAmount);
+        liquidityManager.addLiquidityV2WithTargetMarketCap{value: ethAmount}(
+            token,
+            tokenAmount,
+            ethAmount,
+            burnAddress,
+            TARGET_MARKET_CAP_USD,
+            ethPriceUSD
         );
     }
 
@@ -713,6 +762,33 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         require(amount > 0, "Amount must be greater than zero");
         (bool success, ) = payable(to).call{value: amount}("");
         require(success, "ETH transfer failed");
+    }
+
+    /// @dev Best-effort ETH send that NEVER reverts — used only for protocol/creator
+    ///      FEES, so a hostile creator or misconfigured fee recipient can't brick
+    ///      trading. User principal (sale proceeds, refunds) still uses _transferETH.
+    function _transferETHTolerant(address to, uint256 amount) internal returns (bool) {
+        if (to == address(0) || amount == 0) return false;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        return ok;
+    }
+
+    /// @dev Pay the token creator's fee; if the (untrusted) creator refuses ETH,
+    ///      route it to the platform instead of reverting the trade (anti-honeypot).
+    function _payTokenOwnerFee(address owner_, uint256 fee) private {
+        if (fee == 0) return;
+        if (!_transferETHTolerant(owner_, fee)) {
+            _transferETHTolerant(feeAddress, fee);
+        }
+    }
+
+    /// @dev Split a platform fee to feeAddress + distributor, tolerant of a
+    ///      misconfigured recipient (never bricks trading).
+    function _payPlatformFee(uint256 fee) private {
+        if (fee == 0) return;
+        uint256 half = fee / 2;
+        if (half > 0) _transferETHTolerant(feeAddress, half);
+        _transferETHTolerant(distributorAddress, fee - half);
     }
 
     // ==================== ADMIN FUNCTIONS ====================

@@ -3,7 +3,7 @@ use axum::http::HeaderMap;
 use axum::Json;
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Integer};
+use diesel::sql_types::{BigInt, Integer, Text};
 use diesel_async::RunQueryDsl;
 use k256::ecdsa::{SigningKey, VerifyingKey};
 use k256::elliptic_curve::rand_core::OsRng;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::errors::{AppError, AppResult};
-use crate::middleware::auth::recover_address;
+use crate::middleware::auth::verify_signed_action;
 use crate::models::*;
 use crate::schema::*;
 use crate::AppState;
@@ -52,6 +52,9 @@ pub struct CreateTokenBody {
     pub twitter_link: Option<String>,
     pub web_link: Option<String>,
     pub token_address: Option<String>,
+    // Required only when updating an existing token's metadata (token_address set).
+    pub msg: Option<String>,
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,6 +117,26 @@ fn validate_url_optional(url: &Option<String>, label: &str) -> Result<(), AppErr
     Ok(())
 }
 
+/// Detect an image type from its magic bytes. Returns (extension, mime) for a
+/// whitelist of image formats, or None if the bytes are not a recognized image.
+/// Never trust the client-declared content-type or filename for this — both are
+/// spoofable and would otherwise allow storing HTML/JS served as text/html.
+pub(crate) fn sniff_image(data: &[u8]) -> Option<(&'static str, &'static str)> {
+    if data.len() >= 8 && data[..8] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] {
+        return Some(("png", "image/png"));
+    }
+    if data.len() >= 3 && data[..3] == [0xFF, 0xD8, 0xFF] {
+        return Some(("jpg", "image/jpeg"));
+    }
+    if data.len() >= 6 && (&data[..6] == b"GIF87a" || &data[..6] == b"GIF89a") {
+        return Some(("gif", "image/gif"));
+    }
+    if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        return Some(("webp", "image/webp"));
+    }
+    None
+}
+
 // ---------------------------------------------------------------------------
 // GET /tokens
 // ---------------------------------------------------------------------------
@@ -124,7 +147,7 @@ pub async fn list_tokens(
 ) -> AppResult<Json<ListTokensResponse>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
-    let page_number = params.page_number.unwrap_or(1).max(1);
+    let page_number = params.page_number.unwrap_or(1).clamp(1, 1_000_000);
     let page_size = params.page_size.unwrap_or(30).clamp(1, 100);
     let offset = (page_number - 1) * page_size;
     let order_type = params.order_type.as_deref().unwrap_or("createdAt");
@@ -145,8 +168,10 @@ pub async fn list_tokens(
             where_clauses.push("t.category = 'normal'".to_string());
         }
         if let Some(ref network) = params.network {
-            bind_values.push(network.clone());
-            where_clauses.push(format!("t.network = ${}", bind_values.len()));
+            if network != "all" {
+                bind_values.push(network.clone());
+                where_clauses.push(format!("t.network = ${}", bind_values.len()));
+            }
         }
 
         let where_sql = if where_clauses.is_empty() {
@@ -223,13 +248,42 @@ pub async fn list_tokens(
             cnt: i64,
         }
 
-        let ids: Vec<IdRow> = diesel::sql_query(&id_query)
-            .load(&mut conn)
-            .await?;
+        // Bind the (network, search) values positionally as $1/$2 — the query
+        // strings only ever reference these via placeholders, never interpolate
+        // user input. diesel's typed builder forces us to enumerate bind counts.
+        let ids: Vec<IdRow> = match bind_values.len() {
+            0 => diesel::sql_query(&id_query).load(&mut conn).await?,
+            1 => {
+                diesel::sql_query(&id_query)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .load(&mut conn)
+                    .await?
+            }
+            _ => {
+                diesel::sql_query(&id_query)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .bind::<Text, _>(bind_values[1].clone())
+                    .load(&mut conn)
+                    .await?
+            }
+        };
 
-        let count_rows: Vec<CountRow> = diesel::sql_query(&count_str)
-            .load(&mut conn)
-            .await?;
+        let count_rows: Vec<CountRow> = match bind_values.len() {
+            0 => diesel::sql_query(&count_str).load(&mut conn).await?,
+            1 => {
+                diesel::sql_query(&count_str)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .load(&mut conn)
+                    .await?
+            }
+            _ => {
+                diesel::sql_query(&count_str)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .bind::<Text, _>(bind_values[1].clone())
+                    .load(&mut conn)
+                    .await?
+            }
+        };
 
         let token_count = count_rows.get(0).map(|r| r.cnt).unwrap_or(0);
 
@@ -285,15 +339,14 @@ pub async fn list_tokens(
 
     if let Some(ref word) = params.search_word {
         if !word.is_empty() {
-            let pattern = format!("%{}%", word.to_lowercase());
+            // Bound parameter via ilike (case-insensitive) — never interpolate input.
+            let pattern = format!("%{}%", word);
             query = query.filter(
-                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                    "LOWER(tokens.token_address) LIKE '{}' \
-                     OR LOWER(tokens.name) LIKE '{}' \
-                     OR LOWER(tokens.symbol) LIKE '{}' \
-                     OR LOWER(users.address) LIKE '{}'",
-                    pattern, pattern, pattern, pattern
-                )),
+                tokens::token_address
+                    .ilike(pattern.clone())
+                    .or(tokens::name.ilike(pattern.clone()))
+                    .or(tokens::symbol.ilike(pattern.clone()))
+                    .or(users::address.ilike(pattern.clone())),
             );
         }
     }
@@ -319,15 +372,13 @@ pub async fn list_tokens(
     }
     if let Some(ref word) = params.search_word {
         if !word.is_empty() {
-            let pattern = format!("%{}%", word.to_lowercase());
+            let pattern = format!("%{}%", word);
             count_q = count_q.filter(
-                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                    "LOWER(tokens.token_address) LIKE '{}' \
-                     OR LOWER(tokens.name) LIKE '{}' \
-                     OR LOWER(tokens.symbol) LIKE '{}' \
-                     OR LOWER(users.address) LIKE '{}'",
-                    pattern, pattern, pattern, pattern
-                )),
+                tokens::token_address
+                    .ilike(pattern.clone())
+                    .or(tokens::name.ilike(pattern.clone()))
+                    .or(tokens::symbol.ilike(pattern.clone()))
+                    .or(users::address.ilike(pattern.clone())),
             );
         }
     }
@@ -422,7 +473,7 @@ pub async fn get_token_details(
 ) -> AppResult<Json<TokenDetailResponse>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
-    let page_number = params.page_number.unwrap_or(1).max(1);
+    let page_number = params.page_number.unwrap_or(1).clamp(1, 1_000_000);
     let page_size = params.page_size.unwrap_or(30).clamp(1, 100);
     let offset = (page_number - 1) * page_size;
 
@@ -475,10 +526,13 @@ pub async fn get_token_details(
         .collect();
 
     // Holders list
+    // Cap to the top holders — a detail view never needs the full holder set,
+    // and an unbounded load on a popular token is a memory/latency risk.
     let holder_rows: Vec<(Holder, User)> = holders::table
         .inner_join(users::table.on(users::id.eq(holders::user_id)))
         .filter(holders::token_id.eq(token.id))
         .order(holders::amount.desc())
+        .limit(200)
         .load(&mut conn)
         .await?;
 
@@ -619,8 +673,23 @@ pub async fn create_token(
                 .optional()?
                 .ok_or_else(|| AppError::NotFound("Token not found".to_string()))?;
 
-            if !user.address.eq_ignore_ascii_case(&body.creator_address) {
-                return Err(AppError::Forbidden("Only the creator can update this token".to_string()));
+            // Authenticate against a fresh signature from the token's ACTUAL
+            // creator (stored on-chain-verified address) — never the client-claimed
+            // creator_address, which is public and forgeable.
+            let msg = body
+                .msg
+                .as_deref()
+                .ok_or_else(|| AppError::Unauthorized("Signature required".to_string()))?;
+            let signature = body
+                .signature
+                .as_deref()
+                .ok_or_else(|| AppError::Unauthorized("Signature required".to_string()))?;
+            let recovered =
+                verify_signed_action(&state, msg, signature, Some("Update token ")).await?;
+            if !recovered.eq_ignore_ascii_case(&user.address) {
+                return Err(AppError::Forbidden(
+                    "Only the creator can update this token".to_string(),
+                ));
             }
 
             diesel::update(tokens::table.filter(tokens::id.eq(token.id)))
@@ -649,17 +718,22 @@ pub async fn move_token(
     Path(token_address): Path<String>,
     Json(body): Json<MoveTokenBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = recover_address(&body.msg, &body.signature)?;
+    // Admin action: fresh + single-use signature BOUND to this specific token, so a
+    // signature for any other action/token can't be redirected here.
+    let recovered = verify_signed_action(
+        &state,
+        &body.msg,
+        &body.signature,
+        Some(&format!("Move token {token_address}")),
+    )
+    .await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
     // Check if recovered address belongs to an admin
     let admin_user: Option<(Admin, User)> = admins::table
         .inner_join(users::table.on(users::id.eq(admins::user_id)))
-        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-            "LOWER(users.address) = LOWER('{}')",
-            recovered.replace('\'', "")
-        )))
+        .filter(users::address.eq(recovered.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?;
@@ -706,13 +780,6 @@ pub async fn upload_logo(
         return Err(AppError::Unauthorized("Invalid API key".to_string()));
     }
 
-    let allowed_types = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-    ];
     let max_size: usize = 5 * 1024 * 1024; // 5MB
 
     while let Some(field) = multipart
@@ -724,23 +791,6 @@ pub async fn upload_logo(
         if name != "image" {
             continue;
         }
-
-        let content_type = field
-            .content_type()
-            .unwrap_or("application/octet-stream")
-            .to_string();
-
-        if !allowed_types.contains(&content_type.as_str()) {
-            return Err(AppError::BadRequest(
-                "Only image files are allowed (jpeg, png, gif, webp)".to_string(),
-            ));
-        }
-
-        let original_name = field.file_name().unwrap_or("upload").to_string();
-        let ext = original_name
-            .rsplit('.')
-            .next()
-            .unwrap_or("png");
 
         let data = field
             .bytes()
@@ -755,6 +805,14 @@ pub async fn upload_logo(
             )));
         }
 
+        // Derive type + extension from the actual bytes, not the (spoofable)
+        // client content-type or filename.
+        let (ext, content_type) = sniff_image(&data).ok_or_else(|| {
+            AppError::BadRequest(
+                "Only image files are allowed (jpeg, png, gif, webp)".to_string(),
+            )
+        })?;
+
         let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
 
         let public_url = if let Some(ref s3) = state.s3_client {
@@ -762,7 +820,7 @@ pub async fn upload_logo(
                 .bucket(&state.s3_bucket)
                 .key(&filename)
                 .body(data.clone().into())
-                .content_type(&content_type)
+                .content_type(content_type)
                 .send()
                 .await
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("S3 upload failed: {e}")))?;
@@ -781,7 +839,7 @@ pub async fn upload_logo(
             "url": public_url,
             "key": filename,
             "file": {
-                "originalname": original_name,
+                "originalname": filename,
                 "mimetype": content_type,
                 "size": data.len(),
             }

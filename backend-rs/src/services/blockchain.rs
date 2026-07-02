@@ -30,7 +30,12 @@ fn score_decay(time_delta_ms: f64) -> f64 {
 }
 
 /// Start the blockchain event listener for a given chain.
-/// Catches up from last indexed block, then subscribes to new events.
+///
+/// Supervised: any connection/RPC failure tears the provider down and retries
+/// with capped exponential backoff, so a dropped WebSocket no longer silently
+/// kills indexing. The cursor (`last_block`) is only advanced once a block range
+/// has been fully fetched AND processed, so transient RPC errors never skip a
+/// block containing a trade.
 pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     tracing::info!(
         "Starting blockchain listener for {} (chain_id: {})",
@@ -38,26 +43,201 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         chain.chain_id
     );
 
-    let mut conn = match state.db.get().await {
-        Ok(c) => c,
+    let contract_address: Address = match chain.contract_address.parse() {
+        Ok(a) => a,
         Err(e) => {
-            tracing::error!("Failed to get DB connection for listener: {e}");
+            tracing::error!("Invalid contract address for {}: {e}", chain.network);
             return;
         }
     };
 
+    let ws_url = match chain.ws_url.clone() {
+        Some(u) => u,
+        None => {
+            tracing::error!("ws_url required for chain {}", chain.network);
+            return;
+        }
+    };
+
+    let mut backoff = 1u64;
+    loop {
+        match run_listener_once(&state, &chain, contract_address, &ws_url).await {
+            Ok(()) => {
+                tracing::warn!(
+                    "Listener stream for {} ended cleanly; reconnecting",
+                    chain.network
+                );
+                // Don't reset to 1s — a provider that accepts the subscription then
+                // immediately closes it would otherwise become a ~1 req/s storm.
+                backoff = 5;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Listener for {} failed: {e}; retrying in {}s",
+                    chain.network,
+                    backoff
+                );
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(backoff)).await;
+        backoff = (backoff * 2).min(30);
+    }
+}
+
+/// One connect → catch-up → subscribe cycle. Returns Err on any connection/RPC
+/// failure so the supervisor can reconnect; the cursor is never advanced past an
+/// unprocessed block.
+async fn run_listener_once(
+    state: &Arc<AppState>,
+    chain: &ChainConfig,
+    contract_address: Address,
+    ws_url: &str,
+) -> anyhow::Result<()> {
+    let ws = WsConnect::new(ws_url);
+    let provider = ProviderBuilder::new()
+        .connect_ws(ws)
+        .await
+        .map_err(|e| anyhow::anyhow!("WS connect: {e}"))?;
+
+    let mut last_block = load_last_block(state, &chain.network).await?;
+    tracing::info!("Chain {} resuming from block {}", chain.network, last_block);
+
+    let head = provider
+        .get_block_number()
+        .await
+        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+
+    // Only skip forward on an actual chain reset (cursor ahead of head, e.g. an
+    // anvil restart). A large *backward* gap is real history and is backfilled in
+    // chunks by catch_up — never silently skipped (that would drop trades).
+    if last_block > head {
+        tracing::warn!(
+            "Chain {} cursor {} ahead of head {} (reset?); resetting to head",
+            chain.network, last_block, head
+        );
+        last_block = head;
+        update_last_block(state, &chain.network, head as i64).await.ok();
+    } else if head - last_block > 100_000 {
+        tracing::warn!(
+            "Chain {} is {} blocks behind head {}; backfilling in chunks",
+            chain.network, head - last_block, head
+        );
+    }
+
+    // Catch up to head, cursor-safe.
+    last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
+
+    // Blocks may have been mined during catch-up; backfill that gap before
+    // subscribing so nothing between the initial snapshot and the subscription
+    // is dropped.
+    let head2 = provider
+        .get_block_number()
+        .await
+        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+    if head2 > last_block {
+        last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
+    }
+
+    tracing::info!("Chain {} caught up to {}, subscribing", chain.network, last_block);
+
+    let sub = provider
+        .subscribe_blocks()
+        .await
+        .map_err(|e| anyhow::anyhow!("subscribe_blocks: {e}"))?;
+    let mut stream = sub.into_stream();
+
+    while let Some(block) = stream.next().await {
+        let block_num = block.number;
+        if block_num <= last_block {
+            continue; // already indexed (reorg replay / duplicate notification)
+        }
+
+        // Process the whole range (last_block, block_num] so no block is skipped
+        // even if block notifications arrive non-contiguously.
+        let from = last_block + 1;
+        let filter = Filter::new()
+            .address(contract_address)
+            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
+            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num));
+
+        let logs = provider
+            .get_logs(&filter)
+            .await
+            .map_err(|e| anyhow::anyhow!("get_logs {from}-{block_num}: {e}"))?;
+        for log in logs {
+            process_log(state, chain, &log)
+                .await
+                .map_err(|e| anyhow::anyhow!("process_log at block {block_num}: {e}"))?;
+        }
+
+        // Only now advance the cursor.
+        last_block = block_num;
+        update_last_block(state, &chain.network, block_num as i64).await.ok();
+    }
+
+    Ok(())
+}
+
+/// Fetch + process logs from `last_block` up to the current head in chunks,
+/// advancing the persisted cursor only after each chunk fully succeeds.
+async fn catch_up<P: Provider>(
+    state: &Arc<AppState>,
+    chain: &ChainConfig,
+    provider: &P,
+    contract_address: Address,
+    mut last_block: u64,
+) -> anyhow::Result<u64> {
+    const CHUNK_SIZE: u64 = 50_000;
+    let head = provider
+        .get_block_number()
+        .await
+        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+
+    // Cursor semantics (consistent with the subscribe loop): `last_block` is the
+    // highest FULLY-PROCESSED block; the next block to fetch is `last_block + 1`.
+    while last_block < head {
+        let from = last_block + 1;
+        let end = (from + CHUNK_SIZE - 1).min(head);
+        tracing::info!("Chain {} catching up blocks {} to {}", chain.network, from, end);
+
+        let filter = Filter::new()
+            .address(contract_address)
+            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
+            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
+
+        let logs = provider
+            .get_logs(&filter)
+            .await
+            .map_err(|e| anyhow::anyhow!("catch_up get_logs {from}-{end}: {e}"))?;
+        for log in logs {
+            process_log(state, chain, &log)
+                .await
+                .map_err(|e| anyhow::anyhow!("catch_up process_log: {e}"))?;
+        }
+
+        // Advance only after the whole chunk was fetched AND processed.
+        last_block = end;
+        update_last_block(state, &chain.network, last_block as i64).await.ok();
+    }
+
+    Ok(last_block)
+}
+
+/// Load the persisted indexing cursor for a network, inserting a zero row if absent.
+async fn load_last_block(state: &AppState, network: &str) -> anyhow::Result<u64> {
+    let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
     let idx_state: Option<IndexingState> = indexing_state::table
-        .filter(indexing_state::network.eq(&chain.network))
+        .filter(indexing_state::network.eq(network))
         .first(&mut conn)
         .await
         .optional()
         .unwrap_or(None);
 
-    let mut last_block = match idx_state {
-        Some(s) => s.last_block as u64,
+    match idx_state {
+        Some(s) => Ok(s.last_block.max(0) as u64),
         None => {
             let new_state = NewIndexingState {
-                network: chain.network.clone(),
+                network: network.to_string(),
                 last_block: 0,
             };
             diesel::insert_into(indexing_state::table)
@@ -65,116 +245,9 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
                 .execute(&mut conn)
                 .await
                 .ok();
-            0
+            Ok(0)
         }
-    };
-
-    tracing::info!("Chain {} last indexed block: {}", chain.network, last_block);
-
-    let contract_address: Address = chain
-        .contract_address
-        .parse()
-        .expect("Invalid contract address");
-
-    // For WebSocket provider
-    let ws_url = chain.ws_url.as_ref().expect("ws_url is required");
-    let ws = WsConnect::new(ws_url.as_str());
-    let provider = ProviderBuilder::new()
-        .connect_ws(ws)
-        .await
-        .expect("Failed to create WS provider");
-
-    // let abi_functions: Vec<alloy::json_abi::Function> =
-    //     serde_json::from_value(chain.abi.clone()).expect("Failed to parse ABI");
-
-    let current_block = match provider.get_block_number().await {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::error!("Failed to get current block: {e}");
-            return;
-        }
-    };
-
-    // Handle chain reset or large gap: skip to current block
-    // This handles Anvil restarts (last > current) and forked chains with huge gaps
-    let gap = if last_block > current_block {
-        last_block - current_block
-    } else {
-        current_block - last_block
-    };
-    if last_block > current_block || gap > 100_000 {
-        tracing::warn!(
-            "Chain {} last indexed block ({}) vs current block ({}), gap={}, skipping to current",
-            chain.network, last_block, current_block, gap
-        );
-        last_block = current_block;
-        let _ = update_last_block(&state, &chain.network, current_block as i64).await;
     }
-
-    const CHUNK_SIZE: u64 = 50_000;
-
-    while last_block < current_block {
-        let end = (last_block + CHUNK_SIZE).min(current_block);
-        tracing::info!("Catching up blocks {} to {}", last_block, end);
-
-        let filter = Filter::new()
-            .address(contract_address)
-            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(last_block))
-            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
-
-        match provider.get_logs(&filter).await {
-            Ok(logs) => {
-                for log in logs {
-                    if let Err(e) = process_log(&state, &chain, &log).await {
-                        tracing::error!("Error processing log: {e}");
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::error!("Error fetching logs: {e}");
-            }
-        }
-
-        last_block = end + 1;
-        let _ = update_last_block(&state, &chain.network, last_block as i64).await;
-    }
-
-    tracing::info!(
-        "Caught up to block {}, now subscribing to new blocks",
-        current_block
-    );
-
-    let state_clone = state.clone();
-    let chain_clone = chain.clone();
-
-    tokio::spawn(async move {
-        let stream = provider
-            .subscribe_blocks()
-            .await
-            .expect("Failed to subscribe to blocks");
-
-        let mut stream = stream.into_stream();
-
-        while let Some(block) = stream.next().await {
-            let block_num = block.number;
-            tracing::debug!("New block: {}", block_num);
-
-            let filter = Filter::new()
-                .address(contract_address)
-                .from_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num))
-                .to_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num));
-
-            if let Ok(logs) = provider.get_logs(&filter).await {
-                for log in logs {
-                    if let Err(e) = process_log(&state_clone, &chain_clone, &log).await {
-                        tracing::error!("Error processing log: {e}");
-                    }
-                }
-            }
-
-            let _ = update_last_block(&state_clone, &chain_clone.network, block_num as i64).await;
-        }
-    });
 }
 
 async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow::Result<()> {
@@ -189,14 +262,19 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     let buy_tokens_sig = keccak256(b"BuyTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
     let sell_tokens_sig = keccak256(b"SellTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
 
+    // log index within its block — used together with tx_hash as the trade's
+    // idempotency key so replays/reorgs cannot double-count.
+    let log_index = log.log_index.unwrap_or(0) as i64;
+
     if *topic == token_created_sig {
-        process_token_created_log(state, chain, &data.data).await?;
+        let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
+        process_token_created_log(state, chain, &data.data, &tx_hash).await?;
     } else if *topic == buy_tokens_sig {
         let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
-        process_swap_log(state, chain, &data.data, true, &tx_hash).await?;
+        process_swap_log(state, chain, &data.data, true, &tx_hash, log_index).await?;
     } else if *topic == sell_tokens_sig {
         let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
-        process_swap_log(state, chain, &data.data, false, &tx_hash).await?;
+        process_swap_log(state, chain, &data.data, false, &tx_hash, log_index).await?;
     }
 
     Ok(())
@@ -206,6 +284,7 @@ async fn process_token_created_log(
     state: &AppState,
     chain: &ChainConfig,
     data: &Bytes,
+    tx_hash: &str,
 ) -> anyhow::Result<()> {
     // TokenCreated(address token, uint256 tokenPrice, uint256 ethPriceUSD, uint32 sig, uint256 date)
     // data layout: [0..32] address, [32..64] tokenPrice, [64..96] ethPriceUSD, [96..128] sig, [128..160] date
@@ -229,6 +308,7 @@ async fn process_token_created_log(
         token_price,
         eth_price,
         timestamp,
+        tx_hash,
     )
     .await?;
 
@@ -242,6 +322,7 @@ async fn process_swap_log(
     data: &Bytes,
     is_buy: bool,
     tx_hash: &str,
+    log_index: i64,
 ) -> anyhow::Result<()> {
     // BuyTokens/SellTokens(address user, address token, uint256 ethAmount, uint256 tokenAmount,
     //                       uint256 tokenPrice, uint256 ethPriceUSD, uint256 marketCap, uint256 date)
@@ -263,15 +344,23 @@ async fn process_swap_log(
     let event_eth_price = U256::from_be_slice(&data[160..192]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
     let marketcap = U256::from_be_slice(&data[192..224]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
 
+    // Precise amounts straight from wei (no lossy f64 hop) — these are the stored,
+    // money-critical trade values that drive leaderboard rewards.
+    let eth_amount_bd = wei_to_bd(&data[64..96]);
+    let token_amount_bd = wei_to_bd(&data[96..128]);
+    let token_price_bd = wei_to_bd(&data[128..160]);
+    let event_eth_price_bd = wei_to_bd(&data[160..192]);
+
     let timestamp = u64::try_from(U256::from_be_slice(&data[224..256])).unwrap_or(0) as i64;
     if timestamp == 0 {
         return Ok(()); // skip invalid events
     }
 
-    let eth_price = if event_eth_price > 0.0 {
-        event_eth_price
+    let (eth_price, eth_price_bd) = if event_eth_price > 0.0 {
+        (event_eth_price, event_eth_price_bd)
     } else {
-        fetch_eth_price(chain).await.unwrap_or(2040.0)
+        let fallback = fetch_eth_price(chain).await.unwrap_or(2040.0);
+        (fallback, BigDecimal::from_str(&fallback.to_string()).unwrap_or_default())
     };
 
     process_swap(
@@ -287,6 +376,11 @@ async fn process_swap_log(
         marketcap,
         tx_hash,
         timestamp,
+        log_index,
+        eth_amount_bd,
+        token_amount_bd,
+        token_price_bd,
+        eth_price_bd,
     )
     .await?;
 
@@ -327,6 +421,29 @@ async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
     Some(price_wei as f64 / 1e18)
 }
 
+/// Fetch the `from` (sender) of a transaction by hash. Used to authenticate the
+/// on-chain creator of a token rather than trusting the unauthenticated staging
+/// request. Returns None on any RPC/parse failure (caller falls back gracefully).
+async fn fetch_tx_sender(chain: &ChainConfig, tx_hash: &str) -> Option<String> {
+    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(&rpc_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_getTransactionByHash",
+            "params": [tx_hash],
+            "id": 1
+        }))
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+    resp.get("result")?.get("from")?.as_str().map(|s| s.to_lowercase())
+}
+
 /// Process a token creation event from the blockchain.
 /// Called when a TokenCreated event is received.
 pub async fn process_token_created(
@@ -337,23 +454,72 @@ pub async fn process_token_created(
     _token_price: f64,
     eth_price_usd: f64,
     _timestamp: i64,
+    tx_hash: &str,
 ) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    // Find the pending request
-    let request: TokenCreationRequest = token_creation_requests::table
+    // Find the pending request. Idempotent: if it was already processed (row
+    // deleted), a re-delivered TokenCreated log is a no-op rather than an error
+    // that would wedge the whole listener into an infinite reconnect loop.
+    let request: TokenCreationRequest = match token_creation_requests::table
         .find(request_id)
         .first(&mut conn)
-        .await?;
+        .await
+        .optional()?
+    {
+        Some(r) => r,
+        None => {
+            tracing::debug!("TokenCreated request {request_id} already processed; skipping");
+            return Ok(());
+        }
+    };
 
     let body = &request.body;
 
-    // Find or create the creator user
-    let creator_address = request.creator_address.clone();
-    let creator: crate::models::user::User = users::table
+    // The staging request (POST /tokens) is unauthenticated and carries a
+    // client-claimed creator_address, so it cannot be trusted for attribution.
+    // Authenticate the creator against the actual on-chain transaction sender.
+    // Fall back to the claimed address only if the RPC lookup fails.
+    let mut creator_address = request.creator_address.to_lowercase();
+    match fetch_tx_sender(chain, tx_hash).await {
+        Some(sender) => {
+            if !sender.eq_ignore_ascii_case(&creator_address) {
+                tracing::warn!(
+                    "TokenCreated creator mismatch (request claimed {}, on-chain sender {}); using on-chain sender",
+                    creator_address,
+                    sender
+                );
+                creator_address = sender.to_lowercase();
+            }
+        }
+        None => tracing::warn!(
+            "Could not fetch tx sender for {}; trusting claimed creator {}",
+            tx_hash,
+            creator_address
+        ),
+    }
+
+    // Find or create the creator user (the on-chain deployer may not have a row).
+    let creator: crate::models::user::User = match users::table
         .filter(users::address.eq(&creator_address))
         .first(&mut conn)
-        .await?;
+        .await
+        .optional()?
+    {
+        Some(u) => u,
+        None => {
+            let new_user = crate::models::user::NewUser {
+                address: &creator_address,
+                username: None,
+                avatar: None,
+                bio: None,
+            };
+            diesel::insert_into(users::table)
+                .values(&new_user)
+                .get_result(&mut conn)
+                .await?
+        }
+    };
 
     let initial_price = chain.virtual_eth_amount / chain.virtual_token_amount;
     let marketcap = initial_price * chain.total_supply * eth_price_usd;
@@ -433,6 +599,15 @@ pub async fn process_token_created(
     Ok(())
 }
 
+/// Convert a 32-byte big-endian U256 wei value to a BigDecimal in whole units
+/// (÷ 1e18) with no lossy f64 intermediate. A wei amount like 5e16 exceeds f64's
+/// exact integer range, so this preserves full precision for stored trade values.
+fn wei_to_bd(bytes: &[u8]) -> BigDecimal {
+    let wei = U256::from_be_slice(bytes).to_string();
+    BigDecimal::from_str(&wei).unwrap_or_default()
+        / BigDecimal::from_str("1000000000000000000").unwrap()
+}
+
 /// Process a buy/sell event from the blockchain.
 pub async fn process_swap(
     state: &AppState,
@@ -447,6 +622,12 @@ pub async fn process_swap(
     marketcap_usd: f64,
     tx_hash: &str,
     timestamp: i64,
+    log_index: i64,
+    // Precise wei-derived amounts for the stored trade row (reward-critical).
+    eth_amount_bd: BigDecimal,
+    token_amount_bd: BigDecimal,
+    token_price_bd: BigDecimal,
+    eth_price_bd: BigDecimal,
 ) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -517,7 +698,46 @@ pub async fn process_swap(
 
     let old_volume: f64 = token.volume.to_string().parse().unwrap_or(0.0);
 
-    // Update token
+    // Idempotent trade insert FIRST. (tx_hash, log_index) is unique, so a
+    // re-delivered log (reconnect reprocess / reorg replay) inserts nothing and we
+    // bail out BEFORE touching any aggregate — otherwise volume/score/reserves and
+    // holder balances would double-count on every duplicate.
+    let trade_type = if is_buy {
+        TradeType::Buy
+    } else {
+        TradeType::Sell
+    };
+
+    let new_trade = crate::models::trade::NewTrade {
+        token_id: token.id,
+        swapper_id: swapper.id,
+        trade_type,
+        eth_amount: eth_amount_bd,
+        token_amount: token_amount_bd,
+        token_price: token_price_bd,
+        eth_price: eth_price_bd,
+        tx_hash: tx_hash.to_string(),
+        traded_at: timestamp,
+        log_index,
+    };
+
+    let inserted = diesel::insert_into(trades::table)
+        .values(&new_trade)
+        .on_conflict((trades::tx_hash, trades::log_index))
+        .do_nothing()
+        .execute(&mut conn)
+        .await?;
+
+    if inserted == 0 {
+        tracing::debug!(
+            "Duplicate swap log skipped: tx={} log_index={}",
+            tx_hash,
+            log_index
+        );
+        return Ok(());
+    }
+
+    // Genuinely new trade — now safe to apply aggregates exactly once.
     diesel::update(tokens::table.find(token.id))
         .set((
             tokens::virtual_eth_amount
@@ -534,30 +754,6 @@ pub async fn process_swap(
                 .eq(BigDecimal::from_str(&(old_volume + volume_usd).to_string())
                     .unwrap_or_default()),
         ))
-        .execute(&mut conn)
-        .await?;
-
-    // Create trade record
-    let trade_type = if is_buy {
-        TradeType::Buy
-    } else {
-        TradeType::Sell
-    };
-
-    let new_trade = crate::models::trade::NewTrade {
-        token_id: token.id,
-        swapper_id: swapper.id,
-        trade_type,
-        eth_amount: BigDecimal::from_str(&eth_amount.to_string()).unwrap_or_default(),
-        token_amount: BigDecimal::from_str(&token_amount.to_string()).unwrap_or_default(),
-        token_price: BigDecimal::from_str(&token_price.to_string()).unwrap_or_default(),
-        eth_price: BigDecimal::from_str(&eth_price_usd.to_string()).unwrap_or_default(),
-        tx_hash: tx_hash.to_string(),
-        traded_at: timestamp,
-    };
-
-    diesel::insert_into(trades::table)
-        .values(&new_trade)
         .execute(&mut conn)
         .await?;
 
@@ -644,4 +840,32 @@ pub async fn update_last_block(state: &AppState, network: &str, block: i64) -> a
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod money_tests {
+    use super::*;
+
+    #[test]
+    fn wei_to_bd_is_exact() {
+        // 0.05 ETH = 5e16 wei — exceeds f64's exact-integer range, so the old
+        // f64 path could drift; BigDecimal must be exact.
+        let bytes = U256::from(50_000_000_000_000_000u128).to_be_bytes::<32>();
+        assert_eq!(
+            wei_to_bd(&bytes).normalized(),
+            BigDecimal::from_str("0.05").unwrap().normalized()
+        );
+        // 1 wei preserved to 18 dp.
+        let one = U256::from(1u8).to_be_bytes::<32>();
+        assert_eq!(
+            wei_to_bd(&one).normalized(),
+            BigDecimal::from_str("0.000000000000000001").unwrap().normalized()
+        );
+        // Large value keeps every significant digit.
+        let big = U256::from_str("123456789123456789123456789").unwrap().to_be_bytes::<32>();
+        assert_eq!(
+            wei_to_bd(&big).normalized(),
+            BigDecimal::from_str("123456789.123456789123456789").unwrap().normalized()
+        );
+    }
 }
