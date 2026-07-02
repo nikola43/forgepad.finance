@@ -90,17 +90,7 @@ services:
       exit 0
       "
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
-        NEXT_PUBLIC_LOCAL_MODE: "false"
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
+  # frontend: deployed separately on Vercel
 
 volumes:
   pgdata:
