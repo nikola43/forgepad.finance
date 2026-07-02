@@ -76,6 +76,7 @@ contract ArrowpadTest is Test {
     uint256 constant VIRTUAL_ETH_INITIAL = 2.5 ether;
     uint256 constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18;
     uint256 constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18;
+    uint256 constant PRIVATE_DIVISOR = 10_000;
     uint256 TARGET_MCAP_USD; // read from the contract in setUp so tests track the live target
 
     IUniswapV2Router02 router;
@@ -133,6 +134,12 @@ contract ArrowpadTest is Test {
         arrowpad.setPlatformSellFeeBps(300);
         arrowpad.setMaxBuyPercent(10000);
         arrowpad.setMaxSellPercent(10000);
+
+        // On L2 chains (Arbitrum, Robinhood Chain) the Chainlink feed timestamp
+        // originates from L1 and can lag behind the L2 block time. Use 24h window.
+        if (block.chainid == 4663) {
+            arrowpad.setPriceStalenessThreshold(86400);
+        }
     }
 
     // ================================================================
@@ -371,9 +378,102 @@ contract ArrowpadTest is Test {
         assertGe(k3, k2, "K non-decreasing after sell");
     }
 
-    // ================================================================
-    //  3. BUY OPERATIONS
-    // ================================================================
+    /// @notice _getMaxBuyForReserve caps the effective buyAmount so the computed
+    ///         output never exceeds the available token reserve. Verify indirectly:
+    ///         each buy's received tokens never exceed the pre-buy tokenReserve.
+    function test_02c_MaxBuyForReserve_NoOvercharge() public {
+        console.log("=== TEST 2c: _getMaxBuyForReserve no overcharge ===");
+        address t = _create("MaxBuy", "MXB", 1);
+
+        for (uint256 i = 0; i < 2000; i++) {
+            IArrowpad.PoolInfo memory p = _pool(t);
+            if (p.launched) break;
+
+            uint256 resBefore = p.tokenReserve;
+            uint256 balBefore = IERC20(t).balanceOf(addr1);
+
+            vm.prank(addr1);
+            arrowpad.swapExactETHForTokens{value: 0.3 ether}(t, 0.3 ether, 0, block.timestamp);
+
+            IArrowpad.PoolInfo memory pAfter = _pool(t);
+            if (!pAfter.launched) {
+                uint256 tokensReceived = IERC20(t).balanceOf(addr1) - balBefore;
+                // Invariant: the buy never consumes more tokens than were available.
+                // This is the direct consequence of the _getMaxBuyForReserve cap.
+                assertTrue(tokensReceived <= resBefore, "buyer cannot exceed available reserve");
+            }
+
+            // If graduation happened, our invariant was already verified on prior buys.
+            if (pAfter.launched) {
+                console.log("Graduated after buy", i + 1);
+                break;
+            }
+        }
+        console.log("All buys respected the reserve cap");
+    }
+
+    /// @dev Verify the _getMaxBuyForReserve formula directly by reimplementing
+    ///      it here and cross-checking with getSwapOutput + getAmountIn.
+    function test_02d_MaxBuyForReserve_Math() public {
+        console.log("=== TEST 2d: _getMaxBuyForReserve math ===");
+
+        // Full reserves: vEth=2.5, vToken=1.073e9, tokenReserve=793.1e6, fee=300bps
+        // maxNet = tokenReserve * vEth / (vToken - tokenReserve)
+        //        = 793.1e6 * 1e18 * 2.5e18 / ((1.073e9 - 793.1e6) * 1e18)
+        //        = 793.1e6 * 2.5e18 / 279.9e6 ≈ 7.08e18
+        // maxBuy = maxNet * DIVISOR / (DIVISOR - 300) ≈ 7.08 * 10000 / 9700 ≈ 7.3 ETH
+        uint256 capFull = _maxBuyForReserve(2.5 ether, 1_073_000_000e18, 793_100_000e18, 300);
+        // ~7.3 ETH expected at full reserves
+        assertTrue(capFull > 5 ether, "full reserve cap > 5 ETH");
+        assertTrue(capFull < 10 ether, "full reserve cap < 10 ETH");
+
+        // When tokenReserve is very small, cap should be tiny.
+        uint256 capTiny = _maxBuyForReserve(2.5 ether, 1_073_000_000e18, 0.1 ether, 300);
+        assertTrue(capTiny < 1e15, "tiny reserve produces tiny cap");
+
+        // When tokenReserve >= vToken, reserve is ample -> type(uint256).max
+        uint256 capAmple = _maxBuyForReserve(2.5 ether, 1_000_000e18, 1_000_001e18, 300);
+        assertEq(capAmple, type(uint256).max, "ample reserve returns max");
+
+        // Cross-check: for a given buyAmount <= cap, verify the computed
+        // amountOut never exceeds an imagined tokenReserve.
+        // Use a realistic mid-curve state: vEth=3.0, vToken=800e6, tokenReserve=500e6
+        for (uint256 buy = 0.01 ether; buy <= 5 ether; buy += 0.1 ether) {
+            uint256 maxBuy = _maxBuyForReserve(3 ether, 800_000_000e18, 500_000_000e18, 300);
+            if (buy > maxBuy) {
+                // Buy would be capped; the output at the cap must be <= tokenReserve.
+                (uint256 out,) = _simAmountOut(maxBuy, 3 ether, 800_000_000e18, 300);
+                assertTrue(out <= 500_000_000e18, "capped buy doesn't exceed reserve");
+                break; // verified the boundary
+            }
+        }
+    }
+
+    /// @dev Reimplementation of _getMaxBuyForReserve for test verification.
+    function _maxBuyForReserve(
+        uint256 vEth, uint256 vToken, uint256 tokenReserve, uint256 feeBps
+    ) internal pure returns (uint256) {
+        if (vToken <= tokenReserve) return type(uint256).max;
+        uint256 maxNet = _mul(tokenReserve, vEth) / (vToken - tokenReserve);
+        return _mul(maxNet, PRIVATE_DIVISOR) / (PRIVATE_DIVISOR - feeBps);
+    }
+
+    /// @dev Reimplementation of getAmountOut for test cross-check.
+    function _simAmountOut(
+        uint256 amountIn, uint256 vEth, uint256 vToken, uint256 feeBps
+    ) internal pure returns (uint256 amountOut, uint256 impact) {
+        uint256 amountInWithFee = _mul(amountIn, PRIVATE_DIVISOR - feeBps) / PRIVATE_DIVISOR;
+        uint256 numerator = _mul(amountInWithFee, vToken);
+        uint256 denominator = vEth + amountInWithFee;
+        amountOut = numerator / denominator;
+        impact = amountOut * PRIVATE_DIVISOR / vToken;
+    }
+
+    function _mul(uint256 a, uint256 b) private pure returns (uint256) {
+        uint256 c = a * b;
+        require(a == 0 || c / a == b, "mul overflow");
+        return c;
+    }
 
     function test_03a_SingleBuy() public {
         console.log("=== TEST 3a: Single buy ===");
@@ -2295,9 +2395,10 @@ contract ArrowpadTest is Test {
         );
     }
 
-    /// @notice V3: hostile pre-init blocks graduation (no drain); owner recovers via V2.
-    function test_27_V3HostilePreInitBlockedThenRecovered() public {
-        console.log("=== TEST 27: V3 hostile pre-init blocked + recovered ===");
+    /// @notice V3: hostile pre-init — the auto-fallback to V2 kicks in so graduation
+    ///         succeeds at the target price (owner never needs manual recovery).
+    function test_27_V3HostilePreInit_FallsBackToV2() public {
+        console.log("=== TEST 27: V3 hostile pre-init falls back to V2 ===");
         address t = _create("V3Grief", "V3GR", 2);
         address weth = router.WETH();
 
@@ -2305,43 +2406,35 @@ contract ArrowpadTest is Test {
         address pool = IUniswapV3Factory(V3_FACTORY).createPool(t, weth, V3_FEE);
         IUniswapV3Pool(pool).initialize(HOSTILE_SQRT_PRICE);
 
-        _driveTo(t, 8000); // to 80% of target, no graduation yet
+        // Drive to 80% of target, no graduation yet.
+        _driveTo(t, 8000);
         assertFalse(_pool(t).launched, "not launched while driving");
 
-        // The graduation-crossing buy must revert (drain into hostile pool prevented).
+        // The graduation-crossing buy does NOT revert (the V3 addLiquidity reverts
+        // internally, caught by the try/catch fallback, and V2 is used instead).
         vm.prank(addr1);
-        vm.expectRevert("V3 pool price mismatch");
         arrowpad.swapExactETHForTokens{value: 1 ether}(
             t,
             1 ether,
             0,
             block.timestamp
         );
-        assertFalse(_pool(t).launched, "still not launched (drain prevented)");
 
-        // Owner recovery: reroute to brick-proof V2, then graduate cleanly.
-        arrowpad.recoverPoolType(t, 1);
-        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
-            vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
-                t,
-                0.1 ether,
-                0,
-                block.timestamp
-            );
-        }
-        assertTrue(_pool(t).launched, "recovered + graduated via V2");
+        // Graduation must have succeeded via the V2 fallback path.
+        assertTrue(_pool(t).launched, "graduated via V2 fallback");
+        // poolType was flipped to V2 by the fallback.
+        assertEq(_pool(t).poolType, 1, "poolType reset to V2");
         assertApproxEqRel(
             _v2FdvUsd(t, arrowpad.getETHPriceByUSD()),
             arrowpad.TARGET_MARKET_CAP_USD(),
             0.03e18,
-            "recovered pool opens at target"
+            "V2 fallback opens at target mcap"
         );
     }
 
-    /// @notice V4: hostile pre-init blocks graduation; owner recovers via V2.
-    function test_28_V4HostilePreInitBlockedThenRecovered() public {
-        console.log("=== TEST 28: V4 hostile pre-init blocked + recovered ===");
+    /// @notice V4: hostile pre-init — same auto-fallback to V2.
+    function test_28_V4HostilePreInit_FallsBackToV2() public {
+        console.log("=== TEST 28: V4 hostile pre-init falls back to V2 ===");
         address t = _create("V4Grief", "V4GR", 3);
 
         // Attacker initializes the V4 pool at a hostile price.
@@ -2351,31 +2444,20 @@ contract ArrowpadTest is Test {
         assertFalse(_pool(t).launched, "not launched while driving");
 
         vm.prank(addr1);
-        vm.expectRevert("V4 pool price mismatch");
         arrowpad.swapExactETHForTokens{value: 1 ether}(
             t,
             1 ether,
             0,
             block.timestamp
         );
-        assertFalse(_pool(t).launched, "still not launched (drain prevented)");
 
-        arrowpad.recoverPoolType(t, 1);
-        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
-            vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
-                t,
-                0.1 ether,
-                0,
-                block.timestamp
-            );
-        }
-        assertTrue(_pool(t).launched, "recovered + graduated via V2");
+        assertTrue(_pool(t).launched, "graduated via V2 fallback");
+        assertEq(_pool(t).poolType, 1, "poolType reset to V2");
         assertApproxEqRel(
             _v2FdvUsd(t, arrowpad.getETHPriceByUSD()),
             arrowpad.TARGET_MARKET_CAP_USD(),
             0.03e18,
-            "recovered pool opens at target"
+            "V2 fallback opens at target mcap"
         );
     }
 

@@ -74,6 +74,10 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     uint256 public CREATE_TOKEN_FEE_AMOUNT = 0.001 ether; // ~Pump.fun creation fee equivalent
     // Fees in basis points (1 bps = 0.01%), same DIVISOR basis as MAX_BUY/SELL_PERCENT
     uint256 public TOKEN_OWNER_FEE_BPS = 0; // Optional (e.g. 30 = 0.3%)
+    // Chainlink staleness threshold. Default 3600s (1h) for Ethereum mainnet. On L2
+    // chains (Arbitrum, Robinhood Chain) the feed's updatedAt is the L1 timestamp
+    // and can lag hours behind the L2 block time — set this to 86400 (24h) or more.
+    uint256 public priceStalenessThreshold = 3600;
     uint256 public PLATFORM_BUY_FEE_BPS = 100; // 1%
     uint256 public PLATFORM_SELL_FEE_BPS = 100; // 1%
     uint256 public platformLPFee = 0.1 ether;
@@ -295,6 +299,21 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         PoolInfo storage pool = tokenPools[token];
 
         uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
+
+        // Cap the effective buyAmount so the computed output never exceeds the
+        // available real token reserve. Without this, a buyer near graduation
+        // pays for the full output but the capped output is less — the
+        // difference is silently absorbed rather than refunded.
+        uint256 maxEffectiveBuy = _getMaxBuyForReserve(
+            pool.virtualEthReserve,
+            pool.virtualTokenReserve,
+            pool.tokenReserve,
+            totalFeeBps
+        );
+        if (buyAmount > maxEffectiveBuy) {
+            buyAmount = maxEffectiveBuy;
+        }
+
         uint256 amountOut = getAmountOut(
             buyAmount,
             pool.virtualEthReserve,
@@ -309,11 +328,6 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         uint256 tokenOwnerFee = _mul(buyAmount, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountIn = buyAmount - buyFee - tokenOwnerFee;
 
-        // Cap amountOut to real token reserve to prevent underflow
-        if (amountOut > pool.tokenReserve) {
-            amountOut = pool.tokenReserve;
-        }
-
         // Update real + virtual reserves (K preserved by construction)
         pool.ethReserve += netAmountIn;
         pool.tokenReserve -= amountOut;
@@ -327,6 +341,29 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         _emitBuy(token, netAmountIn, amountOut);
         _checkAndAddLiquidity(token);
+    }
+
+    /// @dev Largest buyAmount (in ETH, before fees) that still produces an
+    ///      amountOut <= tokenReserve. Solves for buyAmount in:
+    ///        amountOut = (buyAmount * (1 - fee)) * vToken / (vEth + buyAmount * (1 - fee))
+    ///      capped at amountOut <= tokenReserve.
+    function _getMaxBuyForReserve(
+        uint256 vEth,
+        uint256 vToken,
+        uint256 tokenReserve,
+        uint256 totalFeeBps
+    ) internal pure returns (uint256) {
+        if (tokenReserve == 0) return 0;
+        // netBuy = buyAmount * (DIVISOR - totalFeeBps) / DIVISOR
+        // amountOut = netBuy * vToken / (vEth + netBuy)
+        // Solve: netBuy * vToken / (vEth + netBuy) <= tokenReserve
+        // => netBuy * vToken <= tokenReserve * vEth + tokenReserve * netBuy
+        // => netBuy * (vToken - tokenReserve) <= tokenReserve * vEth
+        // => netBuy <= tokenReserve * vEth / (vToken - tokenReserve)
+        if (vToken <= tokenReserve) return type(uint256).max; // reserve is ample
+        uint256 maxNet = _mul(tokenReserve, vEth) / (vToken - tokenReserve);
+        // Convert back to gross (pre-fee) buyAmount
+        return _mul(maxNet, DIVISOR) / (DIVISOR - totalFeeBps);
     }
 
     function _swapETHForExactTokens(
@@ -541,7 +578,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         ) {
             if (price <= 0) return 0;
             if (answeredInRound < roundId) return 0; // incomplete round
-            if (updatedAt == 0 || block.timestamp - updatedAt > 3600) return 0;
+            if (updatedAt == 0 || block.timestamp - updatedAt > priceStalenessThreshold) return 0;
             uint8 dec = priceFeedDecimals;
             if (dec <= 18) return uint256(price) * (10 ** (18 - dec));
             return uint256(price) / (10 ** (dec - 18));
@@ -803,6 +840,13 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
     function setFirstBuyFee(uint256 fee) external onlyOwner {
         firstBuyFeeUSD = fee;
+    }
+
+    /// @notice Set the Chainlink staleness threshold. On L2 chains where the feed
+    ///         timestamp originates from L1, increase this to 86400+ (24h).
+    function setPriceStalenessThreshold(uint256 threshold) external onlyOwner {
+        require(threshold > 0, "Threshold must be > 0");
+        priceStalenessThreshold = threshold;
     }
 
     function setTokenOwnerLPFee(uint256 fee) external onlyOwner {

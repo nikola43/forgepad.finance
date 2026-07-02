@@ -10,6 +10,12 @@ import {
     IUniswapV2Router02
 } from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {
+    IUniswapV3Factory
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {
+    IUniswapV3Pool
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {
     IUniswapV2Factory
 } from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {
@@ -82,6 +88,11 @@ contract ArrowpadHardeningTest is Test {
         arrowpad.setPlatformSellFeeBps(100);
         arrowpad.setMaxBuyPercent(10000);
         arrowpad.setMaxSellPercent(10000);
+
+        if (block.chainid == 4663) {
+            arrowpad.setPriceStalenessThreshold(86400);
+        }
+
         TARGET = arrowpad.TARGET_MARKET_CAP_USD();
 
         buyer = makeAddr("buyer");

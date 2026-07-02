@@ -82,7 +82,7 @@ const jsonLd = {
       url: SITE_URL,
       logo: `${SITE_URL}/images/logo.png`,
       description: DESCRIPTION,
-      sameAs: ["https://t.me/arrowpad", "https://x.com/arrowpad"],
+      sameAs: ["https://x.com/RobinArrowPad"],
     },
     {
       "@type": "WebSite",

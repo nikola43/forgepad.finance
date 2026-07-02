@@ -299,6 +299,7 @@ async fn process_token_created_log(
     let timestamp = u64::try_from(U256::from_be_slice(&data[128..160])).unwrap_or(0) as i64;
 
     let eth_price = fetch_eth_price(chain).await.unwrap_or(2040.0);
+    let pool_type = fetch_pool_type(chain, &token_address).await.unwrap_or(crate::models::enums::PoolType::V2);
 
     process_token_created(
         state,
@@ -309,11 +310,60 @@ async fn process_token_created_log(
         eth_price,
         timestamp,
         tx_hash,
+        pool_type,
     )
     .await?;
 
     tracing::info!("Processed TokenCreated: {} at {}", token_address, timestamp);
     Ok(())
+}
+
+/// Fetch the poolType from the on-chain Arrowpad contract via tokenPools().
+/// The TokenCreated event does not emit poolType, so we must read it from
+/// contract state to store it accurately in the backend.
+async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<crate::models::enums::PoolType> {
+    // tokenPools(address) selector = 0x1e4c668a
+    // Returns a struct with 8 fields: ethReserve, tokenReserve, virtualEthReserve,
+    // virtualTokenReserve, token, owner, poolType, launched.
+    // poolType is the 7th field (offset 160 bytes in the ABI-encoded return).
+    let call_data = format!(
+        "0x1e4c668a000000000000000000000000{}",
+        token_address.strip_prefix("0x").unwrap_or(token_address)
+    );
+    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(&rpc_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_call",
+            "params": [{
+                "to": chain.contract_address,
+                "data": call_data
+            }, "latest"],
+            "id": 1
+        }))
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+    let hex = resp.get("result")?.as_str()?;
+    // ABI-encoded struct: 32 bytes each for 8 fields. poolType is the 7th field
+    // at offset 192 bytes (6 * 32 = 192) from the data start.
+    let trimmed = hex.trim_start_matches("0x");
+    if trimmed.len() < 256 {
+        return None;
+    }
+    let pool_type_hex = &trimmed[192..256]; // bytes 192..224 = 7th field
+    let pt = u8::from_str_radix(pool_type_hex, 16).ok()?;
+    match pt {
+        1 => Some(crate::models::enums::PoolType::V2),
+        2 => Some(crate::models::enums::PoolType::V3),
+        3 => Some(crate::models::enums::PoolType::V4),
+        _ => Some(crate::models::enums::PoolType::V2),
+    }
 }
 
 async fn process_swap_log(
@@ -455,6 +505,7 @@ pub async fn process_token_created(
     eth_price_usd: f64,
     _timestamp: i64,
     tx_hash: &str,
+    pool_type: crate::models::enums::PoolType,
 ) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -553,7 +604,7 @@ pub async fn process_token_created(
         virtual_token_amount: BigDecimal::from_str(&chain.virtual_token_amount.to_string())
             .unwrap_or_default(),
         pair_address: None,
-        pool_type: crate::models::enums::PoolType::V2,
+        pool_type,
         category: crate::models::enums::TokenCategory::Normal,
         web_link: body
             .get("webLink")
@@ -615,7 +666,7 @@ pub async fn process_swap(
     token_address: &str,
     swapper_address: &str,
     is_buy: bool,
-    eth_amount: f64,
+    _eth_amount: f64,
     token_amount: f64,
     token_price: f64,
     eth_price_usd: f64,
@@ -660,34 +711,36 @@ pub async fn process_swap(
         Err(e) => return Err(e.into()),
     };
 
-    // Calculate new virtual reserves
-    let old_veth: f64 = token.virtual_eth_amount.to_string().parse().unwrap_or(0.0);
-    let old_vtoken: f64 = token
-        .virtual_token_amount
-        .to_string()
-        .parse()
-        .unwrap_or(0.0);
+    // Use BigDecimal directly for reserve tracking so precision is never lost
+    // through an f64 round-trip. Over many trades, f64 drift causes the
+    // off-chain virtual reserves to diverge from the on-chain reality, which
+    // corrupts the frontend price/market cap display.
+    let old_veth_bd = token.virtual_eth_amount.clone();
+    let old_vtoken_bd = token.virtual_token_amount.clone();
 
     // Token side carries no fee, so the token reserve delta is exact.
-    let new_vtoken = if is_buy {
-        old_vtoken - token_amount
+    let new_vtoken_bd = if is_buy {
+        old_vtoken_bd - &token_amount_bd
     } else {
-        old_vtoken + token_amount
+        old_vtoken_bd + &token_amount_bd
     };
     // Trust the contract's authoritative spot price and derive the ETH reserve from
     // it (fee-independent) instead of reconstructing gross ETH from a hardcoded fee.
-    let new_price = token_price;
-    let new_veth = if new_price > 0.0 && new_vtoken > 0.0 {
-        new_price * new_vtoken
+    let new_price_bd = &token_price_bd;
+    let new_veth_bd = if new_price_bd > &BigDecimal::from(0) && new_vtoken_bd > BigDecimal::from(0)
+    {
+        new_price_bd * &new_vtoken_bd
     } else if is_buy {
-        old_veth + eth_amount
+        old_veth_bd + &eth_amount_bd
     } else {
-        old_veth
+        old_veth_bd
     };
-    let new_marketcap = if marketcap_usd > 0.0 {
-        marketcap_usd
+    let new_marketcap_bd = if marketcap_usd > 0.0 {
+        BigDecimal::from_str(&marketcap_usd.to_string()).unwrap_or_default()
     } else {
-        new_price * chain.total_supply * eth_price_usd
+        new_price_bd
+            * BigDecimal::from_str(&chain.total_supply.to_string()).unwrap_or_default()
+            * &eth_price_bd
     };
 
     // Score decay calculation
@@ -714,8 +767,8 @@ pub async fn process_swap(
         trade_type,
         eth_amount: eth_amount_bd,
         token_amount: token_amount_bd,
-        token_price: token_price_bd,
-        eth_price: eth_price_bd,
+        token_price: token_price_bd.clone(),
+        eth_price: eth_price_bd.clone(),
         tx_hash: tx_hash.to_string(),
         traded_at: timestamp,
         log_index,
@@ -740,15 +793,11 @@ pub async fn process_swap(
     // Genuinely new trade — now safe to apply aggregates exactly once.
     diesel::update(tokens::table.find(token.id))
         .set((
-            tokens::virtual_eth_amount
-                .eq(BigDecimal::from_str(&new_veth.to_string()).unwrap_or_default()),
-            tokens::virtual_token_amount
-                .eq(BigDecimal::from_str(&new_vtoken.to_string()).unwrap_or_default()),
-            tokens::price.eq(BigDecimal::from_str(&new_price.to_string()).unwrap_or_default()),
-            tokens::marketcap
-                .eq(BigDecimal::from_str(&new_marketcap.to_string()).unwrap_or_default()),
-            tokens::eth_price
-                .eq(BigDecimal::from_str(&eth_price_usd.to_string()).unwrap_or_default()),
+            tokens::virtual_eth_amount.eq(&new_veth_bd),
+            tokens::virtual_token_amount.eq(&new_vtoken_bd),
+            tokens::price.eq(&new_price_bd),
+            tokens::marketcap.eq(&new_marketcap_bd),
+            tokens::eth_price.eq(&eth_price_bd),
             tokens::score.eq(BigDecimal::from_str(&new_score.to_string()).unwrap_or_default()),
             tokens::volume
                 .eq(BigDecimal::from_str(&(old_volume + volume_usd).to_string())
@@ -802,7 +851,7 @@ pub async fn process_swap(
     let _ = state.ws_tx.send(WsEvent::Trade {
         token_address: token_address.to_string(),
         date: timestamp,
-        token_price: new_price.to_string(),
+        token_price: new_price_bd.to_string(),
         volume: volume_usd.to_string(),
     });
 

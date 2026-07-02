@@ -62,10 +62,10 @@ contract RobinhoodDeployedTest is Test {
         active = true;
 
         arrowpad = Arrowpad(
-            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x955b9e7809Ee9bdD4C6cD0D07cA9cb6ECAF47a8F))
+            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x871a70037398310427EAFbeb0368D8c42c806CC9))
         );
         lm = ArrowpadLiquidityManager(
-            payable(vm.envOr("DEPLOYED_LM", 0x292655C9759a1F259716Ff2cc878897BC3dF89bB))
+            payable(vm.envOr("DEPLOYED_LM", 0x992C539D7c4377eD3A297550c12f1F1e0BD675f9))
         );
         router = IUniswapV2Router02(
             vm.envOr("V2_ROUTER", 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba)

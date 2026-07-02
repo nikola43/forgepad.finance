@@ -101,6 +101,10 @@ contract ArrowpadAdvancedTest is Test {
         arrowpad.setPlatformSellFeeBps(300);
         arrowpad.setMaxBuyPercent(300);
         arrowpad.setMaxSellPercent(300);
+
+        if (block.chainid == 4663) {
+            arrowpad.setPriceStalenessThreshold(86400);
+        }
     }
 
     // ---- Helper: create token and return address via event ----

@@ -1,10 +1,9 @@
 import styled from "styled-components"
 import CloseIcon from "@mui/icons-material/Close";
 import LogoutIcon from '@mui/icons-material/Logout';
-import TelegramIcon from '@/assets/images/telegram.svg';
 import TwitterIcon from '@/assets/images/x.svg';
 import { CubeIcon, DialogHowItWorks, HomeIcon, TokenIcon, WalletIcon } from "./sidebar";
-import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
+import { FORGE_TWITTER_URL } from "@/config";
 import { useEffect, useState } from "react";
 import { CircularProgress } from "@mui/material";
 import Link from "next/link";
@@ -251,9 +250,6 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
         </Buttons>
 
         <SocialLinks>
-            <Link href={FORGE_TELEGRAM_URL} target="_blank">
-                <Image src={TelegramIcon} width={45} height={45} alt="telegramCommunity" />
-            </Link>
             <Link href={FORGE_TWITTER_URL} target="_blank">
                 <Image src={TwitterIcon} width={45} height={45} alt="twitter" />
             </Link>

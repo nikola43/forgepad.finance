@@ -15,9 +15,20 @@ import "../src/ArrowpadLiquidityManager.sol";
 ///   anvil --fork-url https://rpc.mainnet.chain.robinhood.com &
 ///   PRIVATE_KEY=0x... forge script script/DeployRobinhood.s.sol \
 ///     --rpc-url http://127.0.0.1:8545 --broadcast
+/// @notice Verified Robinhood Chain addresses (chainId 4663).
+///         RPC: https://rpc.mainnet.chain.robinhood.com
+///         Explorer: https://explorer.mainnet.chain.robinhood.com
+///
+///         V2:   factory=0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f
+///               router=0x89e5db8b5aa49aa85ac63f691524311aeb649eba
+///         V3:   factory=0x1f7d7550b1b028f7571e69a784071f0205fd2efa
+///               positionMgr=0x73991a25c818bf1f1128deaab1492d45638de0d3
+///         V4:   poolMgr=0x8366a39cc670b4001a1121b8f6a443a643e40951
+///               positionMgr=0x58daec3116aae6d93017baaea7749052e8a04fa7
 contract DeployArrowpadRobinhood is Script {
     // ---- Uniswap V2 (Robinhood) ----
     address constant V2_ROUTER = 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba;
+    address constant V2_FACTORY = 0x8bcEaA40B9AcdfAedF85AdF4FF01F5Ad6517937f;
 
     // ---- Uniswap V3 (Robinhood) ----
     address constant V3_FACTORY = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
@@ -33,6 +44,8 @@ contract DeployArrowpadRobinhood is Script {
         0x8876789976dEcBfCbBbe364623C63652db8C0904;
 
     // ---- Shared ----
+    // Multicall3 (not used in contract, but useful for batch operations post-deploy)
+    address constant MULTICALL3 = 0xcA11bde05977b3631167028862bE2a173976CA11;
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     // Chainlink ETH/USD (Robinhood, 8 decimals)
     address constant DATA_FEED = 0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9;
@@ -81,6 +94,11 @@ contract DeployArrowpadRobinhood is Script {
         arrowpad.setPlatformSellFeeBps(100);
         arrowpad.setMaxBuyPercent(10000);
         arrowpad.setMaxSellPercent(10000);
+
+        // On Robinhood Chain (Arbitrum Orbit L2) the Chainlink feed timestamp
+        // originates from L1 and can lag hours behind the L2 block time. Use a
+        // 24h staleness window so graduation and fee calculations aren't bricked.
+        arrowpad.setPriceStalenessThreshold(86400);
 
         vm.stopBroadcast();
 

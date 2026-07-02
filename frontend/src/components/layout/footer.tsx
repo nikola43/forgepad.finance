@@ -1,7 +1,6 @@
 import styled from "styled-components"
-import TelegramIcon from '@/assets/images/telegram.svg';
 import TwitterIcon from '@/assets/images/x.svg';
-import { FORGE_TELEGRAM_URL, FORGE_TWITTER_URL } from "@/config";
+import { FORGE_TWITTER_URL } from "@/config";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -173,9 +172,6 @@ export default function Footer() {
                         The token launchpad for Robinhood Chain. Launch on a fair bonding curve, trade instantly, and graduate to Uniswap.
                     </span>
                     <SocialLinks>
-                        <Link href={FORGE_TELEGRAM_URL} target="_blank">
-                            <Image src={TelegramIcon} width={18} height={18} alt="Telegram" />
-                        </Link>
                         <Link href={FORGE_TWITTER_URL} target="_blank">
                             <Image src={TwitterIcon} width={16} height={16} alt="Twitter" />
                         </Link>
@@ -191,7 +187,6 @@ export default function Footer() {
                     </LinkGroup>
                     <LinkGroup>
                         <span className="group-title">Resources</span>
-                        <Link href={FORGE_TELEGRAM_URL} target="_blank">Community</Link>
                         <Link href={FORGE_TWITTER_URL} target="_blank">Twitter / X</Link>
                     </LinkGroup>
                 </FooterLinks>
