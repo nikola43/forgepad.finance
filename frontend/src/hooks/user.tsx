@@ -50,7 +50,7 @@ export function useAccount() {
                 const { data } = await axios.get(`${API_ENDPOINT}/users`, {
                     params: { userAddress: address }
                 })
-                return data
+                return data.user
             } catch (err: any) {
                 if (err?.response?.status === 404) return null
                 throw err
@@ -98,7 +98,7 @@ export function useUserProfile(profileAddress?: string) {
             let user = null
             try {
                 const res = await axios.get(`${API_ENDPOINT}/users`, { params: { userAddress: profileAddress } })
-                user = res.data
+                user = res.data.user
             } catch (err: any) {
                 if (err?.response?.status !== 404) throw err
             }

@@ -179,7 +179,11 @@ export default function Profile() {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const user = profile?.user
+    console.log('[Profile] profileAddress:', profileAddress)
+    console.log('[Profile] profile.user:', user)
+    console.log('[Profile] user?.avatar:', user?.avatar)
     const profilePic = getProfilePic(user, profileAddress)
+    console.log('[Profile] profilePic:', profilePic)
     const shortAddr = profileAddress ? `${profileAddress.slice(0, 6)}...${profileAddress.slice(-4)}` : ''
 
     // Check if connected user follows this profile
