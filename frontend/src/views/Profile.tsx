@@ -242,7 +242,10 @@ export default function Profile() {
         try {
             const provider = new BrowserProvider(walletProvider)
             const signer = await provider.getSigner()
-            const msg = `Upload avatar\n${connectedAddress}\n${Date.now()}`
+            // No newlines: multipart/form-data normalizes \n -> \r\n in field
+            // values, which would change the bytes the backend recovers from and
+            // yield the wrong signer address.
+            const msg = `Upload avatar ${connectedAddress} ${Date.now()}`
             const signature = await signer.signMessage(msg)
             const formData = new FormData()
             formData.append('avatar', file)

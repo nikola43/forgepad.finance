@@ -1163,10 +1163,6 @@ export default function Token() {
                                 </Box>
                                 <Box display="flex" gap="8px">
                                     <StatsBox>
-                                        <Typography fontSize={12} color="#9E9E9E">Virtual Liquidity:</Typography>
-                                        <Typography fontSize={12} color="white">${priceFormatter(detailData?.liquidity ?? 0, 2, true, true)}</Typography>
-                                    </StatsBox>
-                                    <StatsBox>
                                         <Typography fontSize={12} color="#9E9E9E">Volume:</Typography>
                                         <Typography fontSize={12} color="white">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
                                     </StatsBox>
@@ -1286,10 +1282,6 @@ export default function Token() {
                         </Box>
                         <Box display="flex" flexDirection="column" alignItems="stretch" gap="1px">
                             <StatsBox>
-                                <Typography fontSize={12} color="#9E9E9E">Virtual Liquidity:</Typography>
-                                <Typography fontSize={12} color="white">${priceFormatter(detailData?.liquidity ?? 0, 2, true, true)}</Typography>
-                            </StatsBox>
-                            <StatsBox>
                                 <Typography fontSize={12} color="#9E9E9E">Volume:</Typography>
                                 <Typography fontSize={12} color="white">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
                             </StatsBox>
@@ -1395,8 +1387,9 @@ export default function Token() {
                                                         <Typography color="inherit" fontSize="small">{priceFormatter(trade.ethAmount, 4, true, true)}</Typography>
                                                         {/* <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount * trade.tokenPrice, 2, true, true)}</Typography> */}
                                                         <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount, 4, true, true)}</Typography>
-                                                        <Box display={{ sm: 'flex', xs: 'none' }} alignItems="center">
-                                                            <UserName user={trade.user} address={trade.swapperAddress} color={trade.type === "BUY" ? "#10B981" : "#EF4444"} size={18} />
+                                                        <Box display={{ sm: 'flex', xs: 'none' }} alignItems="center" gap="6px">
+                                                            <UserAvatar user={{ username: trade.swapperUsername, avatar: trade.swapperAvatar, address: trade.swapperAddress }} address={trade.swapperAddress} size={18} mr="0" />
+                                                            <UserName user={{ username: trade.swapperUsername, avatar: trade.swapperAvatar, address: trade.swapperAddress }} address={trade.swapperAddress} color={trade.type === "BUY" ? "#10B981" : "#EF4444"} size={18} />
                                                         </Box>
                                                         <Box display={{ sm: 'block', xs: 'none' }}>
                                                             <Link style={{ textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} href={`${tokenChain?.explorerUrl}/tx/${trade.txHash}`} target="_blank">

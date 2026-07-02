@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use chrono::Utc;
 use diesel::prelude::*;
-use diesel::sql_types::{Double, Nullable, Text};
+use diesel::sql_types::{BigInt, Double, Nullable, Text};
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -87,15 +87,6 @@ pub struct FollowingResponse {
     pub address: String,
     pub username: Option<String>,
     pub avatar: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RankingEntry {
-    pub address: String,
-    pub username: Option<String>,
-    pub avatar: Option<String>,
-    pub ranking: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -275,13 +266,40 @@ pub async fn create_user(
 // GET /users/ranking
 // ---------------------------------------------------------------------------
 
-pub async fn get_ranking(
+// ---------------------------------------------------------------------------
+// GET /users/leaderboard
+// Points = 10 per $1 bought minus 4 per $1 sold.
+// Each point is worth 0.000006 ETH (reward_eth = points * 0.000006), distributed manually.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeaderboardQuery {
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeaderboardEntry {
+    pub rank: i32,
+    pub address: String,
+    pub username: Option<String>,
+    pub avatar: Option<String>,
+    pub volume_usd: f64,
+    pub trades: i64,
+    pub points: f64,
+    pub reward_eth: f64,
+}
+
+pub async fn get_leaderboard(
     State(state): State<Arc<AppState>>,
-) -> AppResult<Json<Vec<RankingEntry>>> {
+    Query(params): Query<LeaderboardQuery>,
+) -> AppResult<Json<Vec<LeaderboardEntry>>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
+    let limit = params.limit.unwrap_or(100).clamp(1, 500);
 
     #[derive(QueryableByName)]
-    struct RankRow {
+    struct Row {
         #[diesel(sql_type = Text)]
         address: String,
         #[diesel(sql_type = Nullable<Text>)]
@@ -289,37 +307,51 @@ pub async fn get_ranking(
         #[diesel(sql_type = Nullable<Text>)]
         avatar: Option<String>,
         #[diesel(sql_type = Double)]
-        ranking: f64,
+        volume_usd: f64,
+        #[diesel(sql_type = Double)]
+        points: f64,
+        #[diesel(sql_type = BigInt)]
+        trades: i64,
     }
 
-    let rows: Vec<RankRow> = diesel::sql_query(
+    // points = 10 * buy_volume_usd - 4 * sell_volume_usd. HAVING repeats the
+    // expression because Postgres can't reference SELECT aliases there.
+    // limit is clamped to an integer, so inlining it is injection-safe.
+    const POINTS: &str = "COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 * 10 ELSE 0 END), 0) \
+         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 * 4 ELSE 0 END), 0)";
+    let rows: Vec<Row> = diesel::sql_query(format!(
         "SELECT u.address, u.username, u.avatar, \
-         COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 * 10 ELSE 0 END), 0) \
-         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 * 4 ELSE 0 END), 0) \
-         as ranking \
+         COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
+         {POINTS} as points, \
+         COUNT(t.id) as trades \
          FROM users u \
-         LEFT JOIN trades t ON t.swapper_id = u.id \
+         JOIN trades t ON t.swapper_id = u.id \
          GROUP BY u.id, u.address, u.username, u.avatar \
-         HAVING COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 * 10 ELSE 0 END), 0) \
-                - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 * 4 ELSE 0 END), 0) > 0 \
-         ORDER BY ranking DESC \
-         LIMIT 100"
-    )
+         HAVING {POINTS} > 0 \
+         ORDER BY points DESC \
+         LIMIT {limit}"
+    ))
     .load(&mut conn)
     .await?;
 
-    let entries: Vec<RankingEntry> = rows
+    let entries: Vec<LeaderboardEntry> = rows
         .into_iter()
-        .map(|r| RankingEntry {
+        .enumerate()
+        .map(|(i, r)| LeaderboardEntry {
+            rank: (i as i32) + 1,
             address: r.address,
             username: r.username,
             avatar: r.avatar,
-            ranking: r.ranking,
+            volume_usd: r.volume_usd,
+            trades: r.trades,
+            points: r.points,
+            reward_eth: r.points * 0.000006,
         })
         .collect();
 
     Ok(Json(entries))
 }
+
 
 // ---------------------------------------------------------------------------
 // GET /users/profile/:address
@@ -373,6 +405,8 @@ pub async fn get_user_profile(
             token_amount: holder.amount.to_string(),
             token_name: token.name.clone(),
             token_symbol: token.symbol.clone(),
+            token_image: token.image.clone(),
+            marketcap: token.marketcap.to_string(),
             network: token.network.clone(),
             creator_address: creator.address.clone(),
         })
@@ -802,8 +836,14 @@ pub async fn upload_avatar(
         .await
         .map_err(|e| AppError::Pool(e.to_string()))?;
 
+    // Match the existing user case-insensitively (addresses are stored lowercase)
+    // so the avatar attaches to the real user row instead of creating a duplicate.
+    let addr_lower = recovered.to_lowercase();
     let user: Option<User> = users::table
-        .filter(users::address.eq(&recovered))
+        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+            "LOWER(address) = '{}'",
+            addr_lower.replace('\'', "")
+        )))
         .first::<User>(&mut conn)
         .await
         .optional()?;
@@ -818,7 +858,7 @@ pub async fn upload_avatar(
         }
         None => {
             let new_user = NewUser {
-                address: &recovered,
+                address: &addr_lower,
                 username: None,
                 avatar: Some(&public_url),
                 bio: None,

@@ -458,6 +458,8 @@ pub async fn get_token_details(
             token_address: token.token_address.clone(),
             token_image: token.image.clone(),
             swapper_address: swapper.address.clone(),
+            swapper_username: swapper.username.clone(),
+            swapper_avatar: swapper.avatar.clone(),
             type_: match trade.trade_type {
                 TradeType::Buy => "BUY".to_string(),
                 TradeType::Sell => "SELL".to_string(),
@@ -489,6 +491,8 @@ pub async fn get_token_details(
             token_amount: holder.amount.to_string(),
             token_name: token.name.clone(),
             token_symbol: token.symbol.clone(),
+            token_image: token.image.clone(),
+            marketcap: token.marketcap.to_string(),
             network: token.network.clone(),
             creator_address: creator.address.clone(),
         })

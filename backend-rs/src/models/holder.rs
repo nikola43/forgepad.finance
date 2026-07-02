@@ -34,6 +34,8 @@ pub struct HolderResponse {
     pub token_amount: String,
     pub token_name: String,
     pub token_symbol: String,
+    pub token_image: Option<String>,
+    pub marketcap: String,
     pub network: String,
     pub creator_address: String,
 }

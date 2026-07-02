@@ -276,6 +276,11 @@ function Sidebar({ minimized, setMinimize }: Props) {
             <HomeIcon />
           </Button>
         </StyledLink>
+        <StyledLink href="/leaderboard" title="Leaderboard">
+          <Button className="effect-button">
+            <span style={{ fontSize: 18, lineHeight: 1 }}>🏆</span>
+          </Button>
+        </StyledLink>
         {
           !isConnected &&
           <Button onClick={() => open()} className="effect-button" title="Connect Wallet">
@@ -327,6 +332,13 @@ function Sidebar({ minimized, setMinimize }: Props) {
           <Button className="effect-button">
             <HomeIcon />
             Home
+          </Button>
+        </StyledLink>
+
+        <StyledLink href="/leaderboard">
+          <Button className="effect-button">
+            <span style={{ fontSize: 18, lineHeight: 1 }}>🏆</span>
+            Leaderboard
           </Button>
         </StyledLink>
 

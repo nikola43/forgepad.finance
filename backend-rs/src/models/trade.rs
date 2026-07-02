@@ -49,6 +49,8 @@ pub struct TradeResponse {
     pub token_address: String,
     pub token_image: Option<String>,
     pub swapper_address: String,
+    pub swapper_username: Option<String>,
+    pub swapper_avatar: Option<String>,
     #[serde(rename = "type")]
     pub type_: String,
     pub eth_amount: String,

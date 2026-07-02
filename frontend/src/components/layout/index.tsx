@@ -3,8 +3,8 @@
 import { ReactNode, useEffect, useState, lazy, Suspense } from "react";
 import Header from "./header";
 import Footer from "./footer";
-import Sidebar from "./sidebar";
-import { styled, useMediaQuery } from "@mui/material";
+import AppSidebar from "./AppSidebar";
+import { Box, styled, useMediaQuery } from "@mui/material";
 import MobileMenu from "./menu";
 import imgBackground from "../../assets/images/bg.jpg"
 import { Toaster } from "react-hot-toast"
@@ -24,22 +24,42 @@ const Main = styled('div')`
 
 function MainLayout({ children }: { children: ReactNode }) {
     const [isMenuOpen, setMenuOpen] = useState(false)
+    const [sidebarOpen, setSidebarOpen] = useState(true)
 
     const isMobile = useMediaQuery('(max-width: 800px)')
+
+    // Expose the current sidebar width so the fixed header can start to its right.
+    useEffect(() => {
+        const w = isMobile ? '0px' : (sidebarOpen ? '240px' : '65px')
+        document.documentElement.style.setProperty('--sidebar-w', w)
+    }, [isMobile, sidebarOpen])
 
     return (
         <>
             <Suspense fallback={null}>
                 <ParticleBackground />
             </Suspense>
-            <Main>
-                <Header />
-                <ErrorBoundary>
-                    <ScrollRestoration />
-                    { children }
-                </ErrorBoundary>
-                { !isMobile && <Footer /> }
-            </Main>
+            {isMobile ? (
+                <Main>
+                    <Header />
+                    <ErrorBoundary>
+                        <ScrollRestoration />
+                        {children}
+                    </ErrorBoundary>
+                </Main>
+            ) : (
+                <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+                    <AppSidebar open={sidebarOpen} onToggle={() => setSidebarOpen((o) => !o)} />
+                    <Main style={{ flexGrow: 1, minWidth: 0, width: '100%' }}>
+                        <Header />
+                        <ErrorBoundary>
+                            <ScrollRestoration />
+                            {children}
+                        </ErrorBoundary>
+                        <Footer />
+                    </Main>
+                </Box>
+            )}
             <ScrollToTopButton />
             {
                 isMobile &&

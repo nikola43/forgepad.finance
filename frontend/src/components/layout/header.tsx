@@ -38,8 +38,9 @@ const beat = keyframes`
 const HeaderBox = styled(Box)`
     position: fixed;
     top: 0;
-    left: 0;
+    left: var(--sidebar-w, 0px);
     right: 0;
+    transition: left 0.2s ease;
     max-height: 64px;
     z-index: 3;
     background: rgba(6, 6, 10, 0.8);

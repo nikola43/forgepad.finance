@@ -115,6 +115,8 @@ pub async fn get_trades_by_token(
             token_address: token.token_address.clone(),
             token_image: token.image.clone(),
             swapper_address: swapper.address.clone(),
+            swapper_username: swapper.username.clone(),
+            swapper_avatar: swapper.avatar.clone(),
             type_: match trade.trade_type {
                 TradeType::Buy => "buy".to_string(),
                 TradeType::Sell => "sell".to_string(),
@@ -170,10 +172,8 @@ pub async fn get_recent_trades(
     let trade_responses: Vec<TradeResponse> = trade_rows
         .iter()
         .map(|(trade, (token, _creator))| {
-            let swapper_addr = swapper_map
-                .get(&trade.swapper_id)
-                .map(|u| u.address.clone())
-                .unwrap_or_default();
+            let swapper = swapper_map.get(&trade.swapper_id);
+            let swapper_addr = swapper.map(|u| u.address.clone()).unwrap_or_default();
 
             TradeResponse {
                 id: trade.id,
@@ -182,6 +182,8 @@ pub async fn get_recent_trades(
                 token_address: token.token_address.clone(),
                 token_image: token.image.clone(),
                 swapper_address: swapper_addr,
+                swapper_username: swapper.and_then(|u| u.username.clone()),
+                swapper_avatar: swapper.and_then(|u| u.avatar.clone()),
                 type_: match trade.trade_type {
                     TradeType::Buy => "buy".to_string(),
                     TradeType::Sell => "sell".to_string(),

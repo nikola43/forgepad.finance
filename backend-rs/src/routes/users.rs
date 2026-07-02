@@ -9,7 +9,7 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(handlers::users::get_user_info))
         .route("/", post(handlers::users::create_user))
-        .route("/ranking", get(handlers::users::get_ranking))
+        .route("/leaderboard", get(handlers::users::get_leaderboard))
         .route(
             "/followings/{address}",
             get(handlers::users::get_followings),
