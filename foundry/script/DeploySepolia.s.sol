@@ -68,9 +68,9 @@ contract DeployForgepadSepolia is Script {
         // Authorize Forgepad to drive the liquidity manager at graduation.
         lm.setAuthorizedCaller(address(forgepad), true);
 
-        // 3% buy / 3% sell (300 bps), full buy/sell size allowed.
-        forgepad.setPlatformBuyFeeBps(300);
-        forgepad.setPlatformSellFeeBps(300);
+        // 1% buy / 1% sell (100 bps), full buy/sell size allowed.
+        forgepad.setPlatformBuyFeeBps(100);
+        forgepad.setPlatformSellFeeBps(100);
         forgepad.setMaxBuyPercent(10000);
         forgepad.setMaxSellPercent(10000);
 

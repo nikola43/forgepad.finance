@@ -589,30 +589,12 @@ const SwapContent = ({
                 {tradeType === "sell" && (
                     <>
                         {[25, 50, 75, 100].map(pct => (
-                            <Box
+                            <SmallButton
                                 key={pct}
-                                component="button"
-                                onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * BigInt(pct) / 100n) : undefined)}
-                                sx={{
-                                    background: 'rgba(255,255,255,0.04)',
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                    borderRadius: '100px',
-                                    px: 1.5,
-                                    py: 0.5,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: 'rgba(255,255,255,0.7)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    '&:hover': {
-                                        background: 'rgba(239,68,68,0.1)',
-                                        borderColor: 'rgba(239,68,68,0.3)',
-                                        color: '#EF4444',
-                                    },
-                                }}
+                                onClick={() => setAmountIn(tokenBalance ? ethers.formatEther(tokenBalance * BigInt(pct) / 100n) : '0')}
                             >
                                 {pct}%
-                            </Box>
+                            </SmallButton>
                         ))}
                     </>
                 )}
@@ -628,12 +610,16 @@ const SwapContent = ({
                         Switch Network
                     </Button>
                     : tradeType === "sell" && amountIn && tokenAllowance < ethers.parseEther(amountIn)
-                        ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading || !!error || !amountIn} onClick={approveHandler}>
+                        ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} disabled={isLoading} onClick={() => {
+                            if (!amountIn || Number(amountIn) <= 0) { toast.error('Enter an amount greater than 0'); return; }
+                            approveHandler();
+                        }}>
                             Approve {isLoading && <CircularProgress size={18} style={{ color: "black", marginLeft: "1em" }} />}
                         </Button>
                         : <Button fullWidth sx={{
                             borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none',
                             display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                            color: 'white',
                             background: tradeType === "buy"
                                 ? 'linear-gradient(135deg, #10B981, #059669)'
                                 : 'linear-gradient(135deg, #EF4444, #DC2626)',
@@ -641,8 +627,14 @@ const SwapContent = ({
                                 background: tradeType === "buy"
                                     ? 'linear-gradient(135deg, #059669, #047857)'
                                     : 'linear-gradient(135deg, #DC2626, #B91C1C)',
-                            }
-                        }} disabled={isLoading || !!error || !amountIn} onClick={swapHandler}>
+                            },
+                            // Button stays enabled even at 0; only dims while a swap is in flight.
+                            '&.Mui-disabled': { color: 'rgba(255,255,255,0.85)' },
+                        }} disabled={isLoading} onClick={() => {
+                            if (!amountIn || Number(amountIn) <= 0) { toast.error('Enter an amount greater than 0'); return; }
+                            if (error) { toast.error(error); return; }
+                            swapHandler();
+                        }}>
                             {isLoading ? <CircularProgress size={20} style={{ color: "white" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
                         </Button>
                 : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.open()}>

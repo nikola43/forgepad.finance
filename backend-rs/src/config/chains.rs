@@ -49,13 +49,17 @@ pub fn default_chains() -> Vec<ChainConfig> {
                     .unwrap_or_else(|_| "wss://ethereum-sepolia-rpc.publicnode.com".to_string()),
             ),
             explorer_url: "https://sepolia.etherscan.io".to_string(),
-            contract_address: "0x9d5e3991AaA43Fc544Ddd4931F72F9C413f63628".to_string(),
+            contract_address: "0xfd1B70c51dA4e9D24c92B00f44B1a290A506349A".to_string(),
             abi,
             virtual_eth_amount: 2.5,
             virtual_token_amount: 1_073_000_000.0,
             total_supply: 1_000_000_000.0,
-            target_market_cap: 10_000.0,
-            pools: vec!["uniswap:v2".to_string()],
+            target_market_cap: 20_000.0,
+            pools: vec![
+                "uniswap:v2".to_string(),
+                "uniswap:v3".to_string(),
+                "uniswap:v4".to_string(),
+            ],
         },
     ]
 }

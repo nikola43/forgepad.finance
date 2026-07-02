@@ -2,7 +2,9 @@
 
 import { useMainContext } from "@/context";
 import { Box, IconButton, InputAdornment, Pagination, PaginationItem, Stack, styled, TextField, Typography, useMediaQuery } from "@mui/material";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
+import { API_ENDPOINT } from "@/config";
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -92,6 +94,63 @@ const SearchButton = styled('button')`
         background: rgba(255, 255, 255, 0.06);
     }
 `
+
+// Glowing lime price line for the King of the Hill card (fetches recent closes).
+const KingSparkline = ({ address, network }: { address: string, network: string }) => {
+    const [points, setPoints] = useState<number[]>([])
+    useEffect(() => {
+        let active = true
+        axios.get(`${API_ENDPOINT}/trades/getChartData`, {
+            params: {
+                tokenAddress: address,
+                interval: '15',
+                from: 0,
+                to: Math.floor(Date.now() / 1000) + 86400,
+                countBack: 60,
+            },
+        }).then(({ data }) => {
+            if (!active || !Array.isArray(data)) return
+            const closes = data.map((d: any) => Number(d.close)).filter((n: number) => Number.isFinite(n))
+            setPoints(closes.slice(-60))
+        }).catch(() => { })
+        return () => { active = false }
+    }, [address, network])
+
+    if (points.length < 2) return null
+    const w = 240, h = 60, pad = 4
+    const min = Math.min(...points), max = Math.max(...points)
+    const range = max - min || 1
+    const stepX = (w - pad * 2) / (points.length - 1)
+    const coords = points.map((p, i): [number, number] => [
+        pad + i * stepX,
+        h - pad - ((p - min) / range) * (h - pad * 2),
+    ])
+    const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+    const area = `${line} L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`
+    const stroke = '#d1ff1a'
+    return (
+        <Box sx={{ flex: '0 0 auto', display: { xs: 'none', md: 'block' }, width: w, pointerEvents: 'none' }}>
+            <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible', display: 'block' }}>
+                <defs>
+                    <linearGradient id="king-spark-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={stroke} stopOpacity="0.28" />
+                        <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                <path d={area} fill="url(#king-spark-fill)" />
+                <path
+                    d={line}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ filter: 'drop-shadow(0 0 6px rgba(209,255,26,0.7))' }}
+                />
+            </svg>
+        </Box>
+    )
+}
 
 const KingCard = styled(Box)`
     position: relative;
@@ -477,6 +536,7 @@ export default function Home() {
                                 )}
                             </Box>
                         </Box>
+                        <KingSparkline address={king.tokenAddress} network={king.network} />
                         {king.priceChange !== undefined && (
                             <Box
                                 sx={{

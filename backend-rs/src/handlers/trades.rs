@@ -265,19 +265,28 @@ pub async fn get_chart_data(
         .await?;
 
     if trade_rows.is_empty() {
-        // Return initial price candle at token creation time
+        // No trades yet: draw a flat line at the creation price from creation up
+        // to "now" (like DexScreener), instead of a single lonely candle.
         let initial_price: f64 = token.price.to_string().parse().unwrap_or(0.0);
         if initial_price > 0.0 {
-            let created_ts = token.created_at.timestamp();
-            let bucket = (created_ts / resolution) * resolution;
-            return Ok(Json(vec![Candle {
-                time: bucket,
-                open: initial_price,
-                high: initial_price,
-                low: initial_price,
-                close: initial_price,
-                volume: 0.0,
-            }]));
+            let now = chrono::Utc::now().timestamp();
+            let created_bucket = (token.created_at.timestamp() / resolution) * resolution;
+            let end = (now.max(token.created_at.timestamp()) / resolution) * resolution;
+            let start = created_bucket.max(end - 1999 * resolution);
+            let mut out = Vec::new();
+            let mut t = start;
+            while t <= end && out.len() < 2000 {
+                out.push(Candle {
+                    time: t,
+                    open: initial_price,
+                    high: initial_price,
+                    low: initial_price,
+                    close: initial_price,
+                    volume: 0.0,
+                });
+                t += resolution;
+            }
+            return Ok(Json(out));
         }
         return Ok(Json(vec![]));
     }
@@ -288,24 +297,25 @@ pub async fn get_chart_data(
     let first_trade_ts = trade_rows[0].traded_at;
     let last_trade_ts = trade_rows[trade_rows.len() - 1].traded_at;
     let first_bucket = (first_trade_ts / resolution) * resolution;
-    let last_bucket = (last_trade_ts / resolution) * resolution;
 
     let max_candles = params
         .count_back
         .map(|c| (c as usize).min(2000))
         .unwrap_or(2000);
 
+    // Extend candles up to "now" (never into the future, always at least through
+    // the last trade) so the price shows a continuous flat line after the last
+    // trade — like DexScreener — instead of stopping at the final trade.
+    let now = chrono::Utc::now().timestamp();
+    let effective_to = params.to.min(now).max(last_trade_ts);
+    let end_bucket = (effective_to / resolution) * resolution;
+
     let start_bucket = if params.count_back.is_some() {
-        let candidate = last_bucket - (max_candles as i64 - 1) * resolution;
+        // Keep the most recent `max_candles` buckets ending at `now`.
+        let candidate = end_bucket - (max_candles as i64 - 1) * resolution;
         candidate.max(first_bucket)
     } else {
         first_bucket
-    };
-
-    let end_bucket = if params.count_back.is_some() {
-        last_bucket
-    } else {
-        (params.to / resolution) * resolution
     };
 
     // Build OHLCV candles by grouping trades into time buckets
@@ -325,6 +335,13 @@ pub async fn get_chart_data(
         while trade_idx < trade_rows.len() && trade_rows[trade_idx].traded_at < bucket_end {
             if trade_rows[trade_idx].traded_at >= current {
                 bucket_trades.push(&trade_rows[trade_idx]);
+            } else {
+                // Trade before the visible window (count_back paging): carry its
+                // price forward so the first visible candle opens at the right price.
+                prev_close = trade_rows[trade_idx]
+                    .token_price
+                    .to_f64()
+                    .unwrap_or(prev_close);
             }
             trade_idx += 1;
         }

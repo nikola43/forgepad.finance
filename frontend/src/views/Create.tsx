@@ -293,6 +293,11 @@ export default function Create() {
   const [successModal, setSuccessModal] = React.useState(false);
   const [createdTokenData, setCreatedTokenData] = React.useState<any>(null);
   const [waitingForDeploy, setWaitingForDeploy] = React.useState(false);
+  // Redirect bookkeeping: keep the create button loading until the backend
+  // confirms the deployment, then navigate straight to the token page.
+  const awaitingDeployRef = React.useRef(false);
+  const redirectNetworkRef = React.useRef<string | undefined>(undefined);
+  const deployTimeoutRef = React.useRef<any>(null);
   const { address } = useAppKitAccount();
 
   React.useEffect(() => {
@@ -303,18 +308,14 @@ export default function Create() {
       try {
         const deployedData = typeof data === 'string' ? JSON.parse(data) : data;
         console.log('Token deployed:', deployedData);
+        if (!awaitingDeployRef.current || !deployedData?.tokenAddress) return;
 
-        // Update created token data with the actual token address
-        setCreatedTokenData((prev: any) => {
-          if (prev && deployedData.tokenAddress) {
-            return {
-              ...prev,
-              tokenAddress: deployedData.tokenAddress,
-            };
-          }
-          return prev;
-        });
+        // Confirmed on-chain: stop waiting and go straight to the token page.
+        awaitingDeployRef.current = false;
+        if (deployTimeoutRef.current) clearTimeout(deployTimeoutRef.current);
         setWaitingForDeploy(false);
+        const net = redirectNetworkRef.current || deployedData.network;
+        window.location.href = `/token?network=${net}&address=${deployedData.tokenAddress}`;
       } catch (error) {
         console.error('Error parsing deployed event:', error);
       }
@@ -529,12 +530,26 @@ export default function Create() {
         tokensReceived: tokenAmountOut,
       });
 
+      // Tx submitted. Keep the first modal's button in its loading state until
+      // the backend confirms the deployment, then redirect to the token page.
+      // No intermediate "waiting confirmation" modal.
+      redirectNetworkRef.current = chain?.network;
+      awaitingDeployRef.current = true;
       setWaitingForDeploy(true);
-      setDeployModal(false);
-      setSuccessModal(true);
-      resetForm();
       playSuccessSound();
-      toast.success("Token created successfully!");
+
+      // Safety net: release the button if confirmation never arrives.
+      if (deployTimeoutRef.current) clearTimeout(deployTimeoutRef.current);
+      deployTimeoutRef.current = setTimeout(() => {
+        if (!awaitingDeployRef.current) return;
+        awaitingDeployRef.current = false;
+        setWaitingForDeploy(false);
+        setIsLoading(false);
+        toast.error("Still confirming on-chain — check your profile shortly.");
+      }, 120000);
+
+      // Leave isLoading = true; the button keeps spinning until the redirect.
+      return;
     } catch (ex: any) {
       console.error("Error deploying token:", ex);
       const messageError =
@@ -959,7 +974,7 @@ export default function Create() {
             disabled={isLoading || !!error}
             endIcon={
               isLoading ? (
-                <CircularProgress color="inherit" size={18} />
+                <CircularProgress size={18} sx={{ color: "#000" }} />
               ) : undefined
             }
             onClick={deployToken}
@@ -991,11 +1006,17 @@ export default function Create() {
                 transform: isLoading || !!error ? "none" : "translateY(0px)",
               },
               "&:disabled": {
-                color: "rgba(0, 0, 0, 0.4)",
+                // Pure-black loading label + spinner for clear contrast on the
+                // dimmed button; only the error-disabled state stays muted.
+                color: isLoading ? "#000" : "rgba(0, 0, 0, 0.4)",
               },
             }}
           >
-            {isLoading ? "Creating token..." : "Create token"}
+            {isLoading
+              ? waitingForDeploy
+                ? "Confirming on-chain..."
+                : "Creating token..."
+              : "Create token"}
           </Button>
         </DialogActions>
         {

@@ -626,10 +626,6 @@ export default function Header() {
                     )}
                 </Box>
             </Box>
-            <Box display="flex" justifyContent="center" alignItems="center" onClick={() => setModal("how")} style={{ cursor: "pointer" }}>
-                <img src="/images/forge0.png" width={82} height={82} alt="logo" style={{ top: "0px", position: "relative" }} />
-                <img src="/images/forge1.png" width={281} height={52} alt="logo" />
-            </Box>
             <Box flex={1} display="flex" gap="18px" alignItems="center" justifyContent="flex-end">
                 <SocialLinks>
                     <Link href={FORGE_TELEGRAM_URL} target="_blank"><Image src={TelegramIcon} width={50} height={35} alt="telegramCommunity" /></Link>
@@ -698,8 +694,10 @@ export default function Header() {
                     trades?.length > 0 &&
                     <ScrollBox display="flex" count={count}>
                         {
-                            new Array(count + 1).fill(0).map((_, i) => 
-                                <Box key={`lasttrade-${i}`} flex={1} display="flex" gap="8px" alignItems="center">
+                            new Array(count + 1).fill(0).map((_, i) =>
+                                <Box key={`lasttrade-${i}`} flex={1} display="flex" gap="8px" alignItems="center"
+                                    onClick={() => trades[i]?.tokenAddress && router.push(`/token?network=${trades[i].network}&address=${trades[i].tokenAddress}`)}
+                                    sx={{ cursor: trades[i]?.tokenAddress ? 'pointer' : 'default' }}>
                                     <TokenLogo logo={trades[i]?.tokenImage} size={48} />
                                     <Box>
                                         <Typography color="white" fontSize={14} fontWeight={700}>{trades[i]?.tokenSymbol}</Typography>
@@ -711,44 +709,25 @@ export default function Header() {
                         }
                     </ScrollBox>
                 }
-                <Box sx={{ position: 'relative' }}>
-                    {newTradeCount > 0 && (
-                        <BadgePulse sx={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            background: 'linear-gradient(135deg, #d1ff1a, #e4ff66)',
-                            color: '#0a0a0f',
-                            borderRadius: '100px',
-                            px: 1,
-                            py: 0.25,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            minWidth: 18,
-                            textAlign: 'center',
-                            zIndex: 4,
-                        }}>
-                            {newTradeCount > 99 ? '99+' : newTradeCount}
-                        </BadgePulse>
-                    )}
-                    <Link href="/forge">
-                        <img src="/images/forge2.png" width={127} height={127} style={{ border: "1px solid #d1ff1a", borderRadius: "4px" }} alt="" className="logo" />
-                    </Link>
-                </Box>
                 {
                     trades?.length > 0 &&
                     <ScrollBox display="flex" count={count}>
                         {
-                            new Array(count + 1).fill(0).map((_, i) => 
-                                <Box key={`lasttrade-${i+4}`} flex={1} display="flex" gap="8px" alignItems="center">
-                                    <TokenLogo logo={(trades[i+count] ?? trades[0])?.tokenImage} size={48} />
+                            new Array(count + 1).fill(0).map((_, i) => {
+                                const t = trades[i+count] ?? trades[0]
+                                return (
+                                <Box key={`lasttrade-${i+4}`} flex={1} display="flex" gap="8px" alignItems="center"
+                                    onClick={() => t?.tokenAddress && router.push(`/token?network=${t.network}&address=${t.tokenAddress}`)}
+                                    sx={{ cursor: t?.tokenAddress ? 'pointer' : 'default' }}>
+                                    <TokenLogo logo={t?.tokenImage} size={48} />
                                     <Box>
-                                        <Typography color="white" fontSize={14} fontWeight={700}>{(trades[i+count] ?? trades[0])?.tokenSymbol}</Typography>
-                                        <Typography color={(trades[i+count] ?? trades[0])?.type === "SELL" ? "#EF4444" : "#10B981"} fontSize={10} fontWeight={600}>{(trades[i+count] ?? trades[0])?.type} {priceFormatter((trades[i+count] ?? trades[0])?.tokenAmount ?? 0, 2, true, true)}</Typography>
-                                        <Typography color="#AAA" fontSize={10}>{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(0, 6)}...{(trades[i+count] ?? trades[0])?.tokenAddress?.slice(-4)}</Typography>
+                                        <Typography color="white" fontSize={14} fontWeight={700}>{t?.tokenSymbol}</Typography>
+                                        <Typography color={t?.type === "SELL" ? "#EF4444" : "#10B981"} fontSize={10} fontWeight={600}>{t?.type} {priceFormatter(t?.tokenAmount ?? 0, 2, true, true)}</Typography>
+                                        <Typography color="#AAA" fontSize={10}>{t?.tokenAddress?.slice(0, 6)}...{t?.tokenAddress?.slice(-4)}</Typography>
                                     </Box>
                                 </Box>
-                            )
+                                )
+                            })
                         }
                     </ScrollBox>
                 }

@@ -214,7 +214,8 @@ async fn process_token_created_log(
     }
 
     let token_address = format!("0x{}", hex::encode(&data[12..32]));
-    let token_price = u64::try_from(U256::from_be_slice(&data[32..64])).unwrap_or(0) as f64 / 1e18;
+    // String-parse (not u64::try_from) so a large price never silently truncates to 0.
+    let token_price = U256::from_be_slice(&data[32..64]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
     let request_id = u64::try_from(U256::from_be_slice(&data[96..128])).unwrap_or(0) as i32;
     let timestamp = u64::try_from(U256::from_be_slice(&data[128..160])).unwrap_or(0) as i64;
 
@@ -254,17 +255,23 @@ async fn process_swap_log(
     let token_address = format!("0x{}", hex::encode(&data[44..64]));
     let eth_amount = U256::from_be_slice(&data[64..96]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
     let token_amount = U256::from_be_slice(&data[96..128]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
+    // Use the contract's own authoritative values from the event: spot price after
+    // the trade, ETH/USD, and virtual market cap. These are fee-independent and need
+    // no extra RPC call, so the chart price/market cap stay correct regardless of the
+    // configured buy/sell fee.
+    let token_price = U256::from_be_slice(&data[128..160]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
+    let event_eth_price = U256::from_be_slice(&data[160..192]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
+    let marketcap = U256::from_be_slice(&data[192..224]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
 
     let timestamp = u64::try_from(U256::from_be_slice(&data[224..256])).unwrap_or(0) as i64;
     if timestamp == 0 {
         return Ok(()); // skip invalid events
     }
 
-    let eth_price = fetch_eth_price(chain).await.unwrap_or(2040.0);
-    let token_price = if token_amount > 0.0 {
-        eth_amount / token_amount
+    let eth_price = if event_eth_price > 0.0 {
+        event_eth_price
     } else {
-        0.0
+        fetch_eth_price(chain).await.unwrap_or(2040.0)
     };
 
     process_swap(
@@ -277,6 +284,7 @@ async fn process_swap_log(
         token_amount,
         token_price,
         eth_price,
+        marketcap,
         tx_hash,
         timestamp,
     )
@@ -436,6 +444,7 @@ pub async fn process_swap(
     token_amount: f64,
     token_price: f64,
     eth_price_usd: f64,
+    marketcap_usd: f64,
     tx_hash: &str,
     timestamp: i64,
 ) -> anyhow::Result<()> {
@@ -478,20 +487,27 @@ pub async fn process_swap(
         .parse()
         .unwrap_or(0.0);
 
-    let (new_veth, new_vtoken) = if is_buy {
-        (old_veth + eth_amount, old_vtoken - token_amount)
+    // Token side carries no fee, so the token reserve delta is exact.
+    let new_vtoken = if is_buy {
+        old_vtoken - token_amount
     } else {
-        // Sell: account for 3% fee on sells
-        let gross_eth = eth_amount * 100.0 / 97.0;
-        (old_veth - gross_eth, old_vtoken + token_amount)
+        old_vtoken + token_amount
     };
-
-    let new_price = if new_vtoken > 0.0 {
-        new_veth / new_vtoken
+    // Trust the contract's authoritative spot price and derive the ETH reserve from
+    // it (fee-independent) instead of reconstructing gross ETH from a hardcoded fee.
+    let new_price = token_price;
+    let new_veth = if new_price > 0.0 && new_vtoken > 0.0 {
+        new_price * new_vtoken
+    } else if is_buy {
+        old_veth + eth_amount
     } else {
-        0.0
+        old_veth
     };
-    let new_marketcap = new_price * chain.total_supply * eth_price_usd;
+    let new_marketcap = if marketcap_usd > 0.0 {
+        marketcap_usd
+    } else {
+        new_price * chain.total_supply * eth_price_usd
+    };
 
     // Score decay calculation
     let old_score: f64 = token.score.to_string().parse().unwrap_or(0.0);
