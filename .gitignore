@@ -5,7 +5,6 @@
 
 # Dependencies
 yarn.lock
-package-lock.json
 */node_modules/
 node_modules/
 
@@ -27,6 +26,7 @@ backend-rs/uploads/*
 **/*.zip
 
 # Foundry
+foundry/lib/**/package-lock.json
 foundry/cache/
 foundry/out/
 foundry/broadcast/
