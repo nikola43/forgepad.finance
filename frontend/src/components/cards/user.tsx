@@ -4,7 +4,7 @@ import SecurityIcon from '@mui/icons-material/Security';
 import NextLink from "next/link";
 
 export function getProfilePic(user: any, address?: string) {
-    if (user?.avatar === "bondingCurv") return "/favicon.ico"
+    if (user?.avatar === "bondingCurv") return "/images/logo.png"
     if (user?.twitter_profile_picture) return user.twitter_profile_picture
     if (user?.avatar) {
         if (user.avatar.startsWith("http")) return user.avatar

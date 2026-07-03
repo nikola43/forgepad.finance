@@ -208,3 +208,57 @@ CREATE TRIGGER tokens_updated_at
 CREATE TRIGGER indexing_updated_at
     BEFORE UPDATE ON indexing_state
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Rewards Hub (engagement layer): idempotent bonus-point ledger.
+-- Trade points stay computed from `trades`; discrete awards (quests, streaks,
+-- achievements, referrals) are recorded here with a UNIQUE `ref` so re-evaluation
+-- never double-grants. Everything else (quest/achievement defs, progress, streak)
+-- is computed live in the backend from existing tables.
+CREATE TABLE IF NOT EXISTS points_ledger (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    source VARCHAR(20) NOT NULL,
+    amount DOUBLE PRECISION NOT NULL,
+    ref VARCHAR(120) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(user_id);
+
+-- Watchlist (Tier 3): tokens a user stars for quick access.
+CREATE TABLE IF NOT EXISTS watchlist (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, token_id)
+);
+CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
+
+-- Tier C (streaming): native in-app LiveKit broadcast state on the token.
+-- One room per token (room name = token address). `is_live` drives the 🔴 LIVE
+-- badge; `stream_started_at` powers the "live for X" timer. Live viewer count is
+-- kept ephemerally in Redis (key `stream_viewers:<addr>`), not here.
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_live BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS stream_started_at TIMESTAMPTZ;
+
+-- Tier C (paper trading): risk-free practice against the same bonding-curve math
+-- the contract uses (mirrors getAmountOut in foundry/src/Arrowpad.sol) priced off
+-- each token's live virtual reserves. No chain tx, zero economic value.
+CREATE TABLE IF NOT EXISTS paper_accounts (
+    address VARCHAR(50) PRIMARY KEY,
+    eth_balance NUMERIC(78, 18) NOT NULL DEFAULT 10,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS paper_positions (
+    id SERIAL PRIMARY KEY,
+    address VARCHAR(50) NOT NULL,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    token_amount NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    invested_eth NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    realized_pnl_eth NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(address, token_id)
+);
+CREATE INDEX IF NOT EXISTS idx_paper_positions_address ON paper_positions(address);

@@ -23,6 +23,7 @@ const cols = '48px 1fr 120px 110px 110px'
 
 export default function Leaderboard() {
     const [rows, setRows] = useState<Entry[] | null>(null)
+    const [ethUsd, setEthUsd] = useState<number | null>(null)
     const router = useRouter()
 
     useEffect(() => {
@@ -34,6 +35,28 @@ export default function Leaderboard() {
         return () => { active = false }
     }, [])
 
+    // Free ETH/USD price for reward conversion: Coinbase primary, CoinGecko
+    // fallback. Both are public + CORS-enabled (no key). Refreshed every 60s; if
+    // both fail we simply hide the USD line rather than block the page.
+    useEffect(() => {
+        let active = true
+        const fetchEthUsd = async () => {
+            try {
+                const { data } = await axios.get('https://api.coinbase.com/v2/prices/ETH-USD/spot', { timeout: 8000 })
+                const p = Number(data?.data?.amount)
+                if (active && p > 0) { setEthUsd(p); return }
+            } catch { /* fall through */ }
+            try {
+                const { data } = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', { timeout: 8000 })
+                const p = Number(data?.ethereum?.usd)
+                if (active && p > 0) setEthUsd(p)
+            } catch { /* leave null; USD hidden */ }
+        }
+        fetchEthUsd()
+        const id = setInterval(fetchEthUsd, 60000)
+        return () => { active = false; clearInterval(id) }
+    }, [])
+
     return (
         <PageBox pt={6} maxWidth="900px" mx="auto" width="100%">
             <Box mb={2}>
@@ -41,7 +64,7 @@ export default function Leaderboard() {
                     🏆 Leaderboard
                 </Typography>
                 <Typography fontSize={13} color="#94A3B8">
-                    10 points per $1 bought, −4 per $1 sold. Each point is worth 0.000006 ETH in rewards.
+                    Points = net USD invested (buys − sells). Each point is worth 0.000006 ETH in rewards.
                 </Typography>
             </Box>
 
@@ -66,14 +89,14 @@ export default function Leaderboard() {
                         </Typography>
                         <Typography fontSize={13.5} color="rgba(255,255,255,0.75)" mt={0.75} lineHeight={1.6}>
                             Every buy and sell carries a flat <b style={{ color: '#D3FF24' }}>1% fee</b> — and half of it flows
-                            straight back to traders. You earn <b style={{ color: '#D3FF24' }}>10 points per $1 bought</b> and
-                            {' '}<b style={{ color: '#D3FF24' }}>−4 per $1 sold</b>, so climbing the board rewards real conviction.
+                            straight back to traders. You earn <b style={{ color: '#D3FF24' }}>1 point per $1 you keep invested</b>{' '}
+                            (buys minus sells), so only real, held positions count — wash trading earns nothing.
                             Each week we pool <b style={{ color: '#D3FF24' }}>50% of all platform fees</b> and pay it out in{' '}
                             <b style={{ color: '#D3FF24' }}>ETH</b> to everyone here, split by your share of points. Trade more,
-                            rank higher, and claim a bigger weekly cut.
+                            hold your conviction, and claim a bigger weekly cut.
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                            {['+10 pts / $1 buy', '−4 pts / $1 sell', '1% flat fee', '50% shared weekly', 'Paid in ETH'].map((chip) => (
+                            {['1 pt / $1 net invested', 'No wash-trade farming', '1% flat fee', '50% shared weekly', 'Paid in ETH'].map((chip) => (
                                 <Box
                                     key={chip}
                                     sx={{
@@ -126,8 +149,13 @@ export default function Leaderboard() {
                                 </Typography>
                             </Box>
                             <Typography textAlign="right" color="white" fontSize={14}>${priceFormatter(r.volumeUsd, 2)}</Typography>
-                            <Typography textAlign="right" color="#e4ff66" fontSize={14} fontWeight={600}>{priceFormatter(r.points, 0)}</Typography>
-                            <Typography textAlign="right" color="#10B981" fontSize={14} fontWeight={600}>{priceFormatter(r.rewardEth, 6)} ETH</Typography>
+                            <Typography textAlign="right" color="#e4ff66" fontSize={14} fontWeight={600}>{priceFormatter(r.points, 2)}</Typography>
+                            <Box textAlign="right">
+                                <Typography color="#10B981" fontSize={14} fontWeight={600}>{priceFormatter(r.rewardEth, 6)} ETH</Typography>
+                                {ethUsd != null && (
+                                    <Typography color="#64748B" fontSize={11}>${(r.rewardEth * ethUsd).toFixed(2)}</Typography>
+                                )}
+                            </Box>
                         </Box>
                     ))}
                 </Box>

@@ -1,0 +1,17 @@
+# LiveKit SFU config for ArrowPad native streaming (Tier C).
+# API keys are injected at runtime via the LIVEKIT_KEYS env var (which overrides
+# any `keys:` here), so no secret is committed. See docker-compose.yml.
+port: 7880
+bind_addresses:
+  - ""
+log_level: info
+rtc:
+  # TCP fallback + a UDP media port range. Expose/forward these on the host.
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+# Embedded TURN for NAT traversal. Enable + set a domain/TLS when running behind
+# the cloudflared tunnel (e.g. livekit.arrowpad.io).
+turn:
+  enabled: false

@@ -49,7 +49,7 @@ const robinhood = defineChain({
       name: "Robinhood Explorer",
       url:
         process.env.NEXT_PUBLIC_ROBINHOOD_EXPLORER_URL ||
-        "https://explorer.mainnet.chain.robinhood.com",
+        "https://robinhoodchain.blockscout.com",
     },
   },
 });

@@ -34,7 +34,11 @@ export const metadata: Metadata = {
   creator: "ArrowPad",
   publisher: "ArrowPad",
   alternates: { canonical: "/" },
-  icons: ['/favicon.png'],
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/images/logo.png',
+  },
   openGraph: {
     type: "website",
     url: SITE_URL,

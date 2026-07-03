@@ -78,6 +78,11 @@ pub struct UserProfileResponse {
     pub followees: i64,
     pub referral_count: i64,
     pub points: i32,
+    // Trading rewards — same net-volume model as the leaderboard:
+    // trading_points = max(0, USD bought - USD sold); reward_eth = points * 0.000006.
+    pub trading_points: f64,
+    pub trading_volume_usd: f64,
+    pub reward_eth: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -268,8 +273,11 @@ pub async fn create_user(
 
 // ---------------------------------------------------------------------------
 // GET /users/leaderboard
-// Points = 10 per $1 bought minus 4 per $1 sold.
-// Each point is worth 0.000006 ETH (reward_eth = points * 0.000006), distributed manually.
+// Points = net USD invested = max(0, USD bought - USD sold). Net volume rewards
+// only the capital that stays in, so wash trading (buy $X then sell $X) nets ~0
+// points instead of being profitable, and exiting a position burns the points
+// it earned. Each point is worth 0.000006 ETH (reward_eth = points * 0.000006),
+// distributed manually.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
@@ -314,11 +322,15 @@ pub async fn get_leaderboard(
         trades: i64,
     }
 
-    // points = 10 * buy_volume_usd - 4 * sell_volume_usd. HAVING repeats the
+    // points = max(0, buy_volume_usd - sell_volume_usd) (net USD invested).
+    // GREATEST floors at 0 so a net seller never goes negative. HAVING repeats the
     // expression because Postgres can't reference SELECT aliases there.
     // limit is clamped to an integer, so inlining it is injection-safe.
-    const POINTS: &str = "COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 * 10 ELSE 0 END), 0) \
-         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 * 4 ELSE 0 END), 0)";
+    // Net-volume trade points + idempotent bonus points from the Rewards Hub
+    // (quests/streaks/achievements/referrals) recorded in points_ledger.
+    const POINTS: &str = "GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
+         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
+         + COALESCE((SELECT SUM(pl.amount) FROM points_ledger pl WHERE pl.user_id = u.id), 0)";
     let rows: Vec<Row> = diesel::sql_query(format!(
         "SELECT u.address, u.username, u.avatar, \
          COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
@@ -480,6 +492,27 @@ pub async fn get_user_profile(
         .await
         .unwrap_or(0);
 
+    // Trading rewards — net-volume model, identical to get_leaderboard, scoped to
+    // this user. user.id is an integer from the DB, so inlining it is injection-safe.
+    #[derive(QueryableByName)]
+    struct TradeAgg {
+        #[diesel(sql_type = Double)]
+        volume_usd: f64,
+        #[diesel(sql_type = Double)]
+        points: f64,
+    }
+    let agg: TradeAgg = diesel::sql_query(format!(
+        "SELECT COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
+         GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
+         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
+         + COALESCE((SELECT SUM(amount) FROM points_ledger WHERE user_id = {uid}), 0) as points \
+         FROM trades t WHERE t.swapper_id = {uid}",
+        uid = user.id
+    ))
+    .get_result(&mut conn)
+    .await?;
+    let reward_eth = agg.points * 0.000006;
+
     Ok(Json(UserProfileResponse {
         user: user_resp,
         holdings,
@@ -489,6 +522,9 @@ pub async fn get_user_profile(
         followees,
         referral_count,
         points,
+        trading_points: agg.points,
+        trading_volume_usd: agg.volume_usd,
+        reward_eth,
     }))
 }
 

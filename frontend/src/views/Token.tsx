@@ -10,6 +10,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CopyIcon from '@mui/icons-material/ContentCopy';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import { useWatchlist } from "@/hooks/watchlist";
 import copy from 'copy-to-clipboard';
 import { ethers, MaxUint256, BrowserProvider } from 'ethers';
 import { NumericFormat } from "react-number-format";
@@ -27,6 +30,9 @@ import WebsiteIcon from '@/assets/images/website.svg';
 // import ethIcon from '@/assets/images/coin/eth-1.png';
 
 import { TVChartContainer as TVChartContainerAdvanced } from '@/components/tvchart';
+import TokenAnalyticsPanel from '@/components/TokenAnalyticsPanel';
+import StreamPanel from '@/components/StreamPanel';
+import { useStreamStatus } from '@/hooks/stream';
 import { playBuySound, playSellSound } from '@/utils/sounds';
 import { TimeDiff } from "@/components/time";
 // import { useContractInfo } from "@/hooks/contract";
@@ -687,9 +693,11 @@ const SwapContent = ({
 
 export default function Token() {
     const { address } = useAppKitAccount()
+    const { isWatched, toggle: toggleWatch } = useWatchlist(address)
     const searchParams = useSearchParams()
     const network = searchParams.get('network')
     const id = searchParams.get('address')
+    const { status: streamStatus } = useStreamStatus(id || undefined)
     // const [detailData, setDetailData] = React.useState<any>(null);
     const [chatList, setChatList] = React.useState<any[]>([]);
     const [chatComment, setChatComment] = React.useState('');
@@ -737,7 +745,7 @@ export default function Token() {
 
     const { chains } = useMainContext()
     const { userInfo } = useUserInfo()
-    const { tokenInfo, reload: reloadTokenInfo } = useTokenInfo(id as string, network as string, pageOfTrades, pageSize)
+    const { tokenInfo, reload: reloadTokenInfo, error: tokenInfoError, isLoading: tokenInfoLoading } = useTokenInfo(id as string, network as string, pageOfTrades, pageSize)
     const ethBalance = useMemo(() => userInfo?.balance ?? 0, [userInfo])
     const { balance: tokenBalance, allowance: tokenAllowance, curveBalance: lpBalance } = useMemo(() => tokenInfo ?? { balance: 0n, allowance: 0n, curveBalance: 0n }, [tokenInfo])
     const poolInfo = useMemo(() => tokenInfo?.poolInfo, [tokenInfo])
@@ -975,7 +983,13 @@ export default function Token() {
             if (!detailData || !address || !handlers?.approve)
                 throw Error("Connect wallet");
             const tx = await handlers.approve(detailData.tokenAddress)
-            await tx.wait()
+            // Wait via the read RPC (reliable) rather than the wallet provider,
+            // which can throw ERR_NETWORK while polling the receipt.
+            if (tx?.hash && tokenChain?.rpcUrl) {
+                await new ethers.JsonRpcProvider(tokenChain.rpcUrl).waitForTransaction(tx.hash).catch(() => { })
+            } else if (tx?.wait) {
+                await tx.wait().catch(() => { })
+            }
             toast.success("Successfully approved!");
             setIsLoading(false);
         } catch (error: any) {
@@ -983,7 +997,7 @@ export default function Token() {
             const messageError = error?.shortMessage || error?.data?.message;
             toast.error(messageError);
         }
-    }, [detailData, tradeType, amountIn, address, tokenContract])
+    }, [detailData, tradeType, amountIn, address, tokenContract, tokenChain])
 
     const showSuccessToast = useCallback((txHash: string, type?: string) => {
         const link = `${tokenChain?.explorerUrl}/tx/${txHash}`
@@ -1016,8 +1030,14 @@ export default function Token() {
                 playSellSound()
                 showSuccessToast(tx.hash, 'sell')
             }
-            // Wait for tx to be mined so backend can process the event
-            if (tx?.wait) await tx.wait()
+            // Wait for tx to be mined so backend can process the event. Use the
+            // read RPC (reliable) instead of the wallet provider, which can throw
+            // ERR_NETWORK while polling eth_getTransactionReceipt.
+            if (tx?.hash && tokenChain?.rpcUrl) {
+                await new ethers.JsonRpcProvider(tokenChain.rpcUrl).waitForTransaction(tx.hash).catch(() => { })
+            } else if (tx?.wait) {
+                await tx.wait().catch(() => { })
+            }
             setAmountIn(undefined)
             setIsLoading(false);
             // Small delay to let backend process the block event
@@ -1033,7 +1053,7 @@ export default function Token() {
                 toast.error(msg);
             }
         }
-    }, [detailData, amountIn, address, slippage, handlers, showSuccessToast, reloadTokenInfo, tradeType, exactInput])
+    }, [detailData, amountIn, address, slippage, handlers, showSuccessToast, reloadTokenInfo, tradeType, exactInput, tokenChain])
 
     const parseLink = (domain: string, link?: string) => {
         if (!link)
@@ -1095,6 +1115,30 @@ export default function Token() {
     //     return undefined
     // }, [detailData, poolInfo])
 
+    // A token that isn't in the backend yet (just deployed and awaiting indexing,
+    // or a bad address) makes the detail fetch 404. Show a clear state with retry
+    // instead of spinning forever. Once indexed, detailData arrives and the full
+    // page renders normally.
+    if (!detailData) {
+        return (
+            <PageBox display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="1em" minHeight="60vh" pt={6}>
+                {tokenInfoError && !tokenInfoLoading ? (
+                    <>
+                        <Typography color="white" fontSize={20} fontWeight="bold">Token not found or still indexing</Typography>
+                        <Typography color="#AAA" fontSize={14} textAlign="center" maxWidth={420}>
+                            If you just created this token it can take a few seconds to be indexed. This page refreshes automatically.
+                        </Typography>
+                        <Button onClick={() => reloadTokenInfo()} sx={{ borderRadius: '16px', textTransform: 'none', color: 'black', bgcolor: '#D3FF24', px: 3, py: 1 }}>
+                            Retry
+                        </Button>
+                    </>
+                ) : (
+                    <CircularProgress sx={{ color: '#D3FF24' }} />
+                )}
+            </PageBox>
+        )
+    }
+
     return (
         <PageBox display="flex" flexDirection="column" justifyContent="space-between" gap="1.5em" maxWidth="100%" overflow="hidden" pt={6}>
             {/* {!!detailData?.tokenBanner && (
@@ -1113,6 +1157,13 @@ export default function Token() {
                         }}>
                             <CopyIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
+                        {address && detailData?.tokenAddress && (
+                            <IconButton sx={{ width: 'fit-content' }} title="Add to watchlist" onClick={() => toggleWatch(detailData.tokenAddress, detailData.network)}>
+                                {isWatched(detailData.tokenAddress)
+                                    ? <StarIcon sx={{ color: '#e4ff66', width: 16, height: 16 }} />
+                                    : <StarBorderIcon sx={{ color: '#9E9E9E', width: 16, height: 16 }} />}
+                            </IconButton>
+                        )}
                         <IconButton sx={{ width: 'fit-content' }} onClick={() => {
                             const url = window.location.href
                             if (navigator.share) {
@@ -1125,8 +1176,16 @@ export default function Token() {
                             <LinkIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
                     </Box>
-                    <Box display="flex" gap="8px" alignItems="center" width="100%">
+                    <Box display="flex" gap="8px" alignItems="center" width="100%" position="relative">
                         <TokenLogo logo={detailData?.tokenImage} size={isMobile ? "75px" : "120px"} />
+                        {
+                            streamStatus?.isLive &&
+                            <Box onClick={() => setMode("live")}
+                                sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: '4px', px: '8px', py: '3px', borderRadius: '8px', background: 'rgba(239,68,68,0.9)', cursor: 'pointer', zIndex: 2 }}>
+                                <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: 'white' }} />
+                                <Typography fontSize={11} fontWeight={800} color="white">LIVE {streamStatus.viewers > 0 ? `· ${streamStatus.viewers}` : ''}</Typography>
+                            </Box>
+                        }
                         {
                             !isMobile &&
                             <Box>
@@ -1354,6 +1413,8 @@ export default function Token() {
                                     <div className={mode === "trades" ? "active" : ""} onClick={() => setMode("trades")}>Trades</div>
                                     <div className={mode === "chat" ? "active" : ""} onClick={() => setMode("chat")}>Chat</div>
                                     <div className={mode === "info" ? "active" : ""} onClick={() => setMode("info")}>Info</div>
+                                    <div className={mode === "analytics" ? "active" : ""} onClick={() => setMode("analytics")}>Analytics</div>
+                                    <div className={mode === "live" ? "active" : ""} onClick={() => setMode("live")}>{streamStatus?.isLive ? '🔴 Live' : 'Live'}</div>
                                     {
                                         isMobile &&
                                         <div className={mode === "holders" ? "active" : ""} onClick={() => setMode("holders")}>Holders</div>
@@ -1530,6 +1591,16 @@ export default function Token() {
                                 </Box>
                             }
                             {
+                                mode === "analytics" &&
+                                <Box my="1.5em">
+                                    <TokenAnalyticsPanel network={network ?? undefined} address={id ?? undefined} />
+                                </Box>
+                            }
+                            {
+                                mode === "live" &&
+                                <StreamPanel tokenAddress={id ?? undefined} creatorAddress={detailData?.creatorAddress} />
+                            }
+                            {
                                 mode === "holders" &&
                                 <HolderBox as="ol" mb="1.5em">
                                     <Box component="h3">Top Holders</Box>
@@ -1552,6 +1623,7 @@ export default function Token() {
                                     <Box component="li">
                                         <div>1.</div>
                                         <Box display="flex" alignItems="center" flexGrow={1} minWidth={0}>
+                                            <Avatar src="/images/logo.png" alt="Bonding Curve" sx={{ width: 18, height: 18, mr: '0.5rem' }} />
                                             <UserName
                                                 address={tokenChain?.contractAddress}
                                                 color="#9E9E9E"

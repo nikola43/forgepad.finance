@@ -52,19 +52,25 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
-    // CORS configuration
-    let cors_origins = std::env::var("CORS_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:3000".to_string());
+    // CORS configuration. When CORS_ORIGINS is unset we fall back to the known
+    // production + localhost origins so a missing env var on a deployed host
+    // can't silently break the browser (No 'Access-Control-Allow-Origin').
+    const DEFAULT_CORS_ORIGINS: &str = "https://arrowpad.io,https://www.arrowpad.io,http://localhost:3000,http://localhost:8080";
+    let cors_origins =
+        std::env::var("CORS_ORIGINS").unwrap_or_else(|_| DEFAULT_CORS_ORIGINS.to_string());
     let origins: Vec<_> = cors_origins
         .split(',')
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
     let cors = if origins.is_empty() {
-        // Fail-closed: never fall back to `Any` for the origin. Use a safe
-        // localhost default when no valid origins are configured.
-        CorsLayer::new()
-            .allow_origin(axum::http::HeaderValue::from_static("http://localhost:3000"))
+        // Fail-closed: never fall back to `Any` for the origin. Use the safe
+        // production + localhost defaults when no valid origins are configured.
+        let defaults: Vec<_> = DEFAULT_CORS_ORIGINS
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        CorsLayer::new().allow_origin(defaults)
     } else {
         CorsLayer::new().allow_origin(origins)
     }

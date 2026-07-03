@@ -31,11 +31,22 @@ fn score_decay(time_delta_ms: f64) -> f64 {
 
 /// Start the blockchain event listener for a given chain.
 ///
-/// Supervised: any connection/RPC failure tears the provider down and retries
-/// with capped exponential backoff, so a dropped WebSocket no longer silently
-/// kills indexing. The cursor (`last_block`) is only advanced once a block range
-/// has been fully fetched AND processed, so transient RPC errors never skip a
-/// block containing a trade.
+/// Supervised: any RPC failure tears the provider down and retries with capped
+/// exponential backoff, so a transient outage no longer silently kills indexing.
+/// The cursor (`last_block`) is only advanced once a block range has been fully
+/// fetched AND processed, so transient RPC errors never skip a block containing
+/// a trade.
+///
+/// Transport is split: an HTTP provider (public RPC) fetches all logs and the
+/// chain head, because the public RPC supports full-size `getLogs` chunks and the
+/// only WSS endpoint available (Alchemy free tier) caps `eth_getLogs` at a
+/// 10-block range. On top of that, a WebSocket `newHeads` subscription (Alchemy)
+/// provides low-latency nudges so we react at ~block time (0.2s) instead of
+/// waiting for the poll interval. Both the WS nudge and a poll-interval backstop
+/// drive a single, serialized catch-up loop — never two concurrent processors —
+/// so a log is never processed twice from the overlap. DB writes are idempotent
+/// as a second line of defence (trades unique on (tx_hash, log_index); tokens
+/// upserted; the creation-request row deleted after use).
 pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     tracing::info!(
         "Starting blockchain listener for {} (chain_id: {})",
@@ -51,24 +62,11 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         }
     };
 
-    let ws_url = match chain.ws_url.clone() {
-        Some(u) => u,
-        None => {
-            tracing::error!("ws_url required for chain {}", chain.network);
-            return;
-        }
-    };
-
     let mut backoff = 1u64;
     loop {
-        match run_listener_once(&state, &chain, contract_address, &ws_url).await {
+        match run_listener_once(&state, &chain, contract_address).await {
             Ok(()) => {
-                tracing::warn!(
-                    "Listener stream for {} ended cleanly; reconnecting",
-                    chain.network
-                );
-                // Don't reset to 1s — a provider that accepts the subscription then
-                // immediately closes it would otherwise become a ~1 req/s storm.
+                tracing::warn!("Listener loop for {} ended; restarting", chain.network);
                 backoff = 5;
             }
             Err(e) => {
@@ -84,20 +82,40 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
     }
 }
 
-/// One connect → catch-up → subscribe cycle. Returns Err on any connection/RPC
+/// Poll-interval backstop. The WS `newHeads` subscription is the low-latency
+/// path; this bounds how long indexing can stall if the WS goes silent, and
+/// keeps working when no WS is available at all.
+const POLL_INTERVAL_MS: u64 = 1000;
+
+/// Aborts a spawned task when dropped, so a WS subscription task never leaks
+/// across supervisor reconnects (each `run_listener_once` gets a fresh one).
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+/// One connect → catch-up → (WS nudge + poll) cycle. Returns Err on any HTTP RPC
 /// failure so the supervisor can reconnect; the cursor is never advanced past an
-/// unprocessed block.
+/// unprocessed block. The WS subscription is best-effort: if it can't connect or
+/// drops, indexing degrades to poll-only rather than stalling.
 async fn run_listener_once(
     state: &Arc<AppState>,
     chain: &ChainConfig,
     contract_address: Address,
-    ws_url: &str,
 ) -> anyhow::Result<()> {
-    let ws = WsConnect::new(ws_url);
-    let provider = ProviderBuilder::new()
-        .connect_ws(ws)
-        .await
-        .map_err(|e| anyhow::anyhow!("WS connect: {e}"))?;
+    // Server-side indexing RPC. This must support large `eth_getLogs` ranges
+    // (the Robinhood public node does; QuikNode/Alchemy free tiers cap at a few
+    // blocks), so it is deliberately separate from `chain.rpc_url` — the
+    // browser-facing endpoint exposed via /config, which only needs to be
+    // reachable + CORS-enabled from browsers. Matches the eth_call helpers, which
+    // already prefer ETH_RPC_URL.
+    let indexer_rpc = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let url = indexer_rpc
+        .parse()
+        .map_err(|e| anyhow::anyhow!("invalid indexer rpc {indexer_rpc}: {e}"))?;
+    let provider = ProviderBuilder::new().connect_http(url);
 
     let mut last_block = load_last_block(state, &chain.network).await?;
     tracing::info!("Chain {} resuming from block {}", chain.network, last_block);
@@ -126,56 +144,57 @@ async fn run_listener_once(
 
     // Catch up to head, cursor-safe.
     last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
+    tracing::info!("Chain {} caught up to {}, watching for new blocks", chain.network, last_block);
 
-    // Blocks may have been mined during catch-up; backfill that gap before
-    // subscribing so nothing between the initial snapshot and the subscription
-    // is dropped.
-    let head2 = provider
-        .get_block_number()
-        .await
-        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
-    if head2 > last_block {
-        last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
-    }
+    // WS `newHeads` subscription → sends a nudge on the channel per block. The
+    // task only signals; it never touches the cursor or processes logs, so the
+    // single consumer below stays the only place catch_up runs (dedup by design).
+    // `_ws_guard` aborts the task when this function returns.
+    let (wake_tx, mut wake_rx) = tokio::sync::mpsc::channel::<()>(8);
+    let _ws_guard = chain.ws_url.clone().filter(|u| !u.is_empty()).map(|ws_url| {
+        let wake_tx = wake_tx.clone();
+        let network = chain.network.clone();
+        AbortOnDrop(tokio::spawn(async move {
+            match ProviderBuilder::new().connect_ws(WsConnect::new(ws_url)).await {
+                Ok(ws_provider) => match ws_provider.subscribe_blocks().await {
+                    Ok(sub) => {
+                        tracing::info!("Chain {network} WS newHeads subscription active");
+                        let mut stream = sub.into_stream();
+                        while stream.next().await.is_some() {
+                            // Best-effort, coalescing nudge: a full channel already
+                            // has a pending wake, so dropping this one is fine.
+                            let _ = wake_tx.try_send(());
+                        }
+                        tracing::warn!("Chain {network} WS block stream ended; poll backstop continues");
+                    }
+                    Err(e) => tracing::warn!("Chain {network} subscribe_blocks failed: {e}; poll-only"),
+                },
+                Err(e) => tracing::warn!("Chain {network} WS connect failed: {e}; poll-only"),
+            }
+        }))
+    });
+    // Keep one sender alive here so `wake_rx.recv()` stays pending (rather than
+    // returning None and busy-looping) even if the WS task exits.
+    let _wake_keepalive = wake_tx;
 
-    tracing::info!("Chain {} caught up to {}, subscribing", chain.network, last_block);
-
-    let sub = provider
-        .subscribe_blocks()
-        .await
-        .map_err(|e| anyhow::anyhow!("subscribe_blocks: {e}"))?;
-    let mut stream = sub.into_stream();
-
-    while let Some(block) = stream.next().await {
-        let block_num = block.number;
-        if block_num <= last_block {
-            continue; // already indexed (reorg replay / duplicate notification)
+    // Single serialized consumer: either a WS nudge or the poll tick wakes it,
+    // then it drains up to the current head. catch_up is a no-op when nothing is
+    // new and advances the persisted cursor chunk-by-chunk otherwise.
+    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(POLL_INTERVAL_MS));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        tokio::select! {
+            _ = wake_rx.recv() => {}   // low-latency WS path (~block time)
+            _ = ticker.tick() => {}    // poll backstop
         }
-
-        // Process the whole range (last_block, block_num] so no block is skipped
-        // even if block notifications arrive non-contiguously.
-        let from = last_block + 1;
-        let filter = Filter::new()
-            .address(contract_address)
-            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
-            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(block_num));
-
-        let logs = provider
-            .get_logs(&filter)
+        let head = provider
+            .get_block_number()
             .await
-            .map_err(|e| anyhow::anyhow!("get_logs {from}-{block_num}: {e}"))?;
-        for log in logs {
-            process_log(state, chain, &log)
-                .await
-                .map_err(|e| anyhow::anyhow!("process_log at block {block_num}: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+        if head > last_block {
+            last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
         }
-
-        // Only now advance the cursor.
-        last_block = block_num;
-        update_last_block(state, &chain.network, block_num as i64).await.ok();
     }
-
-    Ok(())
 }
 
 /// Fetch + process logs from `last_block` up to the current head in chunks,
@@ -322,12 +341,12 @@ async fn process_token_created_log(
 /// The TokenCreated event does not emit poolType, so we must read it from
 /// contract state to store it accurately in the backend.
 async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<crate::models::enums::PoolType> {
-    // tokenPools(address) selector = 0x1e4c668a
+    // tokenPools(address) selector = 0xc3d2c3c1 (keccak("tokenPools(address)")[..4]).
     // Returns a struct with 8 fields: ethReserve, tokenReserve, virtualEthReserve,
     // virtualTokenReserve, token, owner, poolType, launched.
-    // poolType is the 7th field (offset 160 bytes in the ABI-encoded return).
+    // poolType is the 7th field → word index 6 → byte offset 192 → hex chars 384..448.
     let call_data = format!(
-        "0x1e4c668a000000000000000000000000{}",
+        "0xc3d2c3c1000000000000000000000000{}",
         token_address.strip_prefix("0x").unwrap_or(token_address)
     );
     let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
@@ -350,13 +369,13 @@ async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<cra
         .await
         .ok()?;
     let hex = resp.get("result")?.as_str()?;
-    // ABI-encoded struct: 32 bytes each for 8 fields. poolType is the 7th field
-    // at offset 192 bytes (6 * 32 = 192) from the data start.
+    // ABI-encoded struct: 32 bytes (64 hex chars) per field. poolType is the 7th
+    // field → word index 6 → hex chars 384..448. Need at least 7 words present.
     let trimmed = hex.trim_start_matches("0x");
-    if trimmed.len() < 256 {
+    if trimmed.len() < 448 {
         return None;
     }
-    let pool_type_hex = &trimmed[192..256]; // bytes 192..224 = 7th field
+    let pool_type_hex = &trimmed[384..448]; // word 6 = poolType
     let pt = u8::from_str_radix(pool_type_hex, 16).ok()?;
     match pt {
         1 => Some(crate::models::enums::PoolType::V2),

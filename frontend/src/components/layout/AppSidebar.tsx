@@ -15,6 +15,18 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import HomeIcon from '@mui/icons-material/Home'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
+import TrackChangesIcon from '@mui/icons-material/TrackChanges'
+import GroupAddOutlinedIcon from '@mui/icons-material/GroupAddOutlined'
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined'
+import StarBorderIcon from '@mui/icons-material/StarBorder'
+import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined'
+import MilitaryTechOutlinedIcon from '@mui/icons-material/MilitaryTechOutlined'
+import RedeemOutlinedIcon from '@mui/icons-material/RedeemOutlined'
+import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined'
+import TravelExploreOutlinedIcon from '@mui/icons-material/TravelExploreOutlined'
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined'
 import { usePathname, useRouter } from 'next/navigation'
 
 const drawerWidth = 240
@@ -58,10 +70,26 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     }),
 )
 
-const items = [
+type NavItem = { label: string; href: string; target?: string; icon: React.ReactNode }
+
+// `target` overrides the navigation destination while `href` stays the active-
+// state match (so /profile?address=me still highlights on /profile).
+const items: NavItem[] = [
     { label: 'Home', href: '/', icon: <HomeIcon /> },
+    { label: 'Discover', href: '/discover', icon: <TravelExploreOutlinedIcon /> },
+    { label: 'Portfolio', href: '/portfolio', icon: <AccountBalanceWalletOutlinedIcon /> },
+    { label: 'Practice', href: '/simulator', icon: <SportsEsportsOutlinedIcon /> },
     { label: 'Leaderboard', href: '/leaderboard', icon: <EmojiEventsIcon /> },
+    { label: 'Season', href: '/season', icon: <EmojiEventsOutlinedIcon /> },
+    { label: 'Rewards', href: '/rewards', icon: <TrackChangesIcon /> },
+    { label: 'Airdrop', href: '/airdrop', icon: <RedeemOutlinedIcon /> },
+    { label: 'Referrals', href: '/referrals', icon: <GroupAddOutlinedIcon /> },
+    { label: 'Watchlist', href: '/watchlist', icon: <StarBorderIcon /> },
+    { label: 'Hall of Kings', href: '/kings', icon: <MilitaryTechOutlinedIcon /> },
+    { label: 'Tier', href: '/tier', icon: <WorkspacePremiumOutlinedIcon /> },
     { label: 'Create Token', href: '/forge', icon: <AddCircleOutlineIcon /> },
+    { label: 'Creator', href: '/creator', icon: <InsightsOutlinedIcon /> },
+    { label: 'Profile', href: '/profile', target: '/profile?address=me', icon: <PersonOutlineIcon /> },
 ]
 
 export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
@@ -81,7 +109,7 @@ export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle
                     return (
                         <ListItem key={item.href} disablePadding sx={{ display: 'block' }}>
                             <ListItemButton
-                                onClick={() => router.push(item.href)}
+                                onClick={() => router.push(item.target ?? item.href)}
                                 sx={{
                                     minHeight: 48,
                                     px: 2,

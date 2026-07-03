@@ -59,6 +59,14 @@ export function useAccount() {
         { revalidateOnFocus: false }
     )
 
+    // Capture a ?ref=CODE from the landing URL and persist it, so it can be
+    // attributed when the wallet connects and auto-registers.
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const ref = new URLSearchParams(window.location.search).get('ref')
+        if (ref) localStorage.setItem('arrowpad_ref', ref)
+    }, [])
+
     // Auto-register on first connect if user doesn't exist
     useEffect(() => {
         if (!isConnected || !address || !walletProvider || registeredRef.current) return
@@ -74,11 +82,14 @@ export function useAccount() {
                 const signer = await provider.getSigner()
                 const msg = `Register on Arrowpad\n${address}\n${Date.now()}`
                 const signature = await signer.signMessage(msg)
+                const refCode = (typeof window !== 'undefined' && localStorage.getItem('arrowpad_ref')) || undefined
                 await axios.post(`${API_ENDPOINT}/users`, {
                     user: { username: '', bio: '', avatar: '' },
                     signature,
-                    msg
+                    msg,
+                    refCode,
                 })
+                localStorage.removeItem('arrowpad_ref')
                 mutate()
             } catch (err) {
                 console.error('Auto-register failed:', err)
@@ -102,7 +113,7 @@ export function useUserProfile(profileAddress?: string) {
             } catch (err: any) {
                 if (err?.response?.status !== 404) throw err
             }
-            let profileData: any = { helds: [], replies: [], tokens: [], followers: 0, followees: [], followerCount: 0, followeeCount: 0, referrals: 0, points: null }
+            let profileData: any = { helds: [], replies: [], tokens: [], followers: 0, followees: [], followerCount: 0, followeeCount: 0, referrals: 0, points: null, tradingPoints: 0, tradingVolumeUsd: 0, rewardEth: 0 }
             try {
                 const res = await axios.get(`${API_ENDPOINT}/users/profile/${profileAddress}`)
                 const d = res.data
@@ -123,6 +134,9 @@ export function useUserProfile(profileAddress?: string) {
                     followees: followeesList,
                     referrals: d.referralCount ?? d.referrals ?? 0,
                     points: d.points ?? null,
+                    tradingPoints: d.tradingPoints ?? 0,
+                    tradingVolumeUsd: d.tradingVolumeUsd ?? 0,
+                    rewardEth: d.rewardEth ?? 0,
                 }
             } catch { /* profile may not exist yet */ }
             return { user, ...profileData }

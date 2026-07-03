@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       '@react-native-async-storage/async-storage': false,
+      // @wagmi/core's unused "tempo" connectors barrel imports an
+      // unresolvable 'accounts' module; the app uses explicit adapters, so stub it.
+      accounts: false,
     };
 
     // config.optimization.splitChunks = {

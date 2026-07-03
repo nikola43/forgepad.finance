@@ -1,5 +1,5 @@
 [env]
-PQ_LIB_DIR = "/opt/homebrew/opt/libpq/lib"
+PQ_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
 
 [build]
-rustflags = ["-L", "/opt/homebrew/opt/libpq/lib"]
+rustflags = ["-L", "/usr/lib/x86_64-linux-gnu"]

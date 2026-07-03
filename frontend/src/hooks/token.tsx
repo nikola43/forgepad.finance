@@ -39,7 +39,7 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
     const isSolanaToken = network === 'solana';
 
     // Use stable primitives in SWR key (avoid provider objects which change reference)
-    const { data: tokenInfo, mutate } = useSWR(
+    const { data: tokenInfo, mutate, error, isLoading } = useSWR(
         tokenAddress && network ? ['/info/token', tokenAddress, network, address, pageNumber, pageSize, !!evmProvider, !!solProvider, !!connection] : undefined,
         async () => {
 
@@ -121,7 +121,7 @@ export function useTokenInfo(tokenAddress: string, network: string, pageNumber: 
     }, [tokenAddress, mutate])
 
     return {
-        tokenInfo, reload: mutate
+        tokenInfo, reload: mutate, error, isLoading
     }
 }
 
@@ -257,27 +257,47 @@ export function useHandlers(network?: CaipNetwork) {
                 const balance = await readProvider.getBalance(address)
                 const value = ethers.parseEther(buyAmt) + createFeeAmount + firstBuyFee
                 const deadline = Math.floor(Date.now() / 1000) + 3600
-                console.log('[value] buyAmt:', buyAmt, 'createFeeAmount:', createFeeAmount.toString(), 'firstBuyFee:', firstBuyFee.toString())
+                const args = [token.name, token.symbol, ethers.parseEther(buyAmt), 0n, sig, token.pool, deadline] as const
+
+                // Estimate gas against the read RPC (not the wallet) so we can
+                // validate the wallet covers fee + buy + gas ourselves. This
+                // avoids the cryptic "missing revert data" estimateGas
+                // CALL_EXCEPTION the wallet throws when funds fall a hair short,
+                // and lets us surface a clean "Insufficient balance" toast.
+                let gasLimit = 1_000_000n
+                try {
+                    gasLimit = await readContract.createToken.estimateGas(...args, { from: address, value })
+                } catch (err: any) {
+                    // A revert here with enough value in the wallet is a real
+                    // contract error (e.g. paused) — bubble it up. Otherwise the
+                    // shortfall is caught by the balance check below.
+                    if (balance >= value && err?.code !== 'INSUFFICIENT_FUNDS')
+                        throw err
+                }
+                const feeData = await readProvider.getFeeData()
+                const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+                // 20% headroom on gas so validation matches what the wallet reserves.
+                const gasCost = (gasLimit * gasPrice * 12n) / 10n
+                const totalCost = value + gasCost
                 console.log('[createToken] params:', {
                     name: token.name,
                     symbol: token.symbol,
                     buyAmount: ethers.parseEther(buyAmt).toString(),
-                    minAmountOut: '0',
                     sig,
                     poolType: token.pool,
                     value: value.toString(),
+                    gasLimit: gasLimit.toString(),
+                    gasCost: gasCost.toString(),
+                    totalCost: totalCost.toString(),
                     balance: balance.toString(),
                     createFeeAmount: createFeeAmount.toString(),
                     firstBuyFee: firstBuyFee.toString(),
-                    buyAmt,
                     contractAddress: chain.contractAddress,
                     sender: address,
                 })
-                if (balance < value)
+                if (balance < totalCost)
                     throw Error("Insufficient balance")
-                const tx = await contract.createToken(
-                    token.name, token.symbol, ethers.parseEther(buyAmt), 0n, sig, token.pool, deadline, { value }
-                )
+                const tx = await contract.createToken(...args, { value, gasLimit })
                 console.log('[createToken] tx hash:', tx.hash)
                 return tx
             },
@@ -286,14 +306,28 @@ export function useHandlers(network?: CaipNetwork) {
                     throw Error("Connect wallet")
                 const signer = new JsonRpcSigner(provider, address as string)
                 const tokenContract = new Contract(token, erc20Abi, signer)
+                const tokenRead = new Contract(token, erc20Abi, readProvider)
                 const poolInfo = await readContract.tokenPools(token).catch(() => undefined)
+                // Spender is the Uniswap router for graduated tokens, else the curve contract.
+                let spender = chain.contractAddress
                 if (poolInfo?.launched) {
                     const lmAddress = await readContract.liquidityManager()
                     const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
-                    const routerAddress = await lm.getRouterV2()
-                    return await tokenContract.approve(routerAddress, MaxUint256)
+                    spender = await lm.getRouterV2()
                 }
-                return await tokenContract.approve(chain.contractAddress, MaxUint256)
+                // Estimate gas on the read provider (reliable) rather than the
+                // wallet, so a flaky wallet RPC can't turn a plain ERC20 approve
+                // into a cryptic "missing revert data" estimateGas error; pass the
+                // gasLimit so the wallet only signs + broadcasts.
+                let gasLimit: bigint
+                try {
+                    gasLimit = await tokenRead.approve.estimateGas(spender, MaxUint256, { from: address })
+                } catch (err: any) {
+                    if (err?.code === 'INSUFFICIENT_FUNDS')
+                        throw Error("Insufficient balance")
+                    throw err
+                }
+                return await tokenContract.approve(spender, MaxUint256, { gasLimit })
             },
             buyToken: async (token: string, amount: string, slippage: bigint, exactInput?: boolean) => {
                 if (!address)
@@ -303,25 +337,56 @@ export function useHandlers(network?: CaipNetwork) {
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
 
+                // Native balance + gas price for pre-flight validation. We estimate
+                // gas on the READ provider (reliable) rather than the wallet, so a
+                // flaky wallet RPC can't turn a valid swap into a cryptic
+                // estimateGas CALL_EXCEPTION, and we pass an explicit gasLimit so
+                // the wallet only signs + broadcasts.
+                const balance = await readProvider.getBalance(address)
+                const feeData = await readProvider.getFeeData()
+                const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+                // Throws a clean "Insufficient balance" (surfaced as a toast) when
+                // the wallet can't cover value + gas.
+                const assertFunds = (value: bigint, gasLimit: bigint) => {
+                    if (balance < value + (gasLimit * gasPrice * 12n) / 10n)
+                        throw Error("Insufficient balance")
+                }
+                const estimateOrThrow = async (fn: any, args: any[], value: bigint) => {
+                    if (balance < value)
+                        throw Error("Insufficient balance")
+                    try {
+                        return await fn.estimateGas(...args, { from: address, value })
+                    } catch (err: any) {
+                        if (err?.code === 'INSUFFICIENT_FUNDS')
+                            throw Error("Insufficient balance")
+                        throw err
+                    }
+                }
+
                 if (poolInfo.launched) {
                     // Graduated token: route through Uniswap V2
                     const lmAddress = await readContract.liquidityManager()
                     const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
                     const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
                     const router = new Contract(routerAddress, uniswapV2RouterAbi, signer)
+                    const routerRead = new Contract(routerAddress, uniswapV2RouterAbi, readProvider)
                     const deadline = Math.floor(Date.now() / 1000) + 1200
                     const path = [wethAddress, token]
 
                     if (exactInput) {
                         const amountInput = ethers.parseEther(amount ?? '0')
-                        const amountsOut = await router.getAmountsOut(amountInput, path)
+                        const amountsOut = await routerRead.getAmountsOut(amountInput, path)
                         const amountOutMin = amountsOut[1] * (10000n - slippage) / 10000n
-                        return await router.swapExactETHForTokens(amountOutMin, path, address, deadline, { value: amountInput })
+                        const gasLimit = await estimateOrThrow(routerRead.swapExactETHForTokens, [amountOutMin, path, address, deadline], amountInput)
+                        assertFunds(amountInput, gasLimit)
+                        return await router.swapExactETHForTokens(amountOutMin, path, address, deadline, { value: amountInput, gasLimit })
                     }
                     const amountOut = ethers.parseEther(amount ?? '0')
-                    const amountsIn = await router.getAmountsIn(amountOut, path)
+                    const amountsIn = await routerRead.getAmountsIn(amountOut, path)
                     const amountInMax = amountsIn[0] * (10000n + slippage) / 10000n
-                    return await router.swapETHForExactTokens(amountOut, path, address, deadline, { value: amountInMax })
+                    const gasLimit = await estimateOrThrow(routerRead.swapETHForExactTokens, [amountOut, path, address, deadline], amountInMax)
+                    assertFunds(amountInMax, gasLimit)
+                    return await router.swapETHForExactTokens(amountOut, path, address, deadline, { value: amountInMax, gasLimit })
                 }
 
                 // Bonding curve swap
@@ -330,17 +395,22 @@ export function useHandlers(network?: CaipNetwork) {
                 const swapDeadline = Math.floor(Date.now() / 1000) + 1200
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
-                    const amountInWithFee = amountInput * 97n / 100n
+                    const value = amountInput + firstBuyFee
+                    const amountInWithFee = amountInput * 99n / 100n
                     const estimateAmount = amountInWithFee * poolInfo.virtualTokenReserve / (poolInfo.virtualEthReserve + amountInWithFee)
                     const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
-                    const gasLimit = await contract.swapExactETHForTokens.estimateGas(token, amountInput, amountOutMin, swapDeadline, { value: amountInput + firstBuyFee })
-                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, swapDeadline, { value: amountInput + firstBuyFee, gasLimit })
+                    const gasLimit = await estimateOrThrow(readContract.swapExactETHForTokens, [token, amountInput, amountOutMin, swapDeadline], value)
+                    assertFunds(value, gasLimit)
+                    return await contract.swapExactETHForTokens(token, amountInput, amountOutMin, swapDeadline, { value, gasLimit })
                 }
                 const amountOut = ethers.parseEther(amount ?? '0')
                 const amountInWei = amountOut * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve - amountOut) + 1n
-                const estimateAmount = amountInWei * 100n / 97n
+                const estimateAmount = amountInWei * 100n / 99n
                 const amountInMax = estimateAmount * (10000n + slippage) / 10000n
-                return await contract.swapETHForExactTokens(token, amountOut, amountInMax, swapDeadline, { value: amountInMax + firstBuyFee })
+                const value = amountInMax + firstBuyFee
+                const gasLimit = await estimateOrThrow(readContract.swapETHForExactTokens, [token, amountOut, amountInMax, swapDeadline], value)
+                assertFunds(value, gasLimit)
+                return await contract.swapETHForExactTokens(token, amountOut, amountInMax, swapDeadline, { value, gasLimit })
             },
             sellToken: async (token: string, amount: string, slippage: bigint) => {
                 if (!address)
@@ -350,27 +420,47 @@ export function useHandlers(network?: CaipNetwork) {
                 if (!poolInfo || !poolInfo.token || poolInfo.token === ethers.ZeroAddress)
                     throw Error("Invalid token")
 
+                // Sells send tokens (no ETH value) but still need the token
+                // balance to cover the amount and native ETH for gas. Estimate on
+                // the read provider so a flaky wallet RPC can't produce a cryptic
+                // estimateGas revert; a shortfall surfaces as an "Insufficient
+                // balance" toast.
+                const amountInput = ethers.parseEther(amount ?? '0')
+                const tokenRead = new Contract(token, erc20Abi, readProvider)
+                const tokenBalance: bigint = await tokenRead.balanceOf(address).catch(() => 0n)
+                if (tokenBalance < amountInput)
+                    throw Error("Insufficient balance")
+                const estimateSell = async (fn: any, args: any[]) => {
+                    try {
+                        return await fn.estimateGas(...args, { from: address })
+                    } catch (err: any) {
+                        if (err?.code === 'INSUFFICIENT_FUNDS')
+                            throw Error("Insufficient balance")
+                        throw err
+                    }
+                }
+
                 if (poolInfo.launched) {
                     // Graduated token: route through Uniswap V2
                     const lmAddress = await readContract.liquidityManager()
                     const lm = new Contract(lmAddress, liquidityManagerAbi, readProvider)
                     const [routerAddress, wethAddress] = await Promise.all([lm.getRouterV2(), lm.WETH()])
                     const router = new Contract(routerAddress, uniswapV2RouterAbi, signer)
+                    const routerRead = new Contract(routerAddress, uniswapV2RouterAbi, readProvider)
                     const deadline = Math.floor(Date.now() / 1000) + 1200
                     const path = [token, wethAddress]
-                    const amountInput = ethers.parseEther(amount ?? '0')
-                    const amountsOut = await router.getAmountsOut(amountInput, path)
+                    const amountsOut = await routerRead.getAmountsOut(amountInput, path)
                     const amountOutMin = amountsOut[1] * (10000n - slippage) / 10000n
-                    return await router.swapExactTokensForETH(amountInput, amountOutMin, path, address, deadline)
+                    const gasLimit = await estimateSell(routerRead.swapExactTokensForETH, [amountInput, amountOutMin, path, address, deadline])
+                    return await router.swapExactTokensForETH(amountInput, amountOutMin, path, address, deadline, { gasLimit })
                 }
 
                 // Bonding curve swap
                 const contract = new Contract(chain.contractAddress, chain.abi, signer)
-                const amountInput = ethers.parseEther(amount ?? '0')
-                const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
+                const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 99n / 100n
                 const amountOutMin = estimateAmount * (10000n - slippage) / 10000n
                 const swapDeadline = Math.floor(Date.now() / 1000) + 1200
-                const gasLimit = await contract.swapExactTokensForETH.estimateGas(token, amountInput, amountOutMin, swapDeadline)
+                const gasLimit = await estimateSell(readContract.swapExactTokensForETH, [token, amountInput, amountOutMin, swapDeadline])
                 return await contract.swapExactTokensForETH(token, amountInput, amountOutMin, swapDeadline, { gasLimit })
             },
             quoteBuy: async (token: string, amount: string, exactInput?: boolean) => {
@@ -403,15 +493,18 @@ export function useHandlers(network?: CaipNetwork) {
                 // Bonding curve quote
                 if (exactInput) {
                     const amountInput = ethers.parseEther(amount ?? '0')
-                    const amountInWithFee = amountInput * 97n / 100n
-                    if (balance < amountInWithFee)
+                    const amountInWithFee = amountInput * 99n / 100n
+                    // The tx sends the FULL amountInput (+ fee) as msg.value, not the
+                    // fee-adjusted amount — so validate against amountInput or the
+                    // quote passes while the swap fails for insufficient value.
+                    if (balance < amountInput)
                         throw Error(`Insufficient ${network.nativeCurrency.symbol} balance`)
                     const estimateAmount = amountInWithFee * poolInfo.virtualTokenReserve / (poolInfo.virtualEthReserve + amountInWithFee)
                     return ethers.formatEther(estimateAmount)
                 }
                 const amountOut = ethers.parseEther(amount ?? '0')
                 const amountInWei = amountOut * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve - amountOut) + 1n
-                const estimateAmount = amountInWei * 100n / 97n
+                const estimateAmount = amountInWei * 100n / 99n
                 if (balance < estimateAmount)
                     throw Error(`Insufficient ${network.nativeCurrency.symbol} balance`)
                 return ethers.formatEther(estimateAmount)
@@ -435,7 +528,7 @@ export function useHandlers(network?: CaipNetwork) {
 
                 // Bonding curve quote
                 const amountInput = ethers.parseEther(amount ?? '0')
-                const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 97n / 100n
+                const estimateAmount = amountInput * poolInfo.virtualEthReserve / (poolInfo.virtualTokenReserve + amountInput) * 99n / 100n
                 return ethers.formatEther(estimateAmount)
             }
         }

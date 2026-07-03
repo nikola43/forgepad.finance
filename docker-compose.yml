@@ -33,24 +33,34 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/forgepad
       REDIS_URL: redis://redis:6379
+      # Browser-facing RPC (Alchemy): returned via /config, used by the frontend.
       ROBINHOOD_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
       ROBINHOOD_PUBLIC_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+      # Server-side RPC (public node): indexing getLogs + eth_call. Supports large
+      # ranges the browser-facing provider does not; kept separate on purpose.
+      ETH_RPC_URL: ${ROBINHOOD_ETH_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+      # WS newHeads subscription (Alchemy).
       ROBINHOOD_WS_URL: ${ROBINHOOD_WS_URL:-wss://rpc.mainnet.chain.robinhood.com}
       CHAIN_ID: "4663"
       PORT: "5001"
-      CORS_ORIGINS: "http://localhost:3000,http://localhost:8080"
+      CORS_ORIGINS: "https://arrowpad.io,https://www.arrowpad.io,http://localhost:3000,http://localhost:8080"
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
-      UPLOAD_BASE_URL: http://localhost:5001/uploads
+      UPLOAD_BASE_URL: https://api.arrowpad.io/uploads
       S3_ENDPOINT: http://minio:9000
       S3_BUCKET: forgepad
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_REGION: us-east-1
-      S3_PUBLIC_URL: http://localhost:9000/forgepad
+      S3_PUBLIC_URL: https://s3.arrowpad.io/forgepad
       RUST_LOG: info,forgepad_backend=debug
+      # LiveKit (native streaming). Keys must match the livekit service's
+      # LIVEKIT_KEYS. LIVEKIT_URL is the public wss the browser connects to.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-devsecret_change_me_min_32_chars_long}
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://localhost:7880}
     ports:
-      - "5001:5001"
+      - "5002:5001"
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -58,6 +68,22 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Native WebRTC streaming SFU (Tier C). Signaling on 7880; media on 7881/tcp +
+  # 50000-50100/udp. Behind the cloudflared tunnel, expose 7880 as wss on a
+  # subdomain (e.g. livekit.arrowpad.io) and enable TURN in livekit/livekit.yaml.
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit/livekit.yaml
+    environment:
+      # Overrides `keys:` in the config file — no secret committed.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret_change_me_min_32_chars_long}"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
 
   minio:
     image: minio/minio:latest
@@ -90,7 +116,19 @@ services:
       exit 0
       "
 
-  # frontend: deployed separately on Vercel
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
+        NEXT_PUBLIC_LOCAL_MODE: "false"
+        NEXT_PUBLIC_API_URL: https://api.arrowpad.io
+        NEXT_PUBLIC_ROBINHOOD_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

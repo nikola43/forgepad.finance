@@ -25,6 +25,7 @@ import TokenLogo from "@/components/tokenLogo"
 import { ProfileSkeleton, ListSkeleton } from "@/components/Skeleton"
 import EmptyStateComponent from "@/components/EmptyState"
 import { useUserProfile } from "@/hooks/user"
+import { useRewards } from "@/hooks/rewards"
 import { API_ENDPOINT } from "@/config"
 import { priceFormatter } from "@/utils/price"
 import Link from "next/link"
@@ -167,6 +168,7 @@ export default function Profile() {
     }, [isConnected, connectedAddress, profileAddress])
 
     const { profile, reloadProfile } = useUserProfile(profileAddress)
+    const { rewards: profileRewards } = useRewards(profileAddress)
 
     const [tab, setTab] = useState(0)
     const [editing, setEditing] = useState(false)
@@ -176,6 +178,28 @@ export default function Profile() {
     const [uploadingAvatar, setUploadingAvatar] = useState(false)
     const [copied, setCopied] = useState(false)
     const [followLoading, setFollowLoading] = useState(false)
+    const [ethUsd, setEthUsd] = useState<number | null>(null)
+
+    // Free ETH/USD price (Coinbase → CoinGecko) for reward conversion. Public,
+    // CORS-enabled, no key; USD line just hides if both fail.
+    useEffect(() => {
+        let active = true
+        const fetchEthUsd = async () => {
+            try {
+                const { data } = await axios.get('https://api.coinbase.com/v2/prices/ETH-USD/spot', { timeout: 8000 })
+                const p = Number(data?.data?.amount)
+                if (active && p > 0) { setEthUsd(p); return }
+            } catch { /* fall through */ }
+            try {
+                const { data } = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', { timeout: 8000 })
+                const p = Number(data?.ethereum?.usd)
+                if (active && p > 0) setEthUsd(p)
+            } catch { /* leave null */ }
+        }
+        fetchEthUsd()
+        const id = setInterval(fetchEthUsd, 60000)
+        return () => { active = false; clearInterval(id) }
+    }, [])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const user = profile?.user
@@ -528,7 +552,33 @@ export default function Profile() {
                         </Typography>
                         <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Following</Typography>
                     </StatBox>
+                    <StatBox className="animate-fade-in" clickable={0}>
+                        <Typography fontSize={20} fontWeight={700} color="#e4ff66" fontFamily="'Space Grotesk', sans-serif">
+                            {priceFormatter(profile?.tradingPoints ?? 0, 2)}
+                        </Typography>
+                        <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Points</Typography>
+                    </StatBox>
+                    <StatBox className="animate-fade-in" clickable={0}>
+                        <Typography fontSize={16} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
+                            {priceFormatter(profile?.rewardEth ?? 0, 6)} ETH
+                        </Typography>
+                        <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">
+                            Reward{ethUsd != null ? ` · $${((profile?.rewardEth ?? 0) * ethUsd).toFixed(2)}` : ''}
+                        </Typography>
+                    </StatBox>
                 </Box>
+
+                {/* Achievement badges */}
+                {!!profileRewards?.achievements?.some((a) => a.earned) && (
+                    <Box display="flex" gap={1} mt={2} flexWrap="wrap" alignItems="center">
+                        <Typography fontSize={11} color="#64748B" textTransform="uppercase" letterSpacing="0.05em" mr={0.5}>Badges</Typography>
+                        {profileRewards.achievements.filter((a) => a.earned).map((a) => (
+                            <Box key={a.key} title={`${a.title} — ${a.description}`} sx={{ fontSize: 22, lineHeight: 1, px: 0.75, py: 0.5, borderRadius: '10px', border: '1px solid rgba(211,255,36,0.3)', background: 'rgba(211,255,36,0.06)', cursor: 'default' }}>
+                            {a.icon}
+                            </Box>
+                        ))}
+                    </Box>
+                )}
             </Box>
 
             {/* Tabs */}

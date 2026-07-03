@@ -26,6 +26,7 @@ import { useAppKitAccount } from "@reown/appkit/react";
 import { ChainController } from "@reown/appkit-controllers";
 import toast from "react-hot-toast";
 import CircularProgress from "@mui/material/CircularProgress";
+import ActivityTicker from "@/components/ActivityTicker";
 import { TokenCardSkeleton, KingCardSkeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 
@@ -459,6 +460,7 @@ export default function Home() {
 
     return (
         <PageBox>
+            <ActivityTicker />
             {/* SEO: crawlable heading + intro (visually hidden, no layout impact) */}
             <div style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
                 <h1>ArrowPad — Launch and Trade Tokens on Robinhood Chain</h1>
@@ -568,30 +570,16 @@ export default function Home() {
                         )}
                     </KingCard>
                     <Box display="flex" gap="8px" mt={1.5} flexWrap="wrap" px={0.5}>
-                        {(['0.1', '0.2', '1'] as const).map(amt => (
+                        {(['0.005', '0.01', '0.05', '0.1'] as const).map(amt => (
                             <QuickBuyButton
                                 key={amt}
                                 loading={quickBuyLoading === amt ? 1 : 0}
                                 onClick={(e) => { e.stopPropagation(); handleQuickBuy(amt, amt) }}
                             >
                                 {quickBuyLoading === amt && <CircularProgress size={12} sx={{ color: '#e4ff66' }} />}
-                                {amt} BNB
+                                {amt} ETH
                             </QuickBuyButton>
                         ))}
-                        <QuickBuyButton
-                            loading={quickBuyLoading === 'max' ? 1 : 0}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (ethBalance > 0.01) {
-                                    handleQuickBuy((ethBalance - 0.005).toFixed(6), 'max')
-                                } else {
-                                    toast.error('Insufficient balance')
-                                }
-                            }}
-                        >
-                            {quickBuyLoading === 'max' && <CircularProgress size={12} sx={{ color: '#e4ff66' }} />}
-                            MAX
-                        </QuickBuyButton>
                     </Box>
                 </Box>
             )}

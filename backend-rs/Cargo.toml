@@ -66,6 +66,9 @@ k256 = { version = "0.13.4", features = ["ecdsa"] }
 sha3 = "0.10.8"
 hex = "0.4.3"
 
+# JWT (LiveKit access-token minting, HS256)
+jsonwebtoken = "9"
+
 # S3 / MinIO
 aws-sdk-s3 = { version = "1", features = ["rt-tokio", "behavior-version-latest"] }
 aws-config = { version = "1", features = ["behavior-version-latest"] }

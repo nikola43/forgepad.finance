@@ -477,11 +477,13 @@ pub async fn get_token_details(
     let page_size = params.page_size.unwrap_or(30).clamp(1, 100);
     let offset = (page_number - 1) * page_size;
 
-    // Find token + creator
+    // Find token + creator. Addresses are stored lowercase, so normalize the
+    // path param — otherwise a checksummed address in the URL 404s a token that
+    // actually exists.
     let (token, creator): (Token, User) = tokens::table
         .inner_join(users::table.on(users::id.eq(tokens::creator_id)))
         .filter(tokens::network.eq(&network))
-        .filter(tokens::token_address.eq(&token_address))
+        .filter(tokens::token_address.eq(&token_address.to_lowercase()))
         .first(&mut conn)
         .await
         .optional()?
