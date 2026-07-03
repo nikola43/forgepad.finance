@@ -452,19 +452,27 @@ contract ArrowpadLiquidityManager is
             pairAddress = factory.createPair(token, weth);
         }
 
-        // Absorb any WETH donated to the deterministic pair address before this
-        // first-mint: reduce our own deposit by the donation so the pool's total
-        // WETH stays == ethAmountToLP and it still opens exactly at the target
-        // price (a donor can no longer skew the launch price — they just gift the
-        // ETH to the project/LP). If the donation already exceeds the target we
-        // deposit nothing; the griefer has simply overpaid into the burned LP.
-        uint256 donated = IERC20(weth).balanceOf(pairAddress);
-        uint256 wethToDeposit = ethAmountToLP > donated ? ethAmountToLP - donated : 0;
-        if (wethToDeposit > 0) {
-            IWETH(weth).deposit{value: wethToDeposit}();
-            IERC20(weth).safeTransfer(pairAddress, wethToDeposit);
-        }
-        IERC20(token).safeTransfer(pairAddress, tokenAmountToLP);
+        // Always wrap and deposit our FULL ethAmountToLP. UniswapV2 mint() credits
+        // the first-mint liquidity on the balance-minus-reserve DELTA, so depositing
+        // our full amount guarantees a strictly-positive WETH delta — the first mint
+        // can never underflow-revert, even if a griefer pre-donated WETH and called
+        // sync() to fold it into the pair's reserves (which balanceOf-only accounting
+        // cannot see, and which previously bricked graduation permanently).
+        IWETH(weth).deposit{value: ethAmountToLP}();
+        IERC20(weth).safeTransfer(pairAddress, ethAmountToLP);
+
+        // Size the token side to the pool's TOTAL WETH (our deposit + any donation)
+        // so it opens at the target market cap. A donation can only push the opening
+        // price ABOVE target (never below, which would bleed the burned LP to
+        // arbitrage); the griefer's WETH is locked into the burned LP. Cap at the
+        // tokens we actually hold.
+        uint256 poolWeth = IERC20(weth).balanceOf(pairAddress);
+        uint256 tokenForPool = (poolWeth * totalSupply) / 1e18;
+        tokenForPool = (tokenForPool * ethPriceUSD) / targetMarketCap;
+        if (tokenForPool > tokenAmount) tokenForPool = tokenAmount;
+        require(tokenForPool > 0, "Calculated token amount must be positive");
+
+        IERC20(token).safeTransfer(pairAddress, tokenForPool);
         IUniswapV2Pair(pairAddress).mint(recipient);
 
         // Transfer any remaining tokens to dead address
@@ -904,15 +912,21 @@ contract ArrowpadLiquidityManager is
         }
     }
 
-    /// @dev True if `actual` is within PRICE_TOLERANCE_BPS of `target` sqrtPrice.
+    /// @dev True if the pool PRICE implied by `actual` sqrtPrice is within
+    ///      PRICE_TOLERANCE_BPS of the `target` price. Price ∝ sqrtPrice², so a
+    ///      naive band on the sqrtPrice would be ~2x looser than the constant
+    ///      claims (5% on sqrt ≈ 10% on price). We compare in price space: the
+    ///      normalized ratio (actual/target) is ~1e4 when equal, squared back to
+    ///      price units, then bounded — overflow-safe (ratio ≈ 1e4, ratio² ≈ 1e8).
     function _withinTolerance(
         uint160 actual,
         uint160 target
     ) internal pure returns (bool) {
-        uint256 diff = actual > target
-            ? uint256(actual) - target
-            : uint256(target) - actual;
-        return diff * 10_000 <= uint256(target) * PRICE_TOLERANCE_BPS;
+        if (target == 0) return false;
+        uint256 ratio = (uint256(actual) * 1e4) / uint256(target); // ~1e4 at parity
+        uint256 priceRatio = (ratio * ratio) / 1e4; // (actual/target)^2, ~1e4 at parity
+        uint256 diff = priceRatio > 1e4 ? priceRatio - 1e4 : 1e4 - priceRatio;
+        return diff <= PRICE_TOLERANCE_BPS;
     }
 
     /**

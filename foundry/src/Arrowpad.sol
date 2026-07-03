@@ -94,6 +94,11 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
     uint256 public tokenCount;
 
+    // Sum of ethReserve across all un-graduated pools. Mirrors every pool.ethReserve
+    // change so emergency withdrawal can be capped to only stray/donated ETH and can
+    // never touch the ETH backing active bonding curves (anti soft-rug).
+    uint256 public totalCurveEthReserve;
+
     // Timelock for emergency withdrawals
     uint256 public constant EMERGENCY_TIMELOCK = 24 hours;
     uint256 public emergencyWithdrawRequestTime;
@@ -290,11 +295,15 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ==================== FIXED SWAP FUNCTIONS (exact Pump.fun constant-product) ====================
+    /// @return usedBuyAmount The ETH actually consumed by the swap (may be less
+    ///         than the requested buyAmount when the reserve cap bites near
+    ///         graduation). Callers MUST refund `msg.value - usedBuyAmount`
+    ///         (net of fees) or the capped-away ETH is stranded in the contract.
     function _swapExactETHForTokens(
         address token,
         uint256 buyAmount,
         uint256 minAmountOut
-    ) internal {
+    ) internal returns (uint256 usedBuyAmount) {
         require(!tokenPools[token].launched, "Pool has been already launched");
         PoolInfo storage pool = tokenPools[token];
 
@@ -333,6 +342,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         pool.tokenReserve -= amountOut;
         pool.virtualEthReserve += netAmountIn;
         pool.virtualTokenReserve -= amountOut;
+        totalCurveEthReserve += netAmountIn;
 
         IERC20(token).safeTransfer(msg.sender, amountOut);
 
@@ -341,6 +351,8 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         _emitBuy(token, netAmountIn, amountOut);
         _checkAndAddLiquidity(token);
+
+        return buyAmount;
     }
 
     /// @dev Largest buyAmount (in ETH, before fees) that still produces an
@@ -401,6 +413,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         pool.tokenReserve -= buyAmount;
         pool.virtualEthReserve += netAmountIn;
         pool.virtualTokenReserve -= buyAmount;
+        totalCurveEthReserve += netAmountIn;
 
         IERC20(token).safeTransfer(msg.sender, buyAmount);
 
@@ -444,6 +457,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         pool.tokenReserve += sellAmount;
         pool.virtualEthReserve -= grossOut;
         pool.virtualTokenReserve += sellAmount;
+        totalCurveEthReserve -= grossOut;
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), sellAmount);
         _transferETH(msg.sender, netAmountOut);
@@ -503,10 +517,13 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         uint256 firstBuyFee = getFirstBuyFee(token);
         require(msg.value >= buyAmount + firstBuyFee, "Insufficient ETH value");
 
-        _swapExactETHForTokens(token, buyAmount, minAmountOut);
+        // Refund against the ACTUAL ETH consumed, not the requested buyAmount:
+        // the reserve cap may shrink the effective buy near graduation, and the
+        // capped-away ETH must be returned or it is stranded in the contract.
+        uint256 usedBuy = _swapExactETHForTokens(token, buyAmount, minAmountOut);
 
-        if (msg.value > buyAmount + firstBuyFee) {
-            _transferETH(msg.sender, msg.value - buyAmount - firstBuyFee);
+        if (msg.value > usedBuy + firstBuyFee) {
+            _transferETH(msg.sender, msg.value - usedBuy - firstBuyFee);
         }
         if (firstBuyFee > 0) {
             _transferETHTolerant(feeAddress, firstBuyFee);
@@ -633,11 +650,17 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         PoolInfo storage pool = tokenPools[token];
         if (pool.virtualTokenReserve == 0) return 10000; // 100%
 
+        // tokensSold here equals REAL tokens sold from the curve, because
+        // virtualTokenReserve == tokenReserve + (VIRTUAL_TOKEN_INITIAL -
+        // REAL_TOKEN_INITIAL). So the correct denominator is REAL_TOKEN_INITIAL;
+        // the old (VIRTUAL_TOKEN_INITIAL - REAL_TOKEN_INITIAL) under-counted and
+        // let this report >100%.
         uint256 tokensSold = VIRTUAL_TOKEN_INITIAL - pool.virtualTokenReserve;
-        uint256 maxSellable = VIRTUAL_TOKEN_INITIAL - REAL_TOKEN_INITIAL;
+        uint256 maxSellable = REAL_TOKEN_INITIAL;
 
         if (maxSellable == 0) return 0;
         progressPercent = _mul(tokensSold, DIVISOR) / maxSellable;
+        if (progressPercent > DIVISOR) progressPercent = DIVISOR;
     }
 
     function _checkAndAddLiquidity(address token) internal {
@@ -662,6 +685,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         // Effects before interactions: clear reserves up front. poolType/owner
         // stay intact for _addLiquidity, which reads token balance, not reserves.
+        totalCurveEthReserve -= pool.ethReserve;
         pool.ethReserve = 0;
         pool.tokenReserve = 0;
         pool.virtualEthReserve = 0;
@@ -938,10 +962,18 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         tokenPools[token].poolType = newPoolType;
     }
 
+    /// @notice ETH the owner may emergency-withdraw: contract balance minus the
+    ///         ETH backing active bonding curves. Ensures emergency recovery can
+    ///         only ever touch stray/donated ETH, never users' curve funds.
+    function withdrawableEth() public view returns (uint256) {
+        uint256 bal = address(this).balance;
+        return bal > totalCurveEthReserve ? bal - totalCurveEthReserve : 0;
+    }
+
     function requestEmergencyWithdrawETH(uint256 amount) external onlyOwner {
         require(
-            amount <= address(this).balance,
-            "Insufficient contract balance"
+            amount <= withdrawableEth(),
+            "Exceeds withdrawable (curve-backed ETH protected)"
         );
         emergencyWithdrawRequestTime = block.timestamp;
         emergencyWithdrawAmount = amount;
@@ -960,8 +992,8 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         );
         uint256 amount = emergencyWithdrawAmount;
         require(
-            amount <= address(this).balance,
-            "Insufficient contract balance"
+            amount <= withdrawableEth(),
+            "Exceeds withdrawable (curve-backed ETH protected)"
         );
 
         emergencyWithdrawRequestTime = 0;

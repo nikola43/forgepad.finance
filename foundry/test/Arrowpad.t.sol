@@ -1433,10 +1433,10 @@ contract ArrowpadTest is Test {
     }
 
     function test_11f_EmergencyWithdraw() public {
-        console.log("=== TEST 11f: Emergency withdraw with timelock ===");
+        console.log("=== TEST 11f: Emergency withdraw (curve-backed ETH protected) ===");
         address t = _create("EmergToken", "EMRG", 1);
 
-        // Buy to put ETH in contract
+        // Buy to put ETH into an ACTIVE bonding curve.
         uint256 fee = arrowpad.getFirstBuyFee(t);
         vm.prank(addr1);
         arrowpad.swapExactETHForTokens{value: 1 ether + fee}(
@@ -1446,27 +1446,38 @@ contract ArrowpadTest is Test {
             block.timestamp
         );
 
-        uint256 contractBal = address(arrowpad).balance;
-        assertTrue(contractBal > 0, "contract has ETH");
+        uint256 curveEth = arrowpad.totalCurveEthReserve();
+        assertGt(curveEth, 0, "curve holds ETH");
+        // Curve-backed ETH is NOT withdrawable (anti soft-rug). Only rounding dust
+        // (<< curve ETH) may be withdrawable before any stray ETH is donated.
+        uint256 dust = arrowpad.withdrawableEth();
+        assertLt(dust, 1e12, "curve ETH is protected (only dust withdrawable)");
+        vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
+        arrowpad.requestEmergencyWithdrawETH(curveEth);
 
-        uint256 withdrawAmt = contractBal / 2;
+        // Now STRAY ETH lands in the contract (donation / leftover). Only that
+        // (plus pre-existing dust) becomes withdrawable — curve ETH stays protected.
+        uint256 stray = 0.5 ether;
+        (bool ok, ) = address(arrowpad).call{value: stray}("");
+        require(ok, "stray send failed");
+        uint256 withdrawable = arrowpad.withdrawableEth();
+        assertEq(withdrawable, dust + stray, "stray added to withdrawable");
 
-        // Request
-        arrowpad.requestEmergencyWithdrawETH(withdrawAmt);
+        // Cannot take more than the withdrawable amount (curve ETH stays protected).
+        vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
+        arrowpad.requestEmergencyWithdrawETH(withdrawable + 1);
 
-        // Execute too early
+        arrowpad.requestEmergencyWithdrawETH(withdrawable);
         vm.expectRevert("Timelock not expired");
         arrowpad.executeEmergencyWithdrawETH();
 
-        // Warp past timelock (24h)
         vm.warp(block.timestamp + 24 hours + 1);
-
         uint256 ownerBefore = address(this).balance;
         arrowpad.executeEmergencyWithdrawETH();
-        uint256 ownerAfter = address(this).balance;
-
-        assertEq(ownerAfter - ownerBefore, withdrawAmt, "withdrew correct amount");
-        console.log("Emergency withdraw with timelock works");
+        assertEq(address(this).balance - ownerBefore, withdrawable, "withdrew only stray+dust");
+        // Curve ETH is still fully backed.
+        assertGe(address(arrowpad).balance, arrowpad.totalCurveEthReserve(), "curve still backed");
+        console.log("Emergency withdraw protects curve-backed ETH");
     }
 
     function test_11g_CancelEmergencyWithdraw() public {
@@ -1482,6 +1493,9 @@ contract ArrowpadTest is Test {
             block.timestamp
         );
 
+        // Donate stray ETH so there is a withdrawable (non-curve) balance to request.
+        (bool ok, ) = address(arrowpad).call{value: 0.2 ether}("");
+        require(ok, "stray send failed");
         arrowpad.requestEmergencyWithdrawETH(0.1 ether);
         arrowpad.cancelEmergencyWithdraw();
 
