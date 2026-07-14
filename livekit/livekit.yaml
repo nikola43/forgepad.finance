@@ -11,7 +11,9 @@ rtc:
   port_range_start: 50000
   port_range_end: 50100
   use_external_ip: true
-# Embedded TURN for NAT traversal. Enable + set a domain/TLS when running behind
-# the cloudflared tunnel (e.g. livekit.arrowpad.io).
+# Embedded TURN for NAT traversal. Uses a dedicated UDP port outside the RTC
+# range so clients behind symmetric NAT/firewalls can relay media.
 turn:
-  enabled: false
+  enabled: true
+  domain: livekit.arrowpad.io
+  udp_port: 3478

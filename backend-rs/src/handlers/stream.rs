@@ -64,6 +64,8 @@ struct Claims {
     name: String,
     nbf: i64,
     exp: i64,
+    #[serde(rename = "kind")]
+    kind: String,
     video: VideoGrant,
 }
 
@@ -77,6 +79,7 @@ fn mint_token(cfg: &LiveKitConfig, identity: &str, room: &str, can_publish: bool
         name: identity.to_string(),
         nbf: now - 10,
         exp: now + TOKEN_TTL_SECS,
+        kind: "standard".to_string(),
         video: VideoGrant {
             room: room.to_string(),
             room_join: true,
