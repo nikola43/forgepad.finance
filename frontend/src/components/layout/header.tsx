@@ -463,7 +463,7 @@ export default function Header() {
                 <Link href="/">
                     <img src="/images/logo.png" width={54} height={54} style={{ border: "1px solid #D3FF24", borderRadius: "4px" }} alt="" />
                 </Link>
-                <Link href="/forge" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
+                <Link href="/create" style={{ textDecoration: "none", marginLeft: "auto", marginRight: "60px" }}>
                     <StyledButton className="effect-button" onClick={() => setModal('how')} style={{ height: "40px" }}>
                         <TokenIcon />
                         Create Token
@@ -630,7 +630,7 @@ export default function Header() {
                 <SocialLinks>
                     <Link href={FORGE_TWITTER_URL} target="_blank"><Image src={TwitterIcon} width={50} height={35} alt="twitter" /></Link>
                 </SocialLinks>
-                <Link href="/forge" style={{ textDecoration: "none" }}>
+                <Link href="/create" style={{ textDecoration: "none" }}>
                     <StyledButton className="effect-button">
                         <TokenIcon />
                         Create Token

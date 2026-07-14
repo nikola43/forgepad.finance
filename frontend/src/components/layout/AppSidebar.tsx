@@ -87,7 +87,7 @@ const items: NavItem[] = [
     { label: 'Watchlist', href: '/watchlist', icon: <StarBorderIcon /> },
     { label: 'Hall of Kings', href: '/kings', icon: <MilitaryTechOutlinedIcon /> },
     { label: 'Tier', href: '/tier', icon: <WorkspacePremiumOutlinedIcon /> },
-    { label: 'Create Token', href: '/forge', icon: <AddCircleOutlineIcon /> },
+    { label: 'Create Token', href: '/create', icon: <AddCircleOutlineIcon /> },
     { label: 'Creator', href: '/creator', icon: <InsightsOutlinedIcon /> },
     { label: 'Profile', href: '/profile', target: '/profile?address=me', icon: <PersonOutlineIcon /> },
 ]

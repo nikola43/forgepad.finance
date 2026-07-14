@@ -182,7 +182,7 @@ export default function Footer() {
                     <LinkGroup>
                         <span className="group-title">Platform</span>
                         <Link href="/">Explore Tokens</Link>
-                        <Link href="/forge">Create Token</Link>
+                        <Link href="/create">Create Token</Link>
                         <Link href="/profile">My Profile</Link>
                     </LinkGroup>
                     <LinkGroup>

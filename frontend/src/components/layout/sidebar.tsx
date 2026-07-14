@@ -291,7 +291,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
           <CubeIcon />
         </Button>
 
-        <Link href="/forge" style={{ textDecoration: 'none' }} title="Create Token" >
+        <Link href="/create" style={{ textDecoration: 'none' }} title="Create Token" >
           <Button className="effect-button">
             <TokenIcon />
           </Button>
@@ -351,7 +351,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
           How it works
         </Button>
 
-        <Link href="/forge" style={{ textDecoration: 'none' }} >
+        <Link href="/create" style={{ textDecoration: 'none' }} >
           <Button className="effect-button">
             <TokenIcon />
             Create Token

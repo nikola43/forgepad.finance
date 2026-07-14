@@ -233,7 +233,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
                 How it works
             </Button>
 
-            <Link href="/forge" style={{ textDecoration: 'none' }} >
+            <Link href="/create" style={{ textDecoration: 'none' }} >
                 <Button className="effect-button">
                     <TokenIcon />
                     Create Token
