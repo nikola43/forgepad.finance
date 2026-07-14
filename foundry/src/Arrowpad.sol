@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+// OZ >=5.5 ReentrancyGuard is already proxy-safe: ERC-7201 fixed slot, and the
+// guard only trips on `== ENTERED`, so a fresh proxy's zero slot reads as
+// not-entered. That is why OZ dropped ReentrancyGuardUpgradeable in v5.
 import {
     ReentrancyGuard
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {
     SafeERC20,
     IERC20
@@ -14,6 +24,18 @@ import {IArrowpadLiquidityManager} from "./IArrowpadLiquidityManager.sol";
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {
+    IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
+    IUniswapV2Router02
+} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {
+    IUniswapV2Factory
+} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {
+    IUniswapV2Pair
+} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {Token} from "./Token.sol";
 
 interface ILaunchable {
@@ -35,13 +57,20 @@ interface IArrowpad {
     function tokenPools(address) external view returns (PoolInfo memory);
 }
 
-contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
+contract Arrowpad is
+    Initializable,
+    ReentrancyGuard,
+    OwnableUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
     uint256 public constant TARGET_MARKET_CAP_USD = 20_000 * 1e18; // Graduation at ~$20K virtual MCAP
-    uint256 public constant VIRTUAL_ETH_INITIAL = 2.5 ether; // ~$4.8K initial mcap, graduates at ~$70K
+    // Opening mcap is ETH-price dependent: ~$4.5K at ETH $1.9K. Graduation is fixed in
+    // USD by TARGET_MARKET_CAP_USD above ($20K) — not the ~$70K an older comment claimed.revi
+    uint256 public constant VIRTUAL_ETH_INITIAL = 2.5 ether;
     uint256 public constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18; // Virtual tokens for pricing curve
     uint256 public constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
 
@@ -58,39 +87,65 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
     // ==================== STATE VARIABLES ====================
     IArrowpadLiquidityManager public liquidityManager;
-    // Immutable Chainlink ETH/USD feed — read automatically (view call) on every
-    // trade/mcap query. No owner, backend, or transaction is ever needed to read it,
-    // and it cannot be changed after deployment (fully trustless).
-    AggregatorV3Interface internal immutable priceFeed;
-    uint8 private immutable priceFeedDecimals;
+    // Chainlink ETH/USD feed — read automatically (view call) on every trade/mcap
+    // query. No owner, backend, or transaction is ever needed to read it.
+    // Set once in initialize() and never written again: no setter exists, so it is
+    // only changeable via a proxy upgrade (was `immutable` pre-proxy).
+    AggregatorV3Interface internal priceFeed;
+    uint8 private priceFeedDecimals;
+
+    // ---- Uniswap V2 ETH/stable price fallback (opt-in, off by default) ----
+    // Only consulted when the Chainlink feed is stale/down. Zero address = disabled,
+    // in which case _rawEthPrice() behaves exactly as it did before this existed.
+    //
+    // WARNING: this is a SPOT price, not a TWAP — it is manipulable inside a single
+    // transaction (flash loan skews the pair, price reverts on the next block). It is
+    // deliberately gated on Chainlink being down so the exposure window is limited to
+    // an outage, and on a liquidity floor so a shallow pair cannot set the price.
+    // Treat it as a liveness aid, not a trust-minimised oracle. See
+    // MIN_FALLBACK_WETH_LIQUIDITY.
+    IUniswapV2Router02 public fallbackRouterV2;
+    address public fallbackStable;
+    uint8 private fallbackStableDecimals;
 
     mapping(address => PoolInfo) public tokenPools;
     mapping(address => uint256) private tokenTrades;
 
-    address public burnAddress = 0x000000000000000000000000000000000000dEaD;
+    // NOTE: declaration-time values are NOT initializers — behind a proxy they would
+    // never run (they live in the implementation's constructor). Every default below
+    // is assigned in initialize() instead; the values here are documentation only.
+    address public burnAddress;
     address public feeAddress;
     address public distributorAddress;
 
-    uint256 public CREATE_TOKEN_FEE_AMOUNT = 0.001 ether; // ~Pump.fun creation fee equivalent
+    uint256 public CREATE_TOKEN_FEE_AMOUNT; // 0.001 ether, ~Pump.fun creation fee equivalent
     // Fees in basis points (1 bps = 0.01%), same DIVISOR basis as MAX_BUY/SELL_PERCENT
-    uint256 public TOKEN_OWNER_FEE_BPS = 0; // Optional (e.g. 30 = 0.3%)
+    // Optional creator fee (e.g. 30 = 0.3%). Held at 0 in production — the setter and
+    // the sell-side application (unlike Pump.fun, this also applies to sells) are kept
+    // deliberately, not dead code. Reviewers keep flagging the sell path: it is
+    // intentional and inert while this is 0.
+    uint256 public TOKEN_OWNER_FEE_BPS;
     // Chainlink staleness threshold. Default 3600s (1h) for Ethereum mainnet. On L2
     // chains (Arbitrum, Robinhood Chain) the feed's updatedAt is the L1 timestamp
     // and can lag hours behind the L2 block time — set this to 86400 (24h) or more.
-    uint256 public priceStalenessThreshold = 3600;
-    uint256 public PLATFORM_BUY_FEE_BPS = 100; // 1%
-    uint256 public PLATFORM_SELL_FEE_BPS = 100; // 1%
-    uint256 public platformLPFee = 0.1 ether;
-    uint256 public tokenOwnerLPFee = 0 ether;
-    uint256 public firstBuyFeeUSD = 0;
+    uint256 public priceStalenessThreshold;
+    uint256 public PLATFORM_BUY_FEE_BPS; // 100 = 1%
+    uint256 public PLATFORM_SELL_FEE_BPS; // 100 = 1%
+    uint256 public platformLPFee; // 0.1 ether
+    uint256 public tokenOwnerLPFee; // 0
+    uint256 public firstBuyFeeUSD; // 0
 
     // Circuit breakers (same safety as Pump.fun)
-    uint256 public constant MAX_PRICE_IMPACT = 4_500; // 45% max impact
+    uint256 public constant MAX_PRICE_IMPACT = 9_999; // 99.99% max impact
     uint256 public constant MIN_LIQUIDITY = 1e15;
+    /// @dev A V2 spot price is only as trustworthy as the pair is deep. Below this
+    ///      much WETH the fallback pair is ignored (price reads 0) rather than
+    ///      trusted: skewing a shallow pair is cheap.
+    uint256 public constant MIN_FALLBACK_WETH_LIQUIDITY = 50 ether;
     uint256 private constant DIVISOR = 10_000;
 
-    uint256 public MAX_BUY_PERCENT = DIVISOR; // 100%
-    uint256 public MAX_SELL_PERCENT = DIVISOR; // 100%
+    uint256 public MAX_BUY_PERCENT; // DIVISOR = 100%
+    uint256 public MAX_SELL_PERCENT; // DIVISOR = 100%
 
     uint256 public tokenCount;
 
@@ -144,22 +199,49 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         uint256 date
     );
     event TokenLaunched(address token, uint256 date);
+    event FeesClaimed(
+        address token,
+        address creator,
+        uint256 ethFees,
+        uint256 tokenFees,
+        uint256 date
+    );
     event EmergencyWithdrawRequested(uint256 amount, uint256 executeAfter);
     event EmergencyWithdrawExecuted(uint256 amount);
+    event EmergencyWithdrawCancelled();
+    event EthUsdFallbackUpdated(address router, address stable);
     event LiquidityManagerChangeRequested(
         address newManager,
         uint256 executeAfter
     );
     event LiquidityManagerChanged(address newManager);
+    event LiquidityManagerChangeCancelled();
+
+    // ==================== UPGRADE GAP ====================
+    /// @dev Reserved storage so future upgrades can append state without colliding
+    ///      with any child contract's slots. Decrement this when adding a variable.
+    ///      The OZ *Upgradeable bases use ERC-7201 namespaced storage and need no gap
+    ///      of their own.
+    // 50 -> 48: fallbackRouterV2 takes one slot, fallbackStable + fallbackStableDecimals
+    // pack into a second.
+    uint256[48] private __gap;
 
     receive() external payable {}
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _dataFeedAddress,
         address _liquidityManagerAddress,
         address _feeAddress,
         address _distributorAddress
-    ) Ownable(msg.sender) {
+    ) external initializer {
+        __Ownable_init(msg.sender);
+        __Pausable_init();
+
         require(_dataFeedAddress != address(0), "Data feed cannot be zero");
         require(
             _liquidityManagerAddress != address(0),
@@ -176,6 +258,17 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         liquidityManager = IArrowpadLiquidityManager(_liquidityManagerAddress);
         feeAddress = _feeAddress;
         distributorAddress = _distributorAddress;
+
+        // Defaults that used to live on the declarations (constructor-only, so a
+        // proxy would leave them all zero).
+        burnAddress = 0x000000000000000000000000000000000000dEaD;
+        CREATE_TOKEN_FEE_AMOUNT = 0.001 ether;
+        priceStalenessThreshold = 3600;
+        PLATFORM_BUY_FEE_BPS = 100;
+        PLATFORM_SELL_FEE_BPS = 100;
+        platformLPFee = 0.1 ether;
+        MAX_BUY_PERCENT = DIVISOR;
+        MAX_SELL_PERCENT = DIVISOR;
     }
 
     // ==================== MATH HELPERS (native ^0.8.26) ====================
@@ -268,16 +361,23 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         tokenCount++;
 
+        // _rawEthPrice(), not getETHPriceByUSD(): the latter reverts on a stale feed,
+        // which would brick token creation over a reporting-only field. Nothing else
+        // here needs the oracle (getFirstBuyFee already skips itself when it is down),
+        // so report 0 and let creation through — same as createTokenDirect.
         emit TokenCreated(
             newToken,
             getVirtualPrice(newToken),
-            getETHPriceByUSD(),
+            _rawEthPrice(),
             sig,
             block.timestamp
         );
 
+        // Refund against the ACTUAL ETH consumed, not the requested buyAmount:
+        // the reserve cap may shrink the effective buy near graduation, and the
+        // capped-away ETH must be returned or it is stranded in the contract.
         if (buyAmount > 0) {
-            _swapExactETHForTokens(newToken, buyAmount, minAmountOut);
+            buyAmount = _swapExactETHForTokens(newToken, buyAmount, minAmountOut);
         }
 
         if (CREATE_TOKEN_FEE_AMOUNT + firstBuyFee > 0) {
@@ -293,6 +393,121 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
 
         return newToken;
     }
+
+    // ==================== DIRECT LAUNCH (Klik-style, no bonding curve) ====================
+    /// @notice Create a token and list directly on V4 with LP — no bonding curve.
+    ///         Total supply is fixed at 1B. msg.value = fee + LP ETH.
+    ///         The ENTIRE supply is seeded as single-sided liquidity with NO ETH:
+    ///         the position sits above the opening price, so buyers walk the price up
+    ///         through the supply and pay ETH into the pool as they go. The creator
+    ///         keeps no allocation, so there is nothing for them to dump.
+    ///         msg.value covers the creation fee only. Opening price is set so the
+    ///         whole supply is worth TARGET_MARKET_CAP_USD at the current ETH price.
+    function createTokenDirect(
+        string memory name,
+        string memory symbol,
+        uint32 sig,
+        uint256 deadline
+    ) external payable whenNotPaused nonReentrant returns (address) {
+        require(deadline >= block.timestamp, "Swap expired");
+        // Fee only — a direct launch needs no LP ETH at all.
+        require(msg.value >= CREATE_TOKEN_FEE_AMOUNT, "Insufficient fee");
+
+        address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
+
+        // Launch the token immediately — enables free transfers, renounces ownership
+        ILaunchable(newToken).launch();
+
+        // Mark as launched in pool — no bonding curve, no graduation
+        tokenPools[newToken] = PoolInfo({
+            ethReserve: 0,
+            tokenReserve: 0,
+            virtualEthReserve: 0,
+            virtualTokenReserve: 0,
+            token: newToken,
+            owner: msg.sender,
+            poolType: 3, // V4 (klik-style)
+            launched: true
+        });
+
+        tokenCount++;
+
+        emit TokenCreated(newToken, 0, _rawEthPrice(), sig, block.timestamp);
+        emit TokenLaunched(newToken, block.timestamp);
+
+        // Pay fee
+        if (CREATE_TOKEN_FEE_AMOUNT > 0) {
+            _transferETH(feeAddress, CREATE_TOKEN_FEE_AMOUNT);
+        }
+
+        // Refund anything above the fee: there is no LP ETH to spend it on.
+        if (msg.value > CREATE_TOKEN_FEE_AMOUNT) {
+            _transferETH(msg.sender, msg.value - CREATE_TOKEN_FEE_AMOUNT);
+        }
+
+        // Notional value of the whole supply at launch. Never transferred — it only
+        // fixes the opening price, so the pool opens at TARGET_MARKET_CAP_USD.
+        // Unlike createToken this genuinely needs the oracle, so go through the
+        // checked getter: a stale feed must revert with a reason, not panic on a
+        // divide-by-zero.
+        uint256 launchEthValue = (TARGET_MARKET_CAP_USD * 1e18) /
+            getETHPriceByUSD();
+
+        IERC20(newToken).approve(address(liquidityManager), TOTAL_SUPPLY);
+        liquidityManager.addLiquidityV4SingleSided(
+            newToken,
+            TOTAL_SUPPLY,
+            launchEthValue,
+            burnAddress // dust only — the LP position is locked in the manager
+        );
+
+        emit LiquidityAdded(newToken, 0, TOTAL_SUPPLY, TOTAL_SUPPLY);
+
+        // Belt and braces: the whole balance went in as liquidity, so nothing should
+        // remain. Burn any rounding remainder rather than stranding or gifting it.
+        uint256 remainingTokens = IERC20(newToken).balanceOf(address(this));
+        if (remainingTokens > 0) {
+            IERC20(newToken).safeTransfer(burnAddress, remainingTokens);
+        }
+
+        return newToken;
+    }
+
+    // ==================== FEE CLAIMING ====================
+    /// @notice Claim the token's accrued V3/V4 trading fees: 50% to the token's
+    ///         creator, 50% to the platform. Callable by anyone — the payout targets
+    ///         are fixed by on-chain state, so there is nothing to gain by front-
+    ///         running it, and the UI can let a creator claim without gating.
+    /// @dev Deliberately NOT `whenNotPaused`: these are user funds already earned,
+    ///      and a pause should stop trading, not freeze someone's fees.
+    ///      V2 tokens have nothing to claim — their fees are only realisable by
+    ///      burning LP, which would withdraw principal — so this reverts for them.
+    function claimFees(
+        address token
+    ) external nonReentrant returns (uint256 ethFees, uint256 tokenFees) {
+        PoolInfo storage pool = tokenPools[token];
+        require(pool.token != address(0), "Unknown token");
+        require(pool.launched, "Not launched");
+
+        (ethFees, tokenFees) = liquidityManager.collectFees(
+            token,
+            pool.owner,
+            feeAddress
+        );
+
+        emit FeesClaimed(
+            token,
+            pool.owner,
+            ethFees,
+            tokenFees,
+            block.timestamp
+        );
+    }
+
+    // To show a claimable amount, the UI eth_call's claimFees() and reads the
+    // returned (ethFees, tokenFees) — a simulated call costs nothing and needs no
+    // on-chain view. A real `claimable` view would have to recompute Uniswap's
+    // feeGrowthInside math, since tokensOwed is only accurate after a poke.
 
     // ==================== FIXED SWAP FUNCTIONS (exact Pump.fun constant-product) ====================
     /// @return usedBuyAmount The ETH actually consumed by the swap (may be less
@@ -520,7 +735,11 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         // Refund against the ACTUAL ETH consumed, not the requested buyAmount:
         // the reserve cap may shrink the effective buy near graduation, and the
         // capped-away ETH must be returned or it is stranded in the contract.
-        uint256 usedBuy = _swapExactETHForTokens(token, buyAmount, minAmountOut);
+        uint256 usedBuy = _swapExactETHForTokens(
+            token,
+            buyAmount,
+            minAmountOut
+        );
 
         if (msg.value > usedBuy + firstBuyFee) {
             _transferETH(msg.sender, msg.value - usedBuy - firstBuyFee);
@@ -585,7 +804,46 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     /// @dev ETH/USD normalized to 18 decimals, or 0 if the feed is unavailable,
     ///      stale (>1h), non-positive, or from an incomplete round. NEVER reverts —
     ///      so trades (buy/sell events, mcap) can't be frozen by an oracle outage.
+    /// @notice ETH/USD, 18 decimals. Chainlink first; the V2 pair only if Chainlink
+    ///         is stale/down AND a fallback has been configured. 0 = no price.
     function _rawEthPrice() internal view returns (uint256) {
+        uint256 p = _rawEthPriceFromChainlink();
+        if (p != 0) return p;
+        return _rawEthPriceFromRouterV2();
+    }
+
+    /// @notice Spot ETH price from the configured Uniswap V2 ETH/stable pair.
+    /// @dev Returns 0 when unconfigured, when the pair is missing, or when the pair
+    ///      is too shallow to trust. Never reverts — a price source that can revert
+    ///      bricks every trading path that reads it.
+    function _rawEthPriceFromRouterV2() internal view returns (uint256) {
+        IUniswapV2Router02 router = fallbackRouterV2;
+        if (address(router) == address(0)) return 0;
+
+        address weth = router.WETH();
+        address pair = IUniswapV2Factory(router.factory()).getPair(
+            weth,
+            fallbackStable
+        );
+        if (pair == address(0)) return 0;
+
+        (uint112 r0, uint112 r1, ) = IUniswapV2Pair(pair).getReserves();
+        (uint256 wethReserve, uint256 stableReserve) = IUniswapV2Pair(pair)
+            .token0() == weth
+            ? (uint256(r0), uint256(r1))
+            : (uint256(r1), uint256(r0));
+
+        if (wethReserve < MIN_FALLBACK_WETH_LIQUIDITY) return 0;
+        if (stableReserve == 0) return 0;
+
+        // stable-per-WETH, normalised to 18 decimals.
+        return
+            (stableReserve *
+                (10 ** (18 - fallbackStableDecimals)) *
+                1e18) / wethReserve;
+    }
+
+    function _rawEthPriceFromChainlink() internal view returns (uint256) {
         try priceFeed.latestRoundData() returns (
             uint80 roundId,
             int256 price,
@@ -595,7 +853,10 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
         ) {
             if (price <= 0) return 0;
             if (answeredInRound < roundId) return 0; // incomplete round
-            if (updatedAt == 0 || block.timestamp - updatedAt > priceStalenessThreshold) return 0;
+            if (
+                updatedAt == 0 ||
+                block.timestamp - updatedAt > priceStalenessThreshold
+            ) return 0;
             uint8 dec = priceFeedDecimals;
             if (dec <= 18) return uint256(price) * (10 ** (18 - dec));
             return uint256(price) / (10 ** (dec - 18));
@@ -828,7 +1089,10 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     /// @dev Best-effort ETH send that NEVER reverts — used only for protocol/creator
     ///      FEES, so a hostile creator or misconfigured fee recipient can't brick
     ///      trading. User principal (sale proceeds, refunds) still uses _transferETH.
-    function _transferETHTolerant(address to, uint256 amount) internal returns (bool) {
+    function _transferETHTolerant(
+        address to,
+        uint256 amount
+    ) internal returns (bool) {
         if (to == address(0) || amount == 0) return false;
         (bool ok, ) = payable(to).call{value: amount}("");
         return ok;
@@ -871,6 +1135,38 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     function setPriceStalenessThreshold(uint256 threshold) external onlyOwner {
         require(threshold > 0, "Threshold must be > 0");
         priceStalenessThreshold = threshold;
+    }
+
+    /// @notice Configure (or clear) the Uniswap V2 ETH/stable price fallback used
+    ///         only while the Chainlink feed is stale or down.
+    /// @dev Pass address(0) for either argument to disable the fallback entirely,
+    ///      which restores pre-fallback behaviour (no price = no graduation).
+    ///      Read the WARNING on fallbackRouterV2 before enabling: this is a spot
+    ///      price and is manipulable within a transaction.
+    /// @param router Uniswap V2 router (used for its factory + WETH).
+    /// @param stable A USD stablecoin paired with WETH on that factory (USDC/USDT).
+    function setEthUsdFallback(address router, address stable) external onlyOwner {
+        if (router == address(0) || stable == address(0)) {
+            fallbackRouterV2 = IUniswapV2Router02(address(0));
+            fallbackStable = address(0);
+            fallbackStableDecimals = 0;
+            emit EthUsdFallbackUpdated(address(0), address(0));
+            return;
+        }
+
+        uint8 dec = IERC20Metadata(stable).decimals();
+        require(dec <= 18, "Unsupported stable decimals");
+
+        // Resolve the pair now so a typo fails here, loudly, instead of silently
+        // reading 0 forever during the outage the fallback exists to cover.
+        address pair = IUniswapV2Factory(IUniswapV2Router02(router).factory())
+            .getPair(IUniswapV2Router02(router).WETH(), stable);
+        require(pair != address(0), "No V2 pair for stable");
+
+        fallbackRouterV2 = IUniswapV2Router02(router);
+        fallbackStable = stable;
+        fallbackStableDecimals = dec;
+        emit EthUsdFallbackUpdated(router, stable);
     }
 
     function setTokenOwnerLPFee(uint256 fee) external onlyOwner {
@@ -946,6 +1242,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     function cancelLiquidityManagerChange() external onlyOwner {
         pendingLiquidityManager = address(0);
         liquidityManagerChangeTime = 0;
+        emit LiquidityManagerChangeCancelled();
     }
 
     /// @notice Recovery: reroute a not-yet-launched token to another DEX version.
@@ -1006,6 +1303,7 @@ contract Arrowpad is ReentrancyGuard, Ownable, Pausable {
     function cancelEmergencyWithdraw() external onlyOwner {
         emergencyWithdrawRequestTime = 0;
         emergencyWithdrawAmount = 0;
+        emit EmergencyWithdrawCancelled();
     }
 
     function emergencyWithdrawTokens(

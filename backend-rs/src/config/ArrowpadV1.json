@@ -1,28 +1,7 @@
 [
   {
     "type": "constructor",
-    "inputs": [
-      {
-        "name": "_dataFeedAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_liquidityManagerAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_feeAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_distributorAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "inputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -240,6 +219,30 @@
   },
   {
     "type": "function",
+    "name": "claimFees",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ethFees",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenFees",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "createToken",
     "inputs": [
       {
@@ -271,6 +274,40 @@
         "name": "poolType",
         "type": "uint8",
         "internalType": "uint8"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "createTokenDirect",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "sig",
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
         "name": "deadline",
@@ -627,6 +664,34 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [
+      {
+        "name": "_dataFeedAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_liquidityManagerAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_feeAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_distributorAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1099,6 +1164,19 @@
   },
   {
     "type": "function",
+    "name": "totalCurveEthReserve",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -1116,6 +1194,19 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawableEth",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",
@@ -1200,6 +1291,56 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeesClaimed",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "ethFees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenFees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "date",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Initialized",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -1431,6 +1572,16 @@
   {
     "type": "error",
     "name": "ExpectedPause",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitializing",
     "inputs": []
   },
   {

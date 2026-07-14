@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
@@ -74,7 +75,7 @@ contract ArrowpadAdvancedTest is Test {
         vm.deal(addr2, 100000 ether);
         vm.deal(addr3, 100000 ether);
 
-        liquidityManager = new ArrowpadLiquidityManager(
+        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -85,14 +86,16 @@ contract ArrowpadAdvancedTest is Test {
             address(this),
             address(this),
             10000,
-            10000
+            10000,
+            address(this)
         );
 
-        arrowpad = new Arrowpad(
+        arrowpad = ArrowpadDeploy.deployArrowpad(
             DATA_FEED,
             address(liquidityManager),
             FEE_WALLET,
-            DIST_ADDR
+            DIST_ADDR,
+            address(this)
         );
         iArrowpad = IArrowpad(address(arrowpad));
 

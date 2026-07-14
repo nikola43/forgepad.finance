@@ -1,15 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
 import "../src/Arrowpad.sol";
 import "../src/ArrowpadLiquidityManager.sol";
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 
 /// @notice Deploys Arrowpad + ArrowpadLiquidityManager to Sepolia with V2, V3 and
 ///         V4 all enabled. The DEX version is chosen per token via createToken's
 ///         `poolType` argument: 1 = Uniswap V2, 2 = Uniswap V3, 3 = Uniswap V4.
 contract DeployArrowpadSepolia is Script {
+
+    /// @dev The proxies each deploy their own ProxyAdmin and record it in the
+    ///      ERC-1967 admin slot. Log it: it is the only key that can upgrade, and
+    ///      recovering it later means digging through deployment logs.
+    function _proxyAdmin(address proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(proxy, ERC1967Utils.ADMIN_SLOT))));
+    }
     // ---- Uniswap V2 (Sepolia) ----
     address constant V2_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
 
@@ -42,7 +51,7 @@ contract DeployArrowpadSepolia is Script {
         vm.startBroadcast(pk);
 
         // All V2/V3/V4 addresses wired so every poolType is usable.
-        ArrowpadLiquidityManager lm = new ArrowpadLiquidityManager(
+        ArrowpadLiquidityManager lm = ArrowpadDeploy.deployLiquidityManager(
             V2_ROUTER,
             V3_FACTORY,
             V3_POSITION_MANAGER,
@@ -53,15 +62,17 @@ contract DeployArrowpadSepolia is Script {
             deployer, // _marginRecipient (leftover ETH at graduation)
             deployer, // _owner
             10000, // 100% ETH to LP
-            10000 // 100% tokens to LP
+            10000, // 100% tokens to LP
+            deployer
         );
         console.log("ArrowpadLiquidityManager:", address(lm));
 
-        Arrowpad arrowpad = new Arrowpad(
+        Arrowpad arrowpad = ArrowpadDeploy.deployArrowpad(
             DATA_FEED,
             address(lm),
             deployer, // _feeAddress
-            deployer // _distributorAddress
+            deployer, // _distributorAddress
+            deployer
         );
         console.log("Arrowpad:", address(arrowpad));
 
@@ -81,7 +92,9 @@ contract DeployArrowpadSepolia is Script {
         console.log("SEPOLIA DEPLOYMENT COMPLETE (V2 + V3 + V4 enabled)");
         console.log("=================================================");
         console.log("Arrowpad:         ", address(arrowpad));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(arrowpad)));
         console.log("LiquidityManager: ", address(lm));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(lm)));
         console.log("Target MCAP (USD):", arrowpad.TARGET_MARKET_CAP_USD() / 1e18);
         console.log("poolType 1=V2  2=V3  3=V4 (choose in createToken)");
         console.log("=================================================");

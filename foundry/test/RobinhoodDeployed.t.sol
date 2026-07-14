@@ -61,11 +61,15 @@ contract RobinhoodDeployedTest is Test {
         if (block.chainid != ROBINHOOD_CHAIN_ID) return; // not Robinhood -> skip all
         active = true;
 
+        // The CURRENT live pair, matching backend-rs/src/config/chains.rs (the app's
+        // single source of truth). The earlier 0x871a70 / 0x992C539D deployment was
+        // abandoned after the 2026-07-03 security redeploy and has no withdrawableEth()
+        // — pointing these tests at it validated a contract nobody uses.
         arrowpad = Arrowpad(
-            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x871a70037398310427EAFbeb0368D8c42c806CC9))
+            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x5d2391CF88cd48BB6B9Ec12b38BC8119562F9012))
         );
         lm = ArrowpadLiquidityManager(
-            payable(vm.envOr("DEPLOYED_LM", 0x992C539D7c4377eD3A297550c12f1F1e0BD675f9))
+            payable(vm.envOr("DEPLOYED_LM", 0x08Dd64DF51945A84124c1228453b43c896cEfAdE))
         );
         router = IUniswapV2Router02(
             vm.envOr("V2_ROUTER", 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba)

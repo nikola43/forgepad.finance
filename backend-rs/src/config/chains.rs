@@ -60,6 +60,7 @@ pub fn default_chains() -> Vec<ChainConfig> {
                 "uniswap:v2".to_string(),
                 "uniswap:v3".to_string(),
                 "uniswap:v4".to_string(),
+                "direct:v4".to_string(),
             ],
         },
     ]

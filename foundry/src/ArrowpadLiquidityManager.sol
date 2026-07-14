@@ -1,19 +1,44 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
-import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
-import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ReentrancyGuard
+} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    IUniswapV2Router02
+} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {
+    IUniswapV2Factory
+} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {
+    IUniswapV2Pair
+} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {
+    INonfungiblePositionManager
+} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {
+    IUniswapV3Factory
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {
+    IUniswapV3Pool
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {
+    IERC721Receiver
+} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import "./v4-core/interfaces/IHooks.sol";
 import "./v4-core/types/Currency.sol";
@@ -34,9 +59,10 @@ import "./permit2/interfaces/IPermit2.sol";
  *      while maintaining security through reentrancy protection
  */
 contract ArrowpadLiquidityManager is
+    Initializable,
     ReentrancyGuard,
-    Ownable,
-    Pausable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
     IERC721Receiver
 {
     using CurrencyLibrary for Currency;
@@ -98,8 +124,25 @@ contract ArrowpadLiquidityManager is
 
     address public marginRecipient;
 
-    uint16 ethAmountPercentToLP = 10000; // 100%
-    uint16 tokenAmountPercentToLP = 10000; //100%
+    // Set in initialize() — declaration-time values never run behind a proxy.
+    uint16 ethAmountPercentToLP; // 10000 = 100%
+    uint16 tokenAmountPercentToLP; // 10000 = 100%
+
+    /// @notice V3 position NFT this contract holds for a launched token (0 = none).
+    /// @dev The position is retained here forever so its trading fees stay
+    ///      collectable. Burning it to 0xdEaD would strand them permanently — see
+    ///      collectFees(). There is deliberately no path that decreases liquidity or
+    ///      transfers this NFT out, so the LP itself can never be withdrawn.
+    mapping(address => uint256) public v3PositionOf;
+
+    /// @notice V4 position NFT this contract holds for a launched token (0 = none).
+    mapping(address => uint256) public v4PositionOf;
+
+    /// @notice PoolKey per launched token — required to address the V4 pool on collect.
+    mapping(address => PoolKey) public v4PoolKeyOf;
+
+    /// @dev Reserved storage for future upgrades. Decrement when appending state.
+    uint256[47] private __gap;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -151,6 +194,22 @@ contract ArrowpadLiquidityManager is
         address indexed pool
     );
 
+    /// @notice A position NFT is now held by this contract permanently. Emitted
+    ///         instead of a burn so indexers can prove the LP is locked, not rugged.
+    event PositionLocked(
+        address indexed token,
+        uint256 indexed tokenId,
+        uint8 version
+    );
+
+    event FeesCollected(
+        address indexed token,
+        address indexed creator,
+        address indexed platform,
+        uint256 ethFees,
+        uint256 tokenFees
+    );
+
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -189,7 +248,10 @@ contract ArrowpadLiquidityManager is
     }
 
     modifier onlyAuthorized() {
-        require(authorizedCallers[msg.sender] || msg.sender == owner(), "Unauthorized");
+        require(
+            authorizedCallers[msg.sender] || msg.sender == owner(),
+            "Unauthorized"
+        );
         _;
     }
 
@@ -211,7 +273,12 @@ contract ArrowpadLiquidityManager is
      * @param _ethAmountPercentToLP Percent of ETH to use for LP (in basis points)
      * @param _tokenAmountPercentToLP Percent of tokens to use for LP (in basis points)
      */
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _routerV2,
         address _factoryV3,
         address _v3PositionManager,
@@ -223,7 +290,10 @@ contract ArrowpadLiquidityManager is
         address _owner,
         uint16 _ethAmountPercentToLP,
         uint16 _tokenAmountPercentToLP
-    ) Ownable(_owner) {
+    ) external initializer {
+        __Ownable_init(_owner);
+        __Pausable_init();
+
         if (_routerV2 == address(0)) revert ZeroAddress();
         if (_factoryV3 == address(0)) revert ZeroAddress();
         if (_poolV4Manager == address(0)) revert ZeroAddress();
@@ -233,7 +303,9 @@ contract ArrowpadLiquidityManager is
 
         routerV2 = IUniswapV2Router02(_routerV2);
         factoryV3 = IUniswapV3Factory(_factoryV3);
-        nonfungiblePositionManager = INonfungiblePositionManager(_v3PositionManager);
+        nonfungiblePositionManager = INonfungiblePositionManager(
+            _v3PositionManager
+        );
         poolV4Manager = IPoolManager(_poolV4Manager);
         universalRouter = _universalRouter;
         positionManager = IPositionManager(_v4PositionManager);
@@ -421,7 +493,9 @@ contract ArrowpadLiquidityManager is
 
         // Try using all available ETH and calculate required tokens
         uint256 requiredTokensForAllEth = (ethAmount * totalSupply) / 1e18;
-        requiredTokensForAllEth = (requiredTokensForAllEth * ethPriceUSD) / targetMarketCap;
+        requiredTokensForAllEth =
+            (requiredTokensForAllEth * ethPriceUSD) /
+            targetMarketCap;
 
         if (requiredTokensForAllEth <= tokenAmount) {
             // We can use all ETH
@@ -435,7 +509,10 @@ contract ArrowpadLiquidityManager is
         }
 
         // Ensure we have the amounts
-        require(ethAmountToLP > 0 && tokenAmountToLP > 0, "Calculated amounts must be positive");
+        require(
+            ethAmountToLP > 0 && tokenAmountToLP > 0,
+            "Calculated amounts must be positive"
+        );
         require(ethAmountToLP <= ethAmount, "Not enough ETH");
         require(tokenAmountToLP <= tokenAmount, "Not enough tokens");
 
@@ -507,7 +584,9 @@ contract ArrowpadLiquidityManager is
      * @param token The ERC20 token address to pair with ETH
      * @param tokenAmount Amount of tokens to add as liquidity
      * @param ethAmount Amount of ETH to add as liquidity
-     * @param recipient Address to receive the position NFT
+     * @param dustRecipient Address that receives leftover dust — NOT the position.
+     *        The position NFT is retained by this contract so its fees stay
+     *        collectable; see collectFees(). There is no path to withdraw it.
      * @return tokenId The ID of the minted NFT position
      * @return liquidity The amount of liquidity added
      * @return amount0 The amount of token0 actually used
@@ -517,7 +596,7 @@ contract ArrowpadLiquidityManager is
         address token,
         uint256 tokenAmount,
         uint256 ethAmount,
-        address recipient
+        address dustRecipient
     )
         external
         payable
@@ -526,7 +605,7 @@ contract ArrowpadLiquidityManager is
         onlyAuthorized
         validAmounts(tokenAmount, ethAmount)
         notZeroAddress(token)
-        notZeroAddress(recipient)
+        notZeroAddress(dustRecipient)
         returns (
             uint256 tokenId,
             uint128 liquidity,
@@ -588,12 +667,17 @@ contract ArrowpadLiquidityManager is
                     10_000,
                 amount1Min: (amount1Desired * (10_000 - MINT_SLIPPAGE_BPS)) /
                     10_000,
-                recipient: recipient,
+                // Held by this contract, NOT sent to `recipient` (0xdEaD). A burned
+                // NFT can never call collect(), which would strand every fee the
+                // position ever earns. Locked here instead: no withdraw path exists.
+                recipient: address(this),
                 deadline: block.timestamp + 10 minutes
             });
 
         (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager
             .mint(params);
+        v3PositionOf[token] = tokenId;
+        emit PositionLocked(token, tokenId, 3);
 
         // Don't leave standing allowances to the position manager.
         token0.approve(address(nonfungiblePositionManager), 0);
@@ -624,13 +708,14 @@ contract ArrowpadLiquidityManager is
      * @param token The ERC20 token address to pair with ETH
      * @param tokenAmount Amount of tokens to add as liquidity
      * @param ethAmount Amount of ETH to add as liquidity
-     * @param recipient Address to receive the liquidity position
+     * @param dustRecipient Address that receives leftover dust — NOT the position.
+     *        The position is retained by this contract so its fees stay collectable.
      */
     function addLiquidityV4(
         address token,
         uint256 tokenAmount,
         uint256 ethAmount,
-        address recipient
+        address dustRecipient
     )
         external
         payable
@@ -639,7 +724,7 @@ contract ArrowpadLiquidityManager is
         onlyAuthorized
         validAmounts(tokenAmount, ethAmount)
         notZeroAddress(token)
-        notZeroAddress(recipient)
+        notZeroAddress(dustRecipient)
     {
         _validateTokenTransfer(token, tokenAmount);
         _validateETHBalance(ethAmount);
@@ -650,7 +735,11 @@ contract ArrowpadLiquidityManager is
         address token0Address = token;
         address token1Address = routerV2.WETH();
 
-        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
+        uint256 ethAmountToLP = 0;
+        if (ethAmount > 0) {
+            ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
+        }
+
         uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
             10000; // Calculate token amount to LP
 
@@ -710,9 +799,14 @@ contract ArrowpadLiquidityManager is
                 liquidity,
                 amount0Desired + 1,
                 amount1Desired + 1,
-                recipient,
+                address(this), // position stays here so fees remain collectable
+                dustRecipient, // only dust is burned, never the position
                 hookData
             );
+
+        // v4-periphery assigns tokenId = nextTokenId++, so the id read here is the
+        // one this mint receives.
+        uint256 v4TokenId = positionManager.nextTokenId();
 
         // multicall parameters
         bytes[] memory params = new bytes[](2);
@@ -752,6 +846,10 @@ contract ArrowpadLiquidityManager is
 
         positionManager.multicall(params);
 
+        v4PositionOf[token] = v4TokenId;
+        v4PoolKeyOf[token] = poolKey;
+        emit PositionLocked(token, v4TokenId, 4);
+
         // Revoke the approvals granted above (don't leave standing allowances).
         IERC20(token0Address).approve(address(permit2), 0);
         IERC20(token1Address).approve(address(permit2), 0);
@@ -771,6 +869,306 @@ contract ArrowpadLiquidityManager is
             (bool success, ) = address(marginRecipient).call{value: wad}("");
             if (!success) revert TransferFailed();
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     UNISWAP V4 SINGLE-SIDED (DIRECT LAUNCH)
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Seeds a V4 pool with tokens ONLY — no ETH — for direct launches.
+     * @dev A Uniswap position holds both assets only while the price sits inside its
+     *      range. Park the range entirely ABOVE the opening price and it holds pure
+     *      token: buyers walk the price up through the supply and pay ETH in as they
+     *      go, so the pool needs no ETH to start. That is why this cannot reuse
+     *      addLiquidityV4, which assumes a two-sided full-range mint.
+     *
+     *      `ethAmountForPrice` is NOTIONAL — it is never transferred. It only fixes
+     *      the opening price via the tokenAmount:ethAmountForPrice ratio, i.e. what
+     *      the whole supply is deemed to be worth at launch.
+     *
+     *      The position is retained here forever, exactly like the two-sided path,
+     *      so its trading fees stay collectable via collectFees().
+     * @param token The launched token
+     * @param tokenAmount Tokens to deposit — the entire supply for a direct launch
+     * @param ethAmountForPrice Notional ETH value of tokenAmount, sets opening price
+     * @param dustRecipient Receives leftover dust only, never the position
+     */
+    function addLiquidityV4SingleSided(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmountForPrice,
+        address dustRecipient
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        onlyAuthorized
+        notZeroAddress(token)
+        notZeroAddress(dustRecipient)
+    {
+        if (tokenAmount == 0 || ethAmountForPrice == 0) revert ZeroAmount();
+        _validateTokenTransfer(token, tokenAmount);
+        _transferTokensFrom(token, tokenAmount);
+
+        // WETH, not native ETH: V2/V3/V4 all pair against WETH protocol-wide, so the
+        // token may sort either side of it and BOTH currency orderings are reachable.
+        // (Klik pairs V4 against native ETH, which makes the token always currency1 —
+        // we deliberately keep the WETH pairing consistent across versions instead.)
+        address weth = routerV2.WETH();
+        bool tokenIsCurrency0 = token < weth;
+
+        PoolKey memory poolKey = PoolKey({
+            currency0: Currency.wrap(tokenIsCurrency0 ? token : weth),
+            currency1: Currency.wrap(tokenIsCurrency0 ? weth : token),
+            fee: POOL_FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: IHooks(address(0))
+        });
+
+        // Price is always currency1 per currency0, so the notional amounts must be
+        // ordered the same way as the currencies.
+        uint160 sqrtPriceX96 = tokenIsCurrency0
+            ? calculateSqrtPriceX96(tokenAmount, ethAmountForPrice)
+            : calculateSqrtPriceX96(ethAmountForPrice, tokenAmount);
+
+        // Same guard as the two-sided path: never mint into a pool a griefer
+        // pre-initialised at a hostile price.
+        (uint160 existingV4, , , ) = poolV4Manager.getSlot0(poolKey.toId());
+        if (existingV4 != 0) {
+            require(
+                _withinTolerance(existingV4, sqrtPriceX96),
+                "V4 pool price mismatch"
+            );
+        }
+
+        int24 startTick = TickMath.getTickAtSqrtPrice(sqrtPriceX96);
+        int24 tickLower;
+        int24 tickUpper;
+        uint128 liquidity;
+
+        if (tokenIsCurrency0) {
+            // Holding only currency0 means the range must sit STRICTLY above the
+            // current tick. Aligning startTick alone is not enough: when startTick
+            // is already a multiple of TICK_SPACING, tickLower lands on spot, the
+            // position straddles the price and the mint needs currency1 it is
+            // capped at zero for — reverting the launch. +1 forces the next spacing.
+            tickLower = _alignUp(startTick + 1, TICK_SPACING);
+            tickUpper = _alignDown(TickMath.MAX_TICK, TICK_SPACING);
+            liquidity = LiquidityAmounts.getLiquidityForAmount0(
+                TickMath.getSqrtPriceAtTick(tickLower),
+                TickMath.getSqrtPriceAtTick(tickUpper),
+                tokenAmount
+            );
+        } else {
+            // Mirror image: holding only currency1 needs the range at or below the
+            // current tick, so round the upper bound DOWN. Landing exactly on spot is
+            // safe on this side: at the boundary the currency0 amount is zero.
+            tickLower = _alignUp(TickMath.MIN_TICK, TICK_SPACING);
+            tickUpper = _alignDown(startTick, TICK_SPACING);
+            liquidity = LiquidityAmounts.getLiquidityForAmount1(
+                TickMath.getSqrtPriceAtTick(tickLower),
+                TickMath.getSqrtPriceAtTick(tickUpper),
+                tokenAmount
+            );
+        }
+        require(liquidity > 0, "Zero liquidity");
+
+        uint256 v4TokenId = positionManager.nextTokenId();
+
+        bytes memory hookData = new bytes(0);
+        bytes memory actions = abi.encodePacked(
+            uint8(Actions.MINT_POSITION),
+            uint8(Actions.SETTLE_PAIR),
+            uint8(Actions.SWEEP),
+            uint8(Actions.SWEEP)
+        );
+        bytes[] memory mintParams = new bytes[](4);
+        mintParams[0] = abi.encode(
+            poolKey,
+            tickLower,
+            tickUpper,
+            liquidity,
+            // Cap the token side, and hard-cap the ETH side at zero: if the mint ever
+            // tried to pull WETH the position would not be single-sided, and this
+            // reverts rather than silently taking funds we do not have.
+            tokenIsCurrency0 ? tokenAmount : 0,
+            tokenIsCurrency0 ? 0 : tokenAmount,
+            address(this), // position locked here so fees stay collectable
+            hookData
+        );
+        mintParams[1] = abi.encode(poolKey.currency0, poolKey.currency1);
+        mintParams[2] = abi.encode(poolKey.currency0, dustRecipient);
+        mintParams[3] = abi.encode(poolKey.currency1, dustRecipient);
+
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encodeWithSelector(
+            positionManager.initializePool.selector,
+            poolKey,
+            sqrtPriceX96,
+            hookData
+        );
+        params[1] = abi.encodeWithSelector(
+            positionManager.modifyLiquidities.selector,
+            abi.encode(actions, mintParams),
+            block.timestamp + DEADLINE_BUFFER
+        );
+
+        IERC20(token).approve(address(permit2), tokenAmount);
+        permit2.approve(
+            token,
+            address(positionManager),
+            type(uint160).max,
+            type(uint48).max
+        );
+
+        positionManager.multicall(params);
+
+        IERC20(token).approve(address(permit2), 0);
+        permit2.approve(token, address(positionManager), 0, 0);
+
+        v4PositionOf[token] = v4TokenId;
+        v4PoolKeyOf[token] = poolKey;
+        emit PositionLocked(token, v4TokenId, 4);
+
+        // Should be nothing left — the whole balance went in as liquidity.
+        uint256 leftover = IERC20(token).balanceOf(address(this));
+        if (leftover > 0) {
+            IERC20(token).safeTransfer(dustRecipient, leftover);
+        }
+    }
+
+    /// @dev Round a tick UP to the next multiple of `spacing`. Solidity truncates
+    ///      toward zero, so negative ticks need the correction added back.
+    function _alignUp(int24 tick, int24 spacing) internal pure returns (int24) {
+        int24 aligned = (tick / spacing) * spacing;
+        if (tick > 0 && aligned < tick) aligned += spacing;
+        if (tick < 0 && aligned < tick) aligned += spacing;
+        if (aligned < TickMath.MIN_TICK) aligned += spacing;
+        return aligned;
+    }
+
+    /// @dev Round a tick DOWN to the previous multiple of `spacing`.
+    function _alignDown(int24 tick, int24 spacing) internal pure returns (int24) {
+        int24 aligned = (tick / spacing) * spacing;
+        if (aligned > tick) aligned -= spacing;
+        if (aligned > TickMath.MAX_TICK) aligned -= spacing;
+        return aligned;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              FEE COLLECTION
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Collects accrued trading fees for a locked V3/V4 position and splits
+     *         them 50/50 between the token's creator and the platform.
+     * @dev Only ever moves FEES, never principal:
+     *      - V3 collect() pays out `tokensOwed`, which accumulates from swap fees and
+     *        from decreaseLiquidity. This contract never calls decreaseLiquidity with
+     *        a non-zero amount, so tokensOwed can only ever be fees.
+     *      - V4 DECREASE_LIQUIDITY with liquidityDelta = 0 pokes the position to
+     *        realise fees without touching the principal, then TAKE_PAIR sweeps them.
+     *      There is no code path in this contract that removes liquidity or transfers
+     *      a position NFT, so the LP is locked even though the fees are not.
+     * @param token The launched token whose pool fees are being collected
+     * @param creator Receives 50% — the token's creator, supplied by Arrowpad
+     * @param platform Receives 50% — the protocol fee address
+     * @return ethFees Total ETH fees collected (before the split)
+     * @return tokenFees Total token fees collected (before the split)
+     */
+    function collectFees(
+        address token,
+        address creator,
+        address platform
+    )
+        external
+        nonReentrant
+        onlyAuthorized
+        notZeroAddress(token)
+        notZeroAddress(creator)
+        notZeroAddress(platform)
+        returns (uint256 ethFees, uint256 tokenFees)
+    {
+        uint256 v3Id = v3PositionOf[token];
+        uint256 v4Id = v4PositionOf[token];
+        // V2 LP is fungible and its fees accrue straight into the pool reserves —
+        // the only way to realise them is to burn LP, which would withdraw principal
+        // too. There is nothing collectable, so callers must not be told otherwise.
+        require(v3Id != 0 || v4Id != 0, "No claimable position");
+
+        // Every pool (V2/V3/V4) pairs against WETH, so fees always arrive as WETH and
+        // the ETH side is always the WETH balance delta.
+        address weth = routerV2.WETH();
+        uint256 wethBefore = IERC20(weth).balanceOf(address(this));
+        uint256 tokenBefore = IERC20(token).balanceOf(address(this));
+
+        if (v3Id != 0) {
+            nonfungiblePositionManager.collect(
+                INonfungiblePositionManager.CollectParams({
+                    tokenId: v3Id,
+                    recipient: address(this),
+                    amount0Max: type(uint128).max,
+                    amount1Max: type(uint128).max
+                })
+            );
+        } else {
+            _collectV4(v4Id, v4PoolKeyOf[token]);
+        }
+
+        // Measure the delta rather than trusting balances: unrelated dust or margin
+        // ETH already sitting here must not be paid out as though it were fees.
+        ethFees = IERC20(weth).balanceOf(address(this)) - wethBefore;
+        tokenFees = IERC20(token).balanceOf(address(this)) - tokenBefore;
+
+        if (ethFees > 0) {
+            IWETH(weth).withdraw(ethFees);
+            uint256 creatorEth = ethFees / 2;
+            _sendETH(creator, creatorEth);
+            _sendETH(platform, ethFees - creatorEth); // remainder: no dust stranded
+        }
+        if (tokenFees > 0) {
+            uint256 creatorTokens = tokenFees / 2;
+            IERC20(token).safeTransfer(creator, creatorTokens);
+            IERC20(token).safeTransfer(platform, tokenFees - creatorTokens);
+        }
+
+        emit FeesCollected(token, creator, platform, ethFees, tokenFees);
+    }
+
+    /// @dev Poke the V4 position with a zero liquidity delta to realise fees, then
+    ///      take both currencies. Zero delta is what keeps principal untouched.
+    function _collectV4(uint256 tokenId, PoolKey memory poolKey) internal {
+        bytes memory actions = abi.encodePacked(
+            uint8(Actions.DECREASE_LIQUIDITY),
+            uint8(Actions.TAKE_PAIR)
+        );
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(
+            tokenId,
+            uint256(0),
+            uint128(0),
+            uint128(0),
+            bytes("")
+        );
+        params[1] = abi.encode(
+            poolKey.currency0,
+            poolKey.currency1,
+            address(this)
+        );
+        positionManager.modifyLiquidities(
+            abi.encode(actions, params),
+            block.timestamp + DEADLINE_BUFFER
+        );
+    }
+
+    /// ponytail: reverts if a recipient rejects ETH, which also blocks the other
+    /// half's payout. Claiming blocks nobody else, so a pull-based split is only
+    /// worth it if a creator contract actually turns out to reject ETH.
+    function _sendETH(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        if (!ok) revert TransferFailed();
     }
 
     /**
@@ -962,6 +1360,10 @@ contract ArrowpadLiquidityManager is
         poolV4Manager.initialize(pool, sqrtPriceX96);
     }
 
+    /// @param positionOwner Who ends up owning the position NFT — this contract, so
+    ///        its fees stay collectable.
+    /// @param sweepTo Where leftover dust goes (the burn address), which is a
+    ///        different destination from the position itself.
     function _mintLiquidityParams(
         PoolKey memory poolKey,
         int24 _tickLower,
@@ -969,7 +1371,8 @@ contract ArrowpadLiquidityManager is
         uint256 liquidity,
         uint256 amount0Max,
         uint256 amount1Max,
-        address recipient,
+        address positionOwner,
+        address sweepTo,
         bytes memory hookData
     ) internal pure returns (bytes memory, bytes[] memory) {
         bytes memory actions = abi.encodePacked(
@@ -987,12 +1390,12 @@ contract ArrowpadLiquidityManager is
             liquidity,
             amount0Max,
             amount1Max,
-            recipient,
+            positionOwner,
             hookData
         );
         params[1] = abi.encode(poolKey.currency0, poolKey.currency1);
-        params[2] = abi.encode(poolKey.currency0, recipient);
-        params[3] = abi.encode(poolKey.currency1, recipient);
+        params[2] = abi.encode(poolKey.currency0, sweepTo);
+        params[3] = abi.encode(poolKey.currency1, sweepTo);
 
         return (actions, params);
     }
@@ -1061,17 +1464,30 @@ contract ArrowpadLiquidityManager is
         if (!success) revert TransferFailed();
     }
 
-    function setEthAmountPercentToLP(uint16 _ethAmountPercentToLP) external onlyOwner {
-        require(_ethAmountPercentToLP > 0 && _ethAmountPercentToLP <= 10000, "Invalid percent");
+    function setEthAmountPercentToLP(
+        uint16 _ethAmountPercentToLP
+    ) external onlyOwner {
+        require(
+            _ethAmountPercentToLP > 0 && _ethAmountPercentToLP <= 10000,
+            "Invalid percent"
+        );
         ethAmountPercentToLP = _ethAmountPercentToLP;
     }
 
-    function setTokenAmountPercentToLP(uint16 _tokenAmountPercentToLP) external onlyOwner {
-        require(_tokenAmountPercentToLP > 0 && _tokenAmountPercentToLP <= 10000, "Invalid percent");
+    function setTokenAmountPercentToLP(
+        uint16 _tokenAmountPercentToLP
+    ) external onlyOwner {
+        require(
+            _tokenAmountPercentToLP > 0 && _tokenAmountPercentToLP <= 10000,
+            "Invalid percent"
+        );
         tokenAmountPercentToLP = _tokenAmountPercentToLP;
     }
 
-    function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+    function setAuthorizedCaller(
+        address caller,
+        bool authorized
+    ) external onlyOwner {
         require(caller != address(0), "Zero address");
         authorizedCallers[caller] = authorized;
     }

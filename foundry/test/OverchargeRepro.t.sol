@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
 import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 
 /// @notice Repro: does the last buyer before graduation lose ETH when their
 ///         requested buyAmount exceeds the remaining curve capacity (the
@@ -29,12 +30,19 @@ contract OverchargeReproTest is Test {
         address V4_POS = vm.envOr("V4_POS_MGR", 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
         address DATA_FEED = vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
-        lm = new ArrowpadLiquidityManager(
+        lm = ArrowpadDeploy.deployLiquidityManager(
             V2_ROUTER, V3_FACTORY, V3_POS, V4_MGR, UNIV, V4_POS, PERMIT2,
-            address(this), address(this), 10000, 10000
+            address(this), address(this), 10000, 10000,
+            address(this)
         );
-        arrowpad = new Arrowpad(DATA_FEED, address(lm), address(0xFEE), address(0xD1));
+        arrowpad = ArrowpadDeploy.deployArrowpad(
+            DATA_FEED, address(lm), address(0xFEE), address(0xD1),
+            address(this)
+        );
         lm.setAuthorizedCaller(address(arrowpad), true);
+        // See ClaimFees.t.sol: Robinhood's feed heartbeat exceeds the 1h default,
+        // which would stall graduation and make this scenario untestable there.
+        arrowpad.setPriceStalenessThreshold(86400);
 
         buyer = makeAddr("buyer");
         vm.deal(buyer, 100_000 ether);

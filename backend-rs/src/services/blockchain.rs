@@ -372,14 +372,24 @@ async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<cra
     // ABI-encoded struct: 32 bytes (64 hex chars) per field. poolType is the 7th
     // field → word index 6 → hex chars 384..448. Need at least 7 words present.
     let trimmed = hex.trim_start_matches("0x");
-    if trimmed.len() < 448 {
+    // All 8 fields are static, so the response is exactly 8 words = 512 hex chars.
+    // `launched` is the last one, so anything shorter means we can't read it.
+    if trimmed.len() < 512 {
         return None;
     }
     let pool_type_hex = &trimmed[384..448]; // word 6 = poolType
     let pt = u8::from_str_radix(pool_type_hex, 16).ok()?;
+    // Direct-launch tokens report poolType=3 like V4, but they never had a bonding
+    // curve: they are launched from birth with zero virtual reserves. Test the word
+    // for zero directly — a full 256-bit reserve does not fit in u128, and parsing
+    // it would fail into a wrong answer rather than an obvious one.
+    let no_virtual_curve = trimmed[128..192].bytes().all(|b| b == b'0'); // word 2
+    let launched_hex = &trimmed[448..512]; // word 7 = launched (bool)
+    let launched = u8::from_str_radix(launched_hex, 16).unwrap_or(0) != 0;
     match pt {
         1 => Some(crate::models::enums::PoolType::V2),
         2 => Some(crate::models::enums::PoolType::V3),
+        3 if launched && no_virtual_curve => Some(crate::models::enums::PoolType::Direct),
         3 => Some(crate::models::enums::PoolType::V4),
         _ => Some(crate::models::enums::PoolType::V2),
     }

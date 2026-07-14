@@ -410,6 +410,7 @@ export default function Create() {
   const [more, setMore] = React.useState(false);
   // const [showParticles, setShowParticles] = React.useState(false)
   const [poolType, setPoolType] = React.useState(1);
+  const [isDirectLaunch, setIsDirectLaunch] = React.useState(false);
 
   const fileBannerRef = useRef<HTMLInputElement>(null);
   const fileLogoRef = useRef<HTMLInputElement>(null);
@@ -491,7 +492,7 @@ export default function Create() {
       return;
     }
 
-    if (![1, 2, 3].includes(poolType)) {
+    if (![1, 2, 3, 4].includes(poolType)) {
       toast.error("Please select Uniswap version to launch");
       return;
     }
@@ -561,23 +562,34 @@ export default function Create() {
       } = await axios.post(`${API_ENDPOINT}/tokens`, metadata);
       console.log('[deployToken] API response:', { success, sig })
       if (!success) throw Error("API error");
-      console.log('[deployToken] calling createToken with:', {
+      console.log('[deployToken] calling handler with:', {
         name: coinName,
         symbol: coinTicker,
         pool: poolType,
         amount: initBuyAmount,
         sig,
+        isDirectLaunch,
       })
-      await handlers.createToken(
-        {
-          name: coinName,
-          symbol: coinTicker,
-          pool: poolType,
-          amount: initBuyAmount,
-          secretKey: mint?.secretKey,
-        },
-        sig
-      );
+      if (isDirectLaunch) {
+        await handlers.createTokenDirect(
+          {
+            name: coinName,
+            symbol: coinTicker,
+          },
+          sig
+        );
+      } else {
+        await handlers.createToken(
+          {
+            name: coinName,
+            symbol: coinTicker,
+            pool: poolType,
+            amount: initBuyAmount,
+            secretKey: mint?.secretKey,
+          },
+          sig
+        );
+      }
 
       // Store created token data (address will be updated via socket event)
       setCreatedTokenData({
@@ -819,7 +831,10 @@ export default function Create() {
                   key={pool}
                   checked={poolType === index + 1}
                   label="Uniswap"
-                  onClick={() => setPoolType(index + 1)}
+                  onClick={() => {
+                    setPoolType(index + 1);
+                    setIsDirectLaunch(pool.includes('direct'));
+                  }}
                 >
                   <Avatar
                     src={`/pools/${pool?.split(":")?.[0]}.png`}
@@ -833,10 +848,6 @@ export default function Create() {
           </FormControl>
         )}
         <Box
-          display="flex"
-          alignItems="center"
-          alignSelf="flex-end"
-          sx={{ cursor: "pointer" }}
         >
           {more ? (
             <ArrowDownIcon sx={{ color: "white", height: 24 }} />
@@ -969,20 +980,25 @@ export default function Create() {
         aria-describedby="alert-dialog-slide-description"
       >
         <DialogTitle>
-          {"Buy now"}
+          {isDirectLaunch ? "Create Token" : "Buy now"}
           <IconButton aria-label="close" onClick={handleClose}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
         <DialogContent>
           <DialogContentText mb="1rem" fontSize={14}>
-            Choose how many {network?.nativeCurrency.symbol} you want to buy
-            (optional).
+            {isDirectLaunch
+              ? "Create token with 1B supply. No bonding curve."
+              : `Choose how many ${network?.nativeCurrency.symbol} you want to buy (optional).`
+            }
           </DialogContentText>
-          <DialogContentText mb="1rem" fontSize={14}>
-            Tip: its optional but buying a small amount of coins helps protect
-            your coin from snipers
-          </DialogContentText>
+          {!isDirectLaunch && (
+            <DialogContentText mb="1rem" fontSize={14}>
+              Tip: its optional but buying a small amount of coins helps protect
+              your coin from snipers
+            </DialogContentText>
+          )}
+          {!isDirectLaunch && (
           <FormControl fullWidth variant="standard">
             <Box display="flex" gap="8px">
               <Typography component="span" color="#FFF8" fontSize={14}>
@@ -1019,6 +1035,7 @@ export default function Create() {
                             </Box> */}
             </CurrencyInput>
           </FormControl>
+          )}
           {!!error && (
             <Alert severity="error" sx={{ mt: 1 }}>
               {error}
