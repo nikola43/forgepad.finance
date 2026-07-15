@@ -66,10 +66,10 @@ contract RobinhoodDeployedTest is Test {
         // abandoned after the 2026-07-03 security redeploy and has no withdrawableEth()
         // — pointing these tests at it validated a contract nobody uses.
         arrowpad = Arrowpad(
-            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x5d2391CF88cd48BB6B9Ec12b38BC8119562F9012))
+            payable(vm.envOr("DEPLOYED_ARROWPAD", 0x70ce22A606B3A5770e087cB461dB38076eBA9d2F))
         );
         lm = ArrowpadLiquidityManager(
-            payable(vm.envOr("DEPLOYED_LM", 0x08Dd64DF51945A84124c1228453b43c896cEfAdE))
+            payable(vm.envOr("DEPLOYED_LM", 0x2459a6D2837Af70767ec85DE5C7f4A2E3f32b4f7))
         );
         router = IUniswapV2Router02(
             vm.envOr("V2_ROUTER", 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba)
