@@ -301,6 +301,47 @@ export function useHandlers(network?: CaipNetwork) {
                 console.log('[createToken] tx hash:', tx.hash)
                 return tx
             },
+            createTokenDirect: async (token: { name: string, symbol: string }, sig: any) => {
+                if (!address)
+                    throw Error("Connect wallet")
+                const signer = new JsonRpcSigner(provider, address as string)
+                const contract = new Contract(chain.contractAddress, chain.abi, signer)
+                const createFeeAmount = await readContract.CREATE_TOKEN_FEE_AMOUNT();
+                const balance = await readProvider.getBalance(address)
+                const value = createFeeAmount
+                const deadline = Math.floor(Date.now() / 1000) + 3600
+                const args = [token.name, token.symbol, sig, deadline] as const
+
+                let gasLimit = 1_000_000n
+                try {
+                    gasLimit = await readContract.createTokenDirect.estimateGas(...args, { from: address, value })
+                } catch (err: any) {
+                    if (balance >= value && err?.code !== 'INSUFFICIENT_FUNDS')
+                        throw err
+                }
+                const feeData = await readProvider.getFeeData()
+                const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+                const gasCost = (gasLimit * gasPrice * 12n) / 10n
+                const totalCost = value + gasCost
+                console.log('[createTokenDirect] params:', {
+                    name: token.name,
+                    symbol: token.symbol,
+                    sig,
+                    value: value.toString(),
+                    gasLimit: gasLimit.toString(),
+                    gasCost: gasCost.toString(),
+                    totalCost: totalCost.toString(),
+                    balance: balance.toString(),
+                    createFeeAmount: createFeeAmount.toString(),
+                    contractAddress: chain.contractAddress,
+                    sender: address,
+                })
+                if (balance < totalCost)
+                    throw Error("Insufficient balance")
+                const tx = await contract.createTokenDirect(...args, { value, gasLimit })
+                console.log('[createTokenDirect] tx hash:', tx.hash)
+                return tx
+            },
             approve: async (token: string) => {
                 if (!address)
                     throw Error("Connect wallet")
@@ -328,6 +369,38 @@ export function useHandlers(network?: CaipNetwork) {
                     throw err
                 }
                 return await tokenContract.approve(spender, MaxUint256, { gasLimit })
+            },
+            // How much is claimable right now. There is no on-chain view for this —
+            // pending fees only materialise when the position is poked — so simulate
+            // the claim and read its return value. Costs nothing and can't revert
+            // state; a token with no fees returns zeros.
+            getClaimableFees: async (token: string): Promise<{ eth: string, token: string } | undefined> => {
+                try {
+                    const [ethFees, tokenFees] = await readContract.claimFees.staticCall(token, { from: address ?? ethers.ZeroAddress })
+                    return { eth: ethers.formatEther(ethFees), token: ethers.formatEther(tokenFees) }
+                } catch {
+                    // V2 pools, un-launched tokens, and tokens with no position all
+                    // revert here. That's "nothing to claim", not an error worth
+                    // surfacing — the caller just hides the button.
+                    return undefined
+                }
+            },
+            // Splits 50/50 between the token's creator and the platform on-chain, so
+            // whoever pays the gas is irrelevant to where the money lands.
+            claimFees: async (token: string) => {
+                if (!address)
+                    throw Error("Connect wallet")
+                const signer = new JsonRpcSigner(provider, address as string)
+                const contract = new Contract(chain.contractAddress, chain.abi, signer)
+                let gasLimit: bigint
+                try {
+                    gasLimit = await readContract.claimFees.estimateGas(token, { from: address })
+                } catch (err: any) {
+                    if (err?.code === 'INSUFFICIENT_FUNDS')
+                        throw Error("Insufficient balance")
+                    throw Error("No fees to claim")
+                }
+                return await contract.claimFees(token, { gasLimit })
             },
             buyToken: async (token: string, amount: string, slippage: bigint, exactInput?: boolean) => {
                 if (!address)

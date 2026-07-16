@@ -1099,6 +1099,10 @@ export default function Token() {
         }
     }, [detailData, tokenChain])
 
+    const isDirectLaunch = useMemo(() => {
+        return pool?.name === 'direct'
+    }, [pool])
+
     // const dexList: DexKey[] | undefined = useMemo(() => {
     //     if (detailData && detailData.pairAddresses)
     //         return Object.keys(detailData.pairAddresses) as DexKey[]
@@ -1406,7 +1410,18 @@ export default function Token() {
                                 }
                             </Box>
                         } */}
-                        <TVChartContainerAdvanced token={id} network={network} dex={selectedDex} />
+                        {
+                            isDirectLaunch
+                                ? <Box sx={{ width: '100%', height: '465px', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                    <iframe
+                                        src={`https://www.geckoterminal.com/robinhood/tokens/${id}?embed=1&info=0&swaps=0&chart_type=market_cap&resolution=1d&bg_color=111827`}
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                        allow="clipboard-write"
+                                        loading="lazy"
+                                    />
+                                </Box>
+                                : <TVChartContainerAdvanced token={id} network={network} dex={selectedDex} />
+                        }
                         <Box mt="2em">
                             <Box display="flex" justifyContent="space-between" flexDirection={{ xs: 'column', sm: 'row' }}>
                                 <Toggle inner="true">

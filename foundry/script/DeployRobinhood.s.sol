@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
 import "../src/Arrowpad.sol";
 import "../src/ArrowpadLiquidityManager.sol";
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 
 /// @notice Deploys Arrowpad + ArrowpadLiquidityManager to Robinhood Chain
 ///         (Arbitrum Orbit L2, chainId 4663, ETH gas token) with V2, V3 and V4
@@ -26,6 +28,13 @@ import "../src/ArrowpadLiquidityManager.sol";
 ///         V4:   poolMgr=0x8366a39cc670b4001a1121b8f6a443a643e40951
 ///               positionMgr=0x58daec3116aae6d93017baaea7749052e8a04fa7
 contract DeployArrowpadRobinhood is Script {
+
+    /// @dev The proxies each deploy their own ProxyAdmin and record it in the
+    ///      ERC-1967 admin slot. Log it: it is the only key that can upgrade, and
+    ///      recovering it later means digging through deployment logs.
+    function _proxyAdmin(address proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(proxy, ERC1967Utils.ADMIN_SLOT))));
+    }
     // ---- Uniswap V2 (Robinhood) ----
     address constant V2_ROUTER = 0x89e5DB8B5aA49aA85AC63f691524311AEB649eba;
     address constant V2_FACTORY = 0x8bcEaA40B9AcdfAedF85AdF4FF01F5Ad6517937f;
@@ -63,7 +72,7 @@ contract DeployArrowpadRobinhood is Script {
         vm.startBroadcast(pk);
 
         // All V2/V3/V4 addresses wired so every poolType is usable.
-        ArrowpadLiquidityManager lm = new ArrowpadLiquidityManager(
+        ArrowpadLiquidityManager lm = ArrowpadDeploy.deployLiquidityManager(
             V2_ROUTER,
             V3_FACTORY,
             V3_POSITION_MANAGER,
@@ -74,15 +83,17 @@ contract DeployArrowpadRobinhood is Script {
             deployer, // _marginRecipient (leftover ETH at graduation)
             deployer, // _owner
             10000, // 100% ETH to LP
-            10000 // 100% tokens to LP
+            10000, // 100% tokens to LP
+            deployer
         );
         console.log("ArrowpadLiquidityManager:", address(lm));
 
-        Arrowpad arrowpad = new Arrowpad(
+        Arrowpad arrowpad = ArrowpadDeploy.deployArrowpad(
             DATA_FEED,
             address(lm),
             deployer, // _feeAddress
-            DISTRIBUTOR // _distributorAddress
+            DISTRIBUTOR, // _distributorAddress
+            deployer
         );
         console.log("Arrowpad:", address(arrowpad));
 
@@ -107,7 +118,9 @@ contract DeployArrowpadRobinhood is Script {
         console.log("ROBINHOOD DEPLOYMENT COMPLETE (V2 + V3 + V4 enabled)");
         console.log("=================================================");
         console.log("Arrowpad:         ", address(arrowpad));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(arrowpad)));
         console.log("LiquidityManager: ", address(lm));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(lm)));
         console.log("Target MCAP (USD):", arrowpad.TARGET_MARKET_CAP_USD() / 1e18);
         console.log("poolType 1=V2  2=V3  3=V4 (choose in createToken)");
         console.log("=================================================");

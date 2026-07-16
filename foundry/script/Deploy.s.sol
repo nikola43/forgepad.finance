@@ -1,13 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
 import "../src/Arrowpad.sol";
 import "../src/ArrowpadLiquidityManager.sol";
 import "../src/MockPriceFeed.sol";
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 
 contract DeployArrowpad is Script {
+
+    /// @dev The proxies each deploy their own ProxyAdmin and record it in the
+    ///      ERC-1967 admin slot. Log it: it is the only key that can upgrade, and
+    ///      recovering it later means digging through deployment logs.
+    function _proxyAdmin(address proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(proxy, ERC1967Utils.ADMIN_SLOT))));
+    }
     // Uniswap V2 Router on Ethereum
     address constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     // Uniswap V3 Factory on Ethereum
@@ -46,7 +55,7 @@ contract DeployArrowpad is Script {
         address priceFeed = DATA_FEED;
         console.log("PriceFeed (Chainlink):", priceFeed);
 
-        ArrowpadLiquidityManager liquidityManager = new ArrowpadLiquidityManager(
+        ArrowpadLiquidityManager liquidityManager = ArrowpadDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -57,15 +66,17 @@ contract DeployArrowpad is Script {
             deployer,
             deployer,
             10000,
-            10000
+            10000,
+            deployer
         );
         console.log("ArrowpadLiquidityManager:", address(liquidityManager));
 
-        Arrowpad arrowpad = new Arrowpad(
+        Arrowpad arrowpad = ArrowpadDeploy.deployArrowpad(
             priceFeed,
             address(liquidityManager),
             FEE_WALLET,
-            DIST_ADDR
+            DIST_ADDR,
+            deployer
         );
         console.log("Arrowpad:", address(arrowpad));
 
@@ -86,7 +97,9 @@ contract DeployArrowpad is Script {
         console.log("==================================================");
         console.log("PriceFeed:        ", priceFeed);
         console.log("Arrowpad:         ", address(arrowpad));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(arrowpad)));
         console.log("LiquidityManager: ", address(liquidityManager));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(liquidityManager)));
         console.log("==================================================");
     }
 }

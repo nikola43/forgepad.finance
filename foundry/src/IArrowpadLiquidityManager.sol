@@ -27,11 +27,13 @@ interface IArrowpadLiquidityManager {
         uint256 ethPriceUSD
     ) external payable returns (address);
 
+    /// @param dustRecipient Receives leftover dust only. The LP position itself is
+    ///        locked in the manager forever so its trading fees stay claimable.
     function addLiquidityV3(
         address token,
         uint256 tokenAmount,
         uint256 ethAmount,
-        address recipient
+        address dustRecipient
     )
         external
         payable
@@ -42,10 +44,32 @@ interface IArrowpadLiquidityManager {
             uint256 amount1
         );
 
+    /// @param dustRecipient Receives leftover dust only. The LP position itself is
+    ///        locked in the manager forever so its trading fees stay claimable.
     function addLiquidityV4(
         address token,
         uint256 tokenAmount,
         uint256 ethAmount,
-        address recipient
+        address dustRecipient
     ) external payable;
+
+    /// @notice Seeds a V4 pool with tokens only (no ETH) for direct launches.
+    /// @param ethAmountForPrice Notional only — never transferred; sets opening price.
+    /// @param dustRecipient Receives leftover dust only; the position is locked.
+    function addLiquidityV4SingleSided(
+        address token,
+        uint256 tokenAmount,
+        uint256 ethAmountForPrice,
+        address dustRecipient
+    ) external;
+
+    function collectFees(
+        address token,
+        address creator,
+        address platform
+    ) external returns (uint256 ethFees, uint256 tokenFees);
+
+    function v3PositionOf(address token) external view returns (uint256);
+
+    function v4PositionOf(address token) external view returns (uint256);
 }

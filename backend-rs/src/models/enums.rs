@@ -17,6 +17,7 @@ pub enum PoolType {
     V2,
     V3,
     V4,
+    Direct,
 }
 
 impl Serialize for PoolType {
@@ -25,6 +26,7 @@ impl Serialize for PoolType {
             PoolType::V2 => serializer.serialize_str("v2"),
             PoolType::V3 => serializer.serialize_str("v3"),
             PoolType::V4 => serializer.serialize_str("v4"),
+            PoolType::Direct => serializer.serialize_str("direct"),
         }
     }
 }
@@ -36,6 +38,7 @@ impl<'de> Deserialize<'de> for PoolType {
             "v2" | "V2" => Ok(PoolType::V2),
             "v3" | "V3" => Ok(PoolType::V3),
             "v4" | "V4" => Ok(PoolType::V4),
+            "direct" | "Direct" => Ok(PoolType::Direct),
             other => Err(serde::de::Error::custom(format!(
                 "unknown pool type: {other}"
             ))),
@@ -49,6 +52,7 @@ impl ToSql<PoolTypeMapping, Pg> for PoolType {
             PoolType::V2 => "v2",
             PoolType::V3 => "v3",
             PoolType::V4 => "v4",
+            PoolType::Direct => "direct",
         };
         out.write_all(value.as_bytes())?;
         Ok(IsNull::No)
@@ -61,6 +65,7 @@ impl FromSql<PoolTypeMapping, Pg> for PoolType {
             b"v2" => Ok(PoolType::V2),
             b"v3" => Ok(PoolType::V3),
             b"v4" => Ok(PoolType::V4),
+            b"direct" => Ok(PoolType::Direct),
             other => Err(format!(
                 "unrecognized pool_type variant: {}",
                 String::from_utf8_lossy(other)

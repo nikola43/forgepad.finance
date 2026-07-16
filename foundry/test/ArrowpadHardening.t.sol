@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 import "forge-std/Test.sol";
 import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
 import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
@@ -78,11 +79,15 @@ contract ArrowpadHardeningTest is Test {
         DATA_FEED = vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
         router = IUniswapV2Router02(V2_ROUTER);
-        lm = new ArrowpadLiquidityManager(
+        lm = ArrowpadDeploy.deployLiquidityManager(
             V2_ROUTER, V3_FACTORY, V3_POS_MGR, V4_POOL_MGR, UNIVERSAL_ROUTER,
-            V4_POS_MGR, PERMIT2, address(this), address(this), 10000, 10000
+            V4_POS_MGR, PERMIT2, address(this), address(this), 10000, 10000,
+            address(this)
         );
-        arrowpad = new Arrowpad(DATA_FEED, address(lm), address(0xFEE), address(0xD15));
+        arrowpad = ArrowpadDeploy.deployArrowpad(
+            DATA_FEED, address(lm), address(0xFEE), address(0xD15),
+            address(this)
+        );
         lm.setAuthorizedCaller(address(arrowpad), true);
         arrowpad.setPlatformBuyFeeBps(100);
         arrowpad.setPlatformSellFeeBps(100);

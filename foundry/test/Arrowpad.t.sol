@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
@@ -38,6 +39,7 @@ import {PoolId, PoolIdLibrary} from "../src/v4-core/types/PoolId.sol";
 import {Currency} from "../src/v4-core/types/Currency.sol";
 import {IHooks} from "../src/v4-core/interfaces/IHooks.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
 
 contract ArrowpadTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -104,7 +106,7 @@ contract ArrowpadTest is Test {
         vm.deal(addr2, 100_000 ether);
         vm.deal(addr3, 100_000 ether);
 
-        liquidityManager = new ArrowpadLiquidityManager(
+        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -115,14 +117,16 @@ contract ArrowpadTest is Test {
             address(this),
             address(this),
             10000,
-            10000
+            10000,
+            address(this)
         );
 
-        arrowpad = new Arrowpad(
+        arrowpad = ArrowpadDeploy.deployArrowpad(
             DATA_FEED,
             address(liquidityManager),
             FEE_WALLET,
-            DIST_ADDR
+            DIST_ADDR,
+            address(this)
         );
         iArrowpad = IArrowpad(address(arrowpad));
         TARGET_MCAP_USD = arrowpad.TARGET_MARKET_CAP_USD();
@@ -1240,26 +1244,29 @@ contract ArrowpadTest is Test {
     }
 
     function test_10g_PriceImpactLimit() public {
-        console.log("=== TEST 10g: Price impact limit (45%) ===");
+        console.log("=== TEST 10g: Price impact limit (99.99%) ===");
         address t = _create("ImpactToken", "IMP", 1);
 
-        // MAX_PRICE_IMPACT = 4500 (45% of virtualTokenReserve).
+        assertEq(arrowpad.MAX_PRICE_IMPACT(), 9_999, "breaker set to 99.99%");
+
         // virtualEthReserve = 2.5 ETH, virtualTokenReserve = 1.073e9.
-        // MAX_BUY_PERCENT = 10000 (100%), so maxBuy = virtualEthReserve = 2.5 ETH.
-        // A buy of 2.4 ETH passes the maxBuy check but after 3% fee,
-        // net ~2.328 ETH produces amountOut ~517M tokens = ~48% of
-        // virtualTokenReserve, exceeding 45% limit.
+        // A buy of 2.4 ETH nets ~2.328 ETH after fees => amountOut ~517M tokens
+        // = ~48% of virtualTokenReserve. That tripped the old 45% breaker; at
+        // 99.99% it is allowed through.
         uint256 fee = arrowpad.getFirstBuyFee(t);
         vm.prank(addr1);
-        vm.expectRevert("Exceeds max price impact");
         arrowpad.swapExactETHForTokens{value: 2.4 ether + fee}(
             t,
             2.4 ether,
             0,
             block.timestamp
         );
+        assertGt(IERC20(t).balanceOf(addr1), 0, "48% impact buy now permitted");
 
-        console.log("Price impact limit enforced");
+        // Buys can no longer trip this breaker at all: the reserve cap binds first,
+        // holding amountOut at tokenReserve (~74% of virtualTokenReserve) — below
+        // 99.99%. MAX_BUY_PERCENT is what actually bounds buy size now.
+        console.log("Price impact breaker relaxed to 99.99%");
     }
 
     // ================================================================
@@ -2542,41 +2549,59 @@ contract ArrowpadTest is Test {
     }
 
     /// @notice V3 position NFT is minted to the burn address; LM/arrowpad hold none.
-    function test_32_V3PositionBurned() public {
-        console.log("=== TEST 32: V3 position NFT burned ===");
+    /// @notice V3 position is LOCKED IN THE MANAGER, not burned. Burning the NFT
+    ///         would strand every fee the position ever earns, because collect() is
+    ///         owner-only and 0xdEaD can never call it. Locking gives the same
+    ///         no-rug guarantee (no withdraw path exists) while keeping fees claimable.
+    function test_32_V3PositionLockedInManager() public {
+        console.log("=== TEST 32: V3 position NFT locked in LM ===");
         uint256 deadBefore = IERC20(V3_POS_MGR).balanceOf(DEAD);
-        address t = _graduateV3("BurnV3", "BV3");
+        uint256 lmBefore = IERC20(V3_POS_MGR).balanceOf(address(liquidityManager));
+        address t = _graduateV3("LockV3", "LV3");
         assertEq(
             IERC20(V3_POS_MGR).balanceOf(DEAD),
-            deadBefore + 1,
-            "V3 position NFT at burn address"
+            deadBefore,
+            "position must NOT be burned"
         );
         assertEq(
             IERC20(V3_POS_MGR).balanceOf(address(liquidityManager)),
-            0,
-            "LM holds no position"
+            lmBefore + 1,
+            "LM holds the position"
         );
         assertEq(
             IERC20(V3_POS_MGR).balanceOf(address(arrowpad)),
             0,
             "arrowpad holds no position"
         );
+        uint256 id = liquidityManager.v3PositionOf(t);
+        assertTrue(id != 0, "position id recorded for fee collection");
+        assertEq(
+            INonfungiblePositionManager(V3_POS_MGR).ownerOf(id),
+            address(liquidityManager),
+            "LM owns the recorded position"
+        );
     }
 
-    /// @notice V4 position NFT is minted to the burn address; LM holds none.
-    function test_33_V4PositionBurned() public {
-        console.log("=== TEST 33: V4 position NFT burned ===");
+    /// @notice V4 position is locked in the LM rather than burned, for the same
+    ///         reason as V3: a burned position's fees are unreachable forever.
+    function test_33_V4PositionLockedInManager() public {
+        console.log("=== TEST 33: V4 position NFT locked in LM ===");
         uint256 deadBefore = IERC20(V4_POS_MGR).balanceOf(DEAD);
-        address t = _graduateV4("BurnV4", "BV4");
+        uint256 lmBefore = IERC20(V4_POS_MGR).balanceOf(address(liquidityManager));
+        address t = _graduateV4("LockV4", "LV4");
         assertEq(
             IERC20(V4_POS_MGR).balanceOf(DEAD),
-            deadBefore + 1,
-            "V4 position NFT at burn address"
+            deadBefore,
+            "position must NOT be burned"
         );
         assertEq(
             IERC20(V4_POS_MGR).balanceOf(address(liquidityManager)),
-            0,
-            "LM holds no position"
+            lmBefore + 1,
+            "LM holds the position"
+        );
+        assertTrue(
+            liquidityManager.v4PositionOf(t) != 0,
+            "position id recorded for fee collection"
         );
     }
 

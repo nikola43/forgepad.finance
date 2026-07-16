@@ -19,6 +19,8 @@ import { BrowserProvider } from "ethers"
 import axios from "axios"
 import toast from "react-hot-toast"
 
+import { ChainController } from "@reown/appkit-controllers"
+
 import PageBox from "@/components/layout/pageBox"
 import { getProfilePic, UserAvatar, UserName } from "@/components/cards/user"
 import TokenLogo from "@/components/tokenLogo"
@@ -26,6 +28,8 @@ import { ProfileSkeleton, ListSkeleton } from "@/components/Skeleton"
 import EmptyStateComponent from "@/components/EmptyState"
 import { useUserProfile } from "@/hooks/user"
 import { useRewards } from "@/hooks/rewards"
+import { useHandlers } from "@/hooks/token"
+import { useMainContext } from "@/context"
 import { API_ENDPOINT } from "@/config"
 import { priceFormatter } from "@/utils/price"
 import Link from "next/link"
@@ -150,6 +154,84 @@ const ProgressBar = styled('div')<{ value: number }>`
         border-radius: 100px;
     }
 `
+
+/// Claim a launched token's accrued V3/V4 trading fees — 50% creator, 50% platform.
+/// Its own component rather than inline in the list, because each token can be on a
+/// different chain and useHandlers is a hook: it can't be called inside a .map().
+/// Renders nothing unless there is actually something to claim, so V2 tokens, tokens
+/// still on the curve, and tokens with no fees yet never show a dead button.
+const ClaimFeesButton = ({ token, onClaimed }: { token: any, onClaimed: () => void }) => {
+    const { chains } = useMainContext()
+    const tokenChain = useMemo(() => chains?.find(c => c.network === token.network), [chains, token.network])
+    const networks = ChainController.getCaipNetworks()
+    const tokenNetwork = useMemo(
+        () => networks.find(n => n.id === tokenChain?.chainId || n.chainNamespace === tokenChain?.chainId),
+        [networks, tokenChain]
+    )
+    const handlers = useHandlers(tokenNetwork)
+
+    const [fees, setFees] = useState<{ eth: string, token: string } | undefined>()
+    const [claiming, setClaiming] = useState(false)
+
+    const getClaimableFees = (handlers as any)?.getClaimableFees
+
+    useEffect(() => {
+        if (!token.launchedAt || !getClaimableFees) return
+        let active = true
+        getClaimableFees(token.tokenAddress)
+            .then((f: any) => { if (active) setFees(f) })
+            .catch(() => { if (active) setFees(undefined) })
+        return () => { active = false }
+    }, [token.tokenAddress, token.launchedAt, getClaimableFees])
+
+    const hasFees = fees && (Number(fees.eth) > 0 || Number(fees.token) > 0)
+    if (!hasFees) return null
+
+    const claim = async (e: React.MouseEvent) => {
+        // The whole card is a Link to the token page; claiming must not navigate.
+        e.preventDefault()
+        e.stopPropagation()
+        if (!(handlers as any)?.claimFees) return
+        setClaiming(true)
+        try {
+            const tx = await (handlers as any).claimFees(token.tokenAddress)
+            await tx.wait()
+            toast.success('Fees claimed')
+            setFees(undefined)
+            onClaimed()
+        } catch (err: any) {
+            toast.error(err?.reason || err?.message || 'Failed to claim fees')
+        } finally {
+            setClaiming(false)
+        }
+    }
+
+    // Only half of what's collected reaches the creator, so show their half rather
+    // than the gross figure — otherwise the button promises more than it pays.
+    const creatorEth = (Number(fees!.eth) / 2).toFixed(5)
+
+    return (
+        <Button
+            onClick={claim}
+            disabled={claiming}
+            size="small"
+            sx={{
+                background: 'rgba(211,255,36,0.12)',
+                border: '1px solid rgba(211,255,36,0.35)',
+                borderRadius: '8px',
+                px: 1.2, py: 0.3, minWidth: 0, flexShrink: 0,
+                textTransform: 'none',
+                '&:hover': { background: 'rgba(211,255,36,0.22)' },
+            }}
+        >
+            {claiming
+                ? <CircularProgress size={13} sx={{ color: '#D3FF24' }} />
+                : <Typography fontSize={11} fontWeight={700} color="#D3FF24" noWrap>
+                    Claim {creatorEth} ETH
+                </Typography>}
+        </Button>
+    )
+}
 
 export default function Profile() {
     const searchParams = useSearchParams()
@@ -626,6 +708,9 @@ export default function Profile() {
                                                         </Box>
                                                     )}
                                                 </Box>
+                                                {isOwnProfile && token.launchedAt && (
+                                                    <ClaimFeesButton token={token} onClaimed={reloadProfile} />
+                                                )}
                                                 {token.launchedAt ? (
                                                     <Box sx={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', px: 1, py: 0.3 }}>
                                                         <Typography fontSize={11} fontWeight={600} color="#10B981">Launched</Typography>

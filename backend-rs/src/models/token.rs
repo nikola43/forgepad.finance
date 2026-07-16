@@ -185,6 +185,9 @@ impl TokenResponse {
                 PoolType::V2 => 1,
                 PoolType::V3 => 2,
                 PoolType::V4 => 3,
+                // Direct launches live on a V4 pool — on-chain poolType is 3 for both.
+                // The distinction is bonding curve vs none, which `launched` conveys.
+                PoolType::Direct => 3,
             },
             category: token.category,
             replies: token.reply_count,
