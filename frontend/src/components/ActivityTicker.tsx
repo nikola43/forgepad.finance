@@ -18,9 +18,9 @@ export default function ActivityTicker() {
         <Box
             sx={{
                 overflow: 'hidden',
-                borderTop: '1px solid rgba(255,255,255,0.06)',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                background: 'rgba(255,255,255,0.02)',
+                borderTop: '1px solid rgba(234,230,218,0.06)',
+                borderBottom: '1px solid rgba(234,230,218,0.06)',
+                background: 'var(--glass)',
                 py: 0.9,
                 '&:hover .ticker': { animationPlayState: 'paused' },
             }}
@@ -47,13 +47,13 @@ export default function ActivityTicker() {
                             onClick={() => router.push(`/token?network=${t.network}&address=${t.tokenAddress}`)}
                             sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', flexShrink: 0 }}
                         >
-                            <Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', background: buy ? '#10B981' : '#EF4444', flexShrink: 0 }} />
-                            <Typography component="span" fontSize={12} color="#94A3B8">{t.swapperUsername || `${String(t.swapperAddress).slice(0, 6)}…`}</Typography>
-                            <Typography component="span" fontSize={12} color={buy ? '#10B981' : '#EF4444'} fontWeight={600}>{buy ? 'bought' : 'sold'}</Typography>
-                            <Typography component="span" fontSize={12} color="white">${priceFormatter(usd, 2)}</Typography>
-                            <Typography component="span" fontSize={12} color="#64748B">of</Typography>
+                            <Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', background: buy ? 'var(--up)' : 'var(--down)', flexShrink: 0 }} />
+                            <Typography component="span" fontSize={12} color="var(--muted)" fontFamily="var(--font-data)">{t.swapperUsername || `${String(t.swapperAddress).slice(0, 6)}…`}</Typography>
+                            <Typography component="span" fontSize={12} color={buy ? 'var(--up)' : 'var(--down)'} fontWeight={600}>{buy ? 'bought' : 'sold'}</Typography>
+                            <Typography component="span" fontSize={12} color="var(--text-primary)" fontFamily="var(--font-data)">${priceFormatter(usd, 2)}</Typography>
+                            <Typography component="span" fontSize={12} color="var(--text-muted)">of</Typography>
                             <Avatar src={t.tokenImage || undefined} sx={{ width: 16, height: 16 }} />
-                            <Typography component="span" fontSize={12} color="#e4ff66" fontWeight={600}>{t.tokenSymbol}</Typography>
+                            <Typography component="span" fontSize={12} color="var(--citron)" fontWeight={600} fontFamily="var(--font-data)">{t.tokenSymbol}</Typography>
                         </Box>
                     )
                 })}

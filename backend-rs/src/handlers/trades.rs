@@ -326,10 +326,35 @@ pub async fn get_chart_data(
 
     // Build OHLCV candles by grouping trades into time buckets
     let mut candles: Vec<Candle> = Vec::new();
-    let mut prev_close: f64 = trade_rows[0]
-        .token_price
-        .to_f64()
-        .unwrap_or(0.0);
+
+    // Seed the running open with the token's price BEFORE any trade, i.e. the
+    // bonding curve's opening price (virtual_eth / virtual_token from the chain
+    // config — the curve always starts there).
+    //
+    // It must NOT be seeded from trade_rows[0].token_price: a trade's token_price
+    // is the price AFTER that trade executed, so the first candle would open at
+    // its own close, collapsing O=H=L=C into a flat bar and hiding the entire move
+    // from the launch price to the first fill. tokens.price cannot be used either
+    // — it is overwritten on every trade, so it is the CURRENT price, not the
+    // opening one (the no-trades branch above can use it only because no trade has
+    // overwritten it yet).
+    let chain = state
+        .chains
+        .iter()
+        .find(|c| c.network.eq_ignore_ascii_case(&token.network))
+        .cloned()
+        .unwrap_or_else(|| state.chains[0].clone());
+    let curve_open_price = if chain.virtual_token_amount > 0.0 {
+        chain.virtual_eth_amount / chain.virtual_token_amount
+    } else {
+        0.0
+    };
+    let mut prev_close: f64 = if curve_open_price > 0.0 {
+        curve_open_price
+    } else {
+        // Degenerate config: fall back to the first trade rather than a zero axis.
+        trade_rows[0].token_price.to_f64().unwrap_or(0.0)
+    };
 
     let mut trade_idx: usize = 0;
     let mut current = start_bucket;

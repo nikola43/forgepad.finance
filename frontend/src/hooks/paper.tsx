@@ -28,7 +28,7 @@ export type PaperPortfolio = {
     positions: PaperPosition[]
 }
 
-// Risk-free simulator: virtual ETH balance, trades priced on the live bonding
+// Risk-free simulator: virtual BNB balance, trades priced on the live bonding
 // curve server-side. All mutations return the fresh portfolio so we update the
 // SWR cache in one round-trip.
 export function usePaper(address?: string) {

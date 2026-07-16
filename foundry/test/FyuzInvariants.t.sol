@@ -2,17 +2,17 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {Fyuz, IFyuz} from "../src/Fyuz.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/// Drives Arrowpad with random create/buy/sell sequences from several actors.
+/// Drives Fyuz with random create/buy/sell sequences from several actors.
 /// Every call is wrapped in try/catch: a revert is a legitimate outcome (slippage,
 /// launched pool, deadline) and must not abort the run — we care about the state the
 /// contract is left in, not whether any single call succeeds.
-contract ArrowpadHandler is Test {
-    Arrowpad public arrowpad;
+contract FyuzHandler is Test {
+    Fyuz public fyuz;
     address[] public tokens;
     address[] public actors;
 
@@ -22,8 +22,8 @@ contract ArrowpadHandler is Test {
 
     receive() external payable {}
 
-    constructor(Arrowpad _a) {
-        arrowpad = _a;
+    constructor(Fyuz _a) {
+        fyuz = _a;
         for (uint256 i = 0; i < 4; i++) {
             address a = address(uint160(uint256(keccak256(abi.encode("actor", i)))));
             vm.deal(a, 10_000 ether);
@@ -43,11 +43,11 @@ contract ArrowpadHandler is Test {
         if (tokens.length >= 6) return;
         buyAmount = bound(buyAmount, 0, 30 ether);
         address a = _actor(seed);
-        uint256 fee = arrowpad.CREATE_TOKEN_FEE_AMOUNT();
+        uint256 fee = fyuz.CREATE_TOKEN_FEE_AMOUNT();
 
         vm.prank(a);
         try
-            arrowpad.createToken{value: buyAmount + fee}(
+            fyuz.createToken{value: buyAmount + fee}(
                 "Fz",
                 "FZ",
                 buyAmount,
@@ -70,7 +70,7 @@ contract ArrowpadHandler is Test {
 
         vm.prank(a);
         try
-            arrowpad.swapExactETHForTokens{value: amount}(
+            fyuz.swapExactETHForTokens{value: amount}(
                 t,
                 amount,
                 0,
@@ -106,8 +106,8 @@ contract ArrowpadHandler is Test {
         if (amt == 0) return;
 
         vm.startPrank(a);
-        IERC20(t).approve(address(arrowpad), amt);
-        try arrowpad.swapExactTokensForETH(t, amt, 0, block.timestamp + 1) {
+        IERC20(t).approve(address(fyuz), amt);
+        try fyuz.swapExactTokensForETH(t, amt, 0, block.timestamp + 1) {
             sells++;
         } catch {}
         vm.stopPrank();
@@ -118,7 +118,7 @@ contract ArrowpadHandler is Test {
     function donate(uint256 amount) public {
         amount = bound(amount, 1, 1 ether);
         vm.deal(address(this), amount);
-        (bool ok, ) = payable(address(arrowpad)).call{value: amount}("");
+        (bool ok, ) = payable(address(fyuz)).call{value: amount}("");
         ok;
     }
 }
@@ -129,10 +129,10 @@ contract ArrowpadHandler is Test {
 /// breaker no longer bounds buys, so the reserve cap + refund path is the only thing
 /// keeping a large buy from stranding ETH. These invariants hold that line across
 /// random trade sequences rather than hand-picked cases.
-contract ArrowpadInvariants is Test {
-    Arrowpad internal arrowpad;
-    ArrowpadLiquidityManager internal lm;
-    ArrowpadHandler internal handler;
+contract FyuzInvariants is Test {
+    Fyuz internal fyuz;
+    FyuzLiquidityManager internal lm;
+    FyuzHandler internal handler;
 
     address internal constant PERMIT2 =
         0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -144,7 +144,7 @@ contract ArrowpadInvariants is Test {
             vm.envOr("FORK_URL", string("https://ethereum-rpc.publicnode.com"))
         );
 
-        lm = ArrowpadDeploy.deployLiquidityManager(
+        lm = FyuzDeploy.deployLiquidityManager(
             vm.envOr("V2_ROUTER", 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
             vm.envOr("V3_FACTORY", 0x1F98431c8aD98523631AE4a59f267346ea31F984),
             vm.envOr("V3_POS_MGR", 0xC36442b4a4522E871399CD717aBDD847Ab11FE88),
@@ -158,18 +158,18 @@ contract ArrowpadInvariants is Test {
             10000,
             address(this)
         );
-        arrowpad = ArrowpadDeploy.deployArrowpad(
+        fyuz = FyuzDeploy.deployFyuz(
             vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419),
             address(lm),
             address(this),
             address(this),
             address(this)
         );
-        lm.setAuthorizedCaller(address(arrowpad), true);
-        arrowpad.setMaxBuyPercent(10000);
-        arrowpad.setPriceStalenessThreshold(86400);
+        lm.setAuthorizedCaller(address(fyuz), true);
+        fyuz.setMaxBuyPercent(10000);
+        fyuz.setPriceStalenessThreshold(86400);
 
-        handler = new ArrowpadHandler(arrowpad);
+        handler = new FyuzHandler(fyuz);
         targetContract(address(handler));
 
         // Pin the senders. Left to its own devices the fuzzer invents random sender
@@ -205,10 +205,10 @@ contract ArrowpadInvariants is Test {
         assertGt(handler.tokenCount(), 0, "no tokens tracked");
 
         // And the invariants must still hold after real activity.
-        assertGe(address(arrowpad).balance, arrowpad.totalCurveEthReserve());
+        assertGe(address(fyuz).balance, fyuz.totalCurveEthReserve());
         assertEq(
-            arrowpad.withdrawableEth(),
-            address(arrowpad).balance - arrowpad.totalCurveEthReserve()
+            fyuz.withdrawableEth(),
+            address(fyuz).balance - fyuz.totalCurveEthReserve()
         );
     }
 
@@ -218,8 +218,8 @@ contract ArrowpadInvariants is Test {
     /// forge-config: default.invariant.depth = 24
     function invariant_solventAgainstCurveReserve() public view {
         assertGe(
-            address(arrowpad).balance,
-            arrowpad.totalCurveEthReserve(),
+            address(fyuz).balance,
+            fyuz.totalCurveEthReserve(),
             "INSOLVENT: balance below accounted curve reserve"
         );
     }
@@ -230,10 +230,10 @@ contract ArrowpadInvariants is Test {
     /// forge-config: default.invariant.runs = 48
     /// forge-config: default.invariant.depth = 24
     function invariant_surplusIsAlwaysWithdrawable() public view {
-        uint256 surplus = address(arrowpad).balance -
-            arrowpad.totalCurveEthReserve();
+        uint256 surplus = address(fyuz).balance -
+            fyuz.totalCurveEthReserve();
         assertEq(
-            arrowpad.withdrawableEth(),
+            fyuz.withdrawableEth(),
             surplus,
             "surplus ETH is not accounted as withdrawable"
         );
@@ -247,14 +247,14 @@ contract ArrowpadInvariants is Test {
         uint256 sum;
         uint256 n = handler.tokenCount();
         for (uint256 i = 0; i < n; i++) {
-            IArrowpad.PoolInfo memory p = IArrowpad(address(arrowpad)).tokenPools(
+            IFyuz.PoolInfo memory p = IFyuz(address(fyuz)).tokenPools(
                 handler.tokens(i)
             );
             sum += p.ethReserve;
         }
         assertEq(
             sum,
-            arrowpad.totalCurveEthReserve(),
+            fyuz.totalCurveEthReserve(),
             "accumulator drifted from the sum of pool reserves"
         );
     }

@@ -3,7 +3,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import LogoutIcon from '@mui/icons-material/Logout';
 import TwitterIcon from '@/assets/images/x.svg';
 import { CubeIcon, DialogHowItWorks, HomeIcon, TokenIcon, WalletIcon } from "./sidebar";
-import { FORGE_TWITTER_URL } from "@/config";
+import { FYUZ_TWITTER_URL } from "@/config";
+import { FyuzLockup } from "../brand/FyuzMark";
 import { useEffect, useState } from "react";
 import { CircularProgress } from "@mui/material";
 import Link from "next/link";
@@ -112,7 +113,7 @@ const Button = styled.button`
     gap: 12px;
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.1);
-    border: 1px solid #c4ef0e;
+    border: 1px solid var(--citron);
     outline: none;
     border-radius: 8px;
     color: white;
@@ -188,7 +189,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
         return <Menu>
             <MenuButton className="effect-button" onClick={() => onMenuOpen(true)}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 6H4M20 12H4M20 18H4" stroke="#c4ef0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M20 6H4M20 12H4M20 18H4" stroke="var(--citron)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             </MenuButton>
             {
@@ -206,17 +207,17 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
     return <MenuBack>
         <Menu>
             <MenuButton className="effect-button" onClick={() => onMenuOpen(false)}>
-                <CloseIcon style={{ color: "#c4ef0e" }} />
+                <CloseIcon style={{ color: "var(--citron)" }} />
             </MenuButton>
         </Menu>
         <LogoWrapper>
-            <img src="/images/logo.png" style={{ objectFit: 'contain' }} width={220} height={220} alt="logo" />
+            <FyuzLockup size={40} orientation="vertical" />
         </LogoWrapper>
         <Buttons>
             <StyledLink href="/">
                 <Button className="effect-button">
                     <HomeIcon />
-                    Home
+                    Tonight's Card
                 </Button>
             </StyledLink>
 
@@ -236,7 +237,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
             <Link href="/create" style={{ textDecoration: 'none' }} >
                 <Button className="effect-button">
                     <TokenIcon />
-                    Create Token
+                    Make a Match
                 </Button>
             </Link>
 
@@ -250,7 +251,7 @@ export default function MobileMenu({ open, onMenuOpen }: { open: boolean, onMenu
         </Buttons>
 
         <SocialLinks>
-            <Link href={FORGE_TWITTER_URL} target="_blank">
+            <Link href={FYUZ_TWITTER_URL} target="_blank">
                 <Image src={TwitterIcon} width={45} height={45} alt="twitter" />
             </Link>
         </SocialLinks>

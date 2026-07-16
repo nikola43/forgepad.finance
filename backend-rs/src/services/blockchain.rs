@@ -106,8 +106,10 @@ async fn run_listener_once(
     contract_address: Address,
 ) -> anyhow::Result<()> {
     // Server-side indexing RPC. This must support large `eth_getLogs` ranges
-    // (the Robinhood public node does; QuikNode/Alchemy free tiers cap at a few
-    // blocks), so it is deliberately separate from `chain.rpc_url` — the
+    // (BSC public dataseed nodes cap the range — typically ~5k blocks — and
+    // QuikNode/Alchemy free tiers cap at a few blocks, so point ETH_RPC_URL at a
+    // provider with a generous getLogs limit), so it is deliberately separate
+    // from `chain.rpc_url` — the
     // browser-facing endpoint exposed via /config, which only needs to be
     // reachable + CORS-enabled from browsers. Matches the eth_call helpers, which
     // already prefer ETH_RPC_URL.
@@ -242,7 +244,17 @@ async fn catch_up<P: Provider>(
     Ok(last_block)
 }
 
-/// Load the persisted indexing cursor for a network, inserting a zero row if absent.
+/// Load the persisted indexing cursor for a network, seeding it on first run.
+///
+/// The seed is INDEXER_START_BLOCK (default 0). On a chain with existing history
+/// this matters: BNB Smart Chain is ~110M blocks deep, so seeding 0 makes the
+/// indexer try to backfill the entire chain from genesis in 50k-block getLogs
+/// chunks — it never reaches the head and just hammers the RPC until it is rate
+/// limited. Nothing before the Fyuz deployment can contain our events anyway, so
+/// set this to the deployment block (or the fork block on a localnet).
+///
+/// Only used when there is no existing cursor; a real cursor always wins, so this
+/// cannot rewind a running indexer.
 async fn load_last_block(state: &AppState, network: &str) -> anyhow::Result<u64> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
     let idx_state: Option<IndexingState> = indexing_state::table
@@ -255,16 +267,25 @@ async fn load_last_block(state: &AppState, network: &str) -> anyhow::Result<u64>
     match idx_state {
         Some(s) => Ok(s.last_block.max(0) as u64),
         None => {
+            let start_block: i64 = std::env::var("INDEXER_START_BLOCK")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
+            tracing::info!(
+                "Chain {} has no indexing cursor; seeding at block {}",
+                network,
+                start_block
+            );
             let new_state = NewIndexingState {
                 network: network.to_string(),
-                last_block: 0,
+                last_block: start_block,
             };
             diesel::insert_into(indexing_state::table)
                 .values(&new_state)
                 .execute(&mut conn)
                 .await
                 .ok();
-            Ok(0)
+            Ok(start_block.max(0) as u64)
         }
     }
 }
@@ -337,7 +358,7 @@ async fn process_token_created_log(
     Ok(())
 }
 
-/// Fetch the poolType from the on-chain Arrowpad contract via tokenPools().
+/// Fetch the poolType from the on-chain Fyuz contract via tokenPools().
 /// The TokenCreated event does not emit poolType, so we must read it from
 /// contract state to store it accurately in the backend.
 async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<crate::models::enums::PoolType> {
@@ -474,7 +495,9 @@ async fn process_swap_log(
 }
 
 async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
-    // Read ETH price from Arrowpad contract's getETHPriceByUSD() (uses Chainlink on-chain)
+    // Read the native-token (BNB on BSC) price from the Fyuz contract's
+    // getETHPriceByUSD() (reads the Chainlink feed on-chain; on BSC that feed
+    // slot is wired to BNB/USD, so this returns BNB/USD despite the ETH naming).
     let rpc_url = std::env::var("ETH_RPC_URL")
         .unwrap_or_else(|_| chain.rpc_url.clone());
     let client = reqwest::Client::new();

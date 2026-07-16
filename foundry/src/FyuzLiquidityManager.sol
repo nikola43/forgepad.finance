@@ -31,6 +31,7 @@ import {
 import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IV3PoolSlot0} from "./interfaces/IV3PoolSlot0.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     SafeERC20
@@ -52,13 +53,13 @@ import "./v4-periphery/interfaces/IPositionManager.sol";
 import "./permit2/interfaces/IPermit2.sol";
 
 /**
- * @title ArrowpadLiquidityManager
- * @author Arrowpad Protocol
+ * @title FyuzLiquidityManager
+ * @author Fyuz Protocol
  * @notice A comprehensive liquidity management contract supporting Uniswap V2, V3, and V4
  * @dev This contract allows users to add liquidity to different versions of Uniswap protocols
  *      while maintaining security through reentrancy protection
  */
-contract ArrowpadLiquidityManager is
+contract FyuzLiquidityManager is
     Initializable,
     ReentrancyGuard,
     OwnableUpgradeable,
@@ -1072,7 +1073,7 @@ contract ArrowpadLiquidityManager is
      *      There is no code path in this contract that removes liquidity or transfers
      *      a position NFT, so the LP is locked even though the fees are not.
      * @param token The launched token whose pool fees are being collected
-     * @param creator Receives 50% — the token's creator, supplied by Arrowpad
+     * @param creator Receives 50% — the token's creator, supplied by Fyuz
      * @param platform Receives 50% — the protocol fee address
      * @return ethFees Total ETH fees collected (before the split)
      * @return tokenFees Total token fees collected (before the split)
@@ -1295,7 +1296,10 @@ contract ArrowpadLiquidityManager is
             pool = factoryV3.createPool(token, weth, fee);
         }
 
-        (uint160 existing, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        // Read via the uint32-feeProtocol signature: Uniswap V3 uses uint8 but
+        // PancakeSwap V3 widened it, and the narrow signature reverts on any
+        // already-initialized Pancake pool. See IV3PoolSlot0.
+        (uint160 existing, , , , , , ) = IV3PoolSlot0(pool).slot0();
         if (existing == 0) {
             // Freshly created (or created-but-not-initialized): set our price.
             IUniswapV3Pool(pool).initialize(sqrtPriceX96);

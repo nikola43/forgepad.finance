@@ -12,7 +12,7 @@ use crate::AppState;
 
 // ---------------------------------------------------------------------------
 // Discover / trending screener. A dedicated read endpoint (leaves the
-// Home-page `list_tokens` untouched) that ranks ArrowPad tokens with a 24h
+// Home-page `list_tokens` untouched) that ranks Fyuz tokens with a 24h
 // window computed live from `trades`/`holders`. Tabs pick the ORDER BY;
 // numeric filters are parsed to f64/i64 and inlined (injection-safe), and the
 // only string input (network) is sanitized to [a-z0-9-].

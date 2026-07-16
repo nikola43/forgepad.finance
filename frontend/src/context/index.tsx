@@ -29,39 +29,68 @@ import {
 import { projectId } from "@/config";
 import { WagmiProvider } from "wagmi";
 
-// Robinhood Chain (Arbitrum Orbit L2, chainId 4663, ETH gas token)
-const robinhood = defineChain({
-  id: 4663,
-  caipNetworkId: "eip155:4663",
+// BNB Smart Chain (BNB gas token). Built from appkit's ready-made `bsc` network
+// so the canonical metadata (name, BNB nativeCurrency, BscScan, multicall3)
+// comes from upstream; we override the RPC/explorer so they can point at a
+// private node, and the chain id so a localnet can run beside real BSC.
+const bscRpcUrl =
+  process.env.NEXT_PUBLIC_BSC_RPC_URL || "https://bsc-dataseed.bnbchain.org";
+const bscExplorerUrl =
+  process.env.NEXT_PUBLIC_BSC_EXPLORER_URL || "https://bscscan.com";
+
+// Defaults to real BSC (56). A localnet MUST override this: an anvil BSC fork
+// still reports whatever chain id it was started with, and if that id is 56 the
+// wallet matches it to its own built-in BSC network and silently routes
+// transactions to MAINNET instead of the fork. Giving the localnet its own id
+// (e.g. 31337) makes the wallet treat it as a distinct network and keeps real
+// funds out of reach.
+const bscChainId = Number(process.env.NEXT_PUBLIC_BSC_CHAIN_ID ?? 56);
+const isLocalnet = bscChainId !== 56;
+
+const ethNetwork = defineChain({
+  ...bsc,
+  id: bscChainId,
+  name: isLocalnet ? `BNB Smart Chain (localnet ${bscChainId})` : bsc.name,
+  // The upstream `bsc` export is a plain viem chain; defineChain needs the CAIP
+  // fields added on top.
   chainNamespace: "eip155",
-  name: "Robinhood Chain",
-  nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
+  caipNetworkId: `eip155:${bscChainId}`,
   rpcUrls: {
-    default: {
-      http: [
-        process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL ||
-          "https://rpc.mainnet.chain.robinhood.com",
-      ],
-    },
+    ...bsc.rpcUrls,
+    default: { http: [bscRpcUrl] },
   },
   blockExplorers: {
+    ...bsc.blockExplorers,
     default: {
-      name: "Robinhood Explorer",
-      url:
-        process.env.NEXT_PUBLIC_ROBINHOOD_EXPLORER_URL ||
-        "https://robinhoodchain.blockscout.com",
+      ...bsc.blockExplorers?.default,
+      name: bsc.blockExplorers?.default?.name ?? "BscScan",
+      url: bscExplorerUrl,
     },
   },
+  // A local fork has no explorer and no multicall3 deployment of its own; the
+  // inherited BSC multicall3 address does exist in forked state, so it stays.
+  testnet: isLocalnet,
 });
-
-const ethNetwork = robinhood;
 
 const theme = createTheme({
   palette: {
     mode: "dark",
+    background: { default: "#131208", paper: "#1E1C10" },
+    primary: { main: "#BFD143", contrastText: "#131208" },
+    secondary: { main: "#C74B8E", contrastText: "#131208" },
+    success: { main: "#3FA968" },
+    error: { main: "#D64545" },
+    warning: { main: "#E8B93B" },
+    text: { primary: "#EAE6DA", secondary: "#8C8C85" },
   },
   typography: {
-    fontFamily: "Inter",
+    fontFamily: "'Space Grotesk', Helvetica, Arial, sans-serif",
+    h1: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 900 },
+    h2: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 700 },
+    h3: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 700 },
+    h4: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 700 },
+    h5: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 700 },
+    h6: { fontFamily: "'Unbounded', 'Arial Black', sans-serif", fontWeight: 700 },
   },
   breakpoints: {
     values: {
@@ -79,10 +108,10 @@ const queryClient = new QueryClient();
 
 // Set up metadata
 // const metadata = {
-//   name: 'ArrowPad',
-//   description: 'ArrowPad Finance',
-//   url: 'https://arrowpad.io', // origin must match your domain & subdomain
-//   icons: ['https://arrowpad.io/favicon.ico']
+//   name: 'Fyuz',
+//   description: 'Two icons enter. One market leaves.',
+//   url: 'https://fyuz.fun', // origin must match your domain & subdomain
+//   icons: ['https://fyuz.fun/favicon.ico']
 // }
 
 interface Chain {
@@ -133,7 +162,8 @@ const appKit = createAppKit({
   enableWalletGuide: false,
   defaultAccountTypes: { eip155: "eoa", solana: "eoa" },
   themeVariables: {
-    "--w3m-accent": "#D3FF24",
+    "--w3m-accent": "#BFD143",
+    "--w3m-font-family": "'Space Grotesk', Helvetica, Arial, sans-serif",
     "--w3m-border-radius-master": "2px",
   },
 });

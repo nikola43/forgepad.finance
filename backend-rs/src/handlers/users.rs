@@ -38,6 +38,9 @@ pub struct UserPayload {
     pub username: Option<String>,
     pub bio: Option<String>,
     pub avatar: Option<String>,
+    /// X/Twitter handle. Omitted = keep current; "" = clear; otherwise a handle
+    /// or profile URL, normalized and validated in update_user.
+    pub twitter: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,7 +168,7 @@ pub async fn create_user(
         &state,
         &body.msg,
         &body.signature,
-        Some("Register on Arrowpad"),
+        Some("Register on Fyuz"),
     )
     .await?;
 
@@ -418,6 +421,12 @@ pub async fn get_user_profile(
             marketcap: token.marketcap.to_string(),
             network: token.network.clone(),
             creator_address: creator.address.clone(),
+            // These are the profile owner's own holdings.
+            user: CreatorInfo {
+                address: user.address.clone(),
+                username: user.username.clone(),
+                avatar: user.avatar.clone(),
+            },
         })
         .collect();
 
@@ -737,11 +746,41 @@ pub async fn update_user(
         }
     }
 
+    // X/Twitter handle: omitted keeps the current value, "" clears it, anything
+    // else is normalized (profile URL or @handle -> bare handle) and validated
+    // against X's handle rules (1-15 chars, [A-Za-z0-9_]).
+    let new_twitter: Option<String> = match body.user.twitter.as_deref() {
+        None => user.twitter_username.clone(),
+        Some(raw) => {
+            let handle = raw
+                .trim()
+                .trim_start_matches("https://")
+                .trim_start_matches("http://")
+                .trim_start_matches("www.")
+                .trim_start_matches("x.com/")
+                .trim_start_matches("twitter.com/")
+                .trim_start_matches('@')
+                .trim();
+            if handle.is_empty() {
+                None
+            } else if handle.len() <= 15
+                && handle.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                Some(handle.to_string())
+            } else {
+                return Err(AppError::BadRequest(
+                    "Invalid X/Twitter handle: 1-15 letters, digits or _".to_string(),
+                ));
+            }
+        }
+    };
+
     let updated_user = diesel::update(users::table.filter(users::id.eq(user.id)))
         .set((
             users::username.eq(body.user.username.as_deref().or(user.username.as_deref())),
             users::bio.eq(body.user.bio.as_deref().or(user.bio.as_deref())),
             users::avatar.eq(body.user.avatar.as_deref().or(user.avatar.as_deref())),
+            users::twitter_username.eq(new_twitter),
             users::updated_at.eq(Utc::now()),
         ))
         .get_result::<User>(&mut conn)

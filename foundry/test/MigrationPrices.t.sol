@@ -3,10 +3,11 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {Arrowpad} from "../src/Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {Fyuz} from "../src/Fyuz.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {
     IUniswapV2Router02
 } from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
@@ -24,8 +25,8 @@ import {
 /// Emits CSV rows prefixed with "ROW," so the harness can scrape them out of the
 /// forge log without needing fs_permissions.
 contract MigrationPricesTest is Test {
-    Arrowpad internal arrowpad;
-    ArrowpadLiquidityManager internal lm;
+    Fyuz internal fyuz;
+    FyuzLiquidityManager internal lm;
 
     address internal constant PERMIT2 =
         0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -46,7 +47,7 @@ contract MigrationPricesTest is Test {
             0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
         );
 
-        lm = ArrowpadDeploy.deployLiquidityManager(
+        lm = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER,
             vm.envOr("V3_FACTORY", 0x1F98431c8aD98523631AE4a59f267346ea31F984),
             vm.envOr("V3_POS_MGR", 0xC36442b4a4522E871399CD717aBDD847Ab11FE88),
@@ -60,20 +61,20 @@ contract MigrationPricesTest is Test {
             10000,
             address(this)
         );
-        arrowpad = ArrowpadDeploy.deployArrowpad(
+        fyuz = FyuzDeploy.deployFyuz(
             vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419),
             address(lm),
             address(this),
             address(this),
             address(this)
         );
-        lm.setAuthorizedCaller(address(arrowpad), true);
-        arrowpad.setMaxBuyPercent(10000);
+        lm.setAuthorizedCaller(address(fyuz), true);
+        fyuz.setMaxBuyPercent(10000);
         // The fork's feed has a fixed updatedAt; warping simulated time would make it
         // read stale and revert. Widen the window so the walk measures curve price,
         // not the fork's frozen clock. ETH/USD stays constant across the run, which
         // is what we want: it isolates the curve's own price movement.
-        arrowpad.setPriceStalenessThreshold(3650 days);
+        fyuz.setPriceStalenessThreshold(3650 days);
 
         weth = IUniswapV2Router02(V2_ROUTER).WETH();
         user = makeAddr("trader");
@@ -83,7 +84,40 @@ contract MigrationPricesTest is Test {
 
     /// ETH price (18dp) from the same oracle the contract uses.
     function _ethUsd() internal view returns (uint256) {
-        return arrowpad.getETHPriceByUSD();
+        return fyuz.getETHPriceByUSD();
+    }
+
+    /// Gross ETH a FRESH curve must absorb to reach the graduation target, derived
+    /// from the live constants + oracle rather than hardcoded.
+    ///
+    /// The walk used to step a flat 0.15 ether x40 (~6 ETH total), which was sized
+    /// for the ETH-era curve: at VIRTUAL_ETH_INITIAL 2.5 / a $20k target / ETH at
+    /// ~$3k, graduation needed only ~1.8 ETH and landed mid-walk. At the shipping
+    /// vETH 8.25 / $30k target with BNB at ~$575 it needs ~13.4 ETH, so a 6 ETH walk
+    /// could never graduate and the test failed on its own step size, not on the
+    /// contract. Deriving it means the walk re-scales itself on any recalibration
+    /// or gas-token reprice.
+    ///
+    /// mcap = ethUsd * TOTAL_SUPPLY * vEth / vTok / 1e18 and vEth * vTok == k, so the
+    /// target is reached when vEth == sqrt(k * target * 1e18 / (ethUsd * TOTAL_SUPPLY)).
+    function _grossEthToGraduate() internal view returns (uint256) {
+        uint256 vEth0 = fyuz.VIRTUAL_ETH_INITIAL();
+        uint256 k = vEth0 * fyuz.VIRTUAL_TOKEN_INITIAL();
+
+        // mulDiv: the numerator overflows 256 bits before the divide.
+        uint256 vEthTarget = Math.sqrt(
+            Math.mulDiv(
+                k,
+                fyuz.TARGET_MARKET_CAP_USD() * 1e18,
+                _ethUsd() * fyuz.TOTAL_SUPPLY()
+            )
+        );
+        if (vEthTarget <= vEth0) return 0; // already at/over target
+
+        // vEth only advances by the buy NET of fees, so gross the figure back up.
+        uint256 net = vEthTarget - vEth0;
+        uint256 feeBps = fyuz.PLATFORM_BUY_FEE_BPS() + fyuz.TOKEN_OWNER_FEE_BPS();
+        return (net * 10_000) / (10_000 - feeBps);
     }
 
     /// Spot price of the graduated V2 pool, in wei of ETH per whole token (18dp).
@@ -134,45 +168,49 @@ contract MigrationPricesTest is Test {
     function test_migrationPriceCurve() public {
         console.log("ROW,phase,index,minutes,ethIn,priceEthWei,priceUsdWei,mcapUsd,progressBps");
 
-        address t = arrowpad.createToken{
-            value: 0.05 ether + arrowpad.CREATE_TOKEN_FEE_AMOUNT()
+        address t = fyuz.createToken{
+            value: 0.05 ether + fyuz.CREATE_TOKEN_FEE_AMOUNT()
         }("Curve", "CRV", 0.05 ether, 0, 0, 1, block.timestamp + 1);
 
         _row(
             "curve",
             0,
             0.05 ether,
-            arrowpad.getVirtualPrice(t),
-            arrowpad.getTokenVirtualMarketCap(t),
-            arrowpad.getBondingCurveProgress(t)
+            fyuz.getVirtualPrice(t),
+            fyuz.getTokenVirtualMarketCap(t),
+            fyuz.getBondingCurveProgress(t)
         );
 
-        uint256 step = 0.15 ether;
+        // Size the step so the curve graduates ~30 steps into the 40-step walk:
+        // enough rows to show the curve's shape, with headroom so ordinary price
+        // drift can never push graduation past the end of the walk.
+        uint256 step = _grossEthToGraduate() / 30;
+        assertGt(step, 0, "walk step must be derivable from the live curve");
         uint256 lastCurvePrice;
         uint256 graduatedAt;
 
         for (uint256 i = 1; i <= 40; i++) {
-            (, , , , , , bool launched) = arrowpad.getPoolDetails(t);
+            (, , , , , , bool launched) = fyuz.getPoolDetails(t);
             if (launched) {
                 graduatedAt = i;
                 break;
             }
 
-            lastCurvePrice = arrowpad.getVirtualPrice(t);
+            lastCurvePrice = fyuz.getVirtualPrice(t);
 
             vm.warp(block.timestamp + 5 minutes);
             vm.roll(block.number + 25);
 
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(user);
-            arrowpad.swapExactETHForTokens{value: step + fee}(
+            fyuz.swapExactETHForTokens{value: step + fee}(
                 t,
                 step,
                 0,
                 block.timestamp + 1
             );
 
-            (, , , , , , bool nowLaunched) = arrowpad.getPoolDetails(t);
+            (, , , , , , bool nowLaunched) = fyuz.getPoolDetails(t);
             if (nowLaunched) {
                 graduatedAt = i;
                 // The graduating trade zeroes the curve, so price now lives in the pool.
@@ -184,9 +222,9 @@ contract MigrationPricesTest is Test {
                 "curve",
                 i,
                 step,
-                arrowpad.getVirtualPrice(t),
-                arrowpad.getTokenVirtualMarketCap(t),
-                arrowpad.getBondingCurveProgress(t)
+                fyuz.getVirtualPrice(t),
+                fyuz.getTokenVirtualMarketCap(t),
+                fyuz.getBondingCurveProgress(t)
             );
         }
 

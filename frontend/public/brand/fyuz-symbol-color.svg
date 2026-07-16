@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640">
+  <rect width="1000" height="640" fill="#131208"></rect>
+  <g style="isolation:isolate">
+    <circle cx="380" cy="320" r="230" fill="#BFD143" style="mix-blend-mode:screen"></circle>
+    <circle cx="620" cy="320" r="230" fill="#C74B8E" style="mix-blend-mode:screen"></circle>
+    <circle cx="500" cy="320" r="108" fill="#E86A2B"></circle>
+  </g>
+</svg>

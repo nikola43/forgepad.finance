@@ -36,7 +36,7 @@ struct QuestDef {
 const QUESTS: &[QuestDef] = &[
     QuestDef { key: "first_buy", title: "First Buy", description: "Make your first token buy", kind: "oneoff", target: 1.0, points: 5.0 },
     QuestDef { key: "launch_token", title: "Launch a Token", description: "Create your first token", kind: "oneoff", target: 1.0, points: 20.0 },
-    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer a new trader to ArrowPad", kind: "oneoff", target: 1.0, points: 25.0 },
+    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer a new trader to Fyuz", kind: "oneoff", target: 1.0, points: 25.0 },
     QuestDef { key: "daily_trade", title: "Daily Trader", description: "Make at least one trade today", kind: "daily", target: 1.0, points: 3.0 },
     QuestDef { key: "daily_volume", title: "Volume Runner", description: "Trade $10 of volume today", kind: "daily", target: 10.0, points: 10.0 },
 ];
@@ -51,7 +51,7 @@ struct AchDef {
 
 const ACHIEVEMENTS: &[AchDef] = &[
     AchDef { key: "first_blood", title: "First Blood", description: "Completed your first trade", icon: "🩸", points: 0.0 },
-    AchDef { key: "creator", title: "Creator", description: "Launched a token on ArrowPad", icon: "🏗️", points: 10.0 },
+    AchDef { key: "creator", title: "Creator", description: "Launched a token on Fyuz", icon: "🏗️", points: 10.0 },
     AchDef { key: "whale", title: "Whale", description: "Made a single trade over $100", icon: "🐋", points: 15.0 },
     AchDef { key: "graduate", title: "Graduate", description: "Held a token through graduation", icon: "🎓", points: 15.0 },
     AchDef { key: "week_warrior", title: "Week Warrior", description: "Reached a 7-day trading streak", icon: "🔥", points: 20.0 },

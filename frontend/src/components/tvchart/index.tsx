@@ -8,13 +8,21 @@ import {
 import * as React from 'react';
 import { Box, styled, useMediaQuery } from '@mui/material';
 
-// import Logo from '@/assets/images/logo.png';
 import axios from 'axios';
 import { API_ENDPOINT } from '@/config';
 import { priceFormatter } from '@/utils/price';
 import { socket } from '@/utils/socket';
 import { useMainContext } from '@/context';
 import { AssetUtil, ChainController } from "@reown/appkit-controllers"
+
+// The chart lives inside an iframe, so it can't read our CSS custom properties.
+// These mirror the Fyuz tokens in globals.css and must be kept in step with them.
+const CHAMBER = '#131208'   // moss black
+const SURFACE = '#1E1C10'   // surface dark
+const GRID = '#26240F'
+const MUTED = '#8C8C85'
+const UP = '#3FA968'
+const DOWN = '#D64545'
 
 // import { socket } from '../../utils/socket';
 
@@ -156,7 +164,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
             setTimeout(() => callback({
                 supported_resolutions: ['1', '15', '1D', '1W', '1M'],
                 exchanges: [
-                    { value: 'Uniswap', name: 'Uniswap', desc: 'Uniswap exchange' },
+                    { value: 'PancakeSwap', name: 'PancakeSwap', desc: 'PancakeSwap exchange' },
                 ],
                 symbols_types: [
                     { name: 'crypto', value: 'crypto' }
@@ -181,7 +189,7 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
                         timezone: 'Etc/UTC',
                         dex,
                         network,
-                        exchange: dex ?? 'Forge Finance',
+                        exchange: dex ?? 'Fyuz',
                         // logo_urls: [`${IPFS_GATEWAY_URL}${tokenDetails.tokenImage}`],
                         logo_urls: [`${API_ENDPOINT}/logo/${tokenDetails.tokenImage}`],
                         minmov: 1,
@@ -423,18 +431,26 @@ export const TVChartContainer = ({ token, network, dex, ...props }: any) => {
             },
             overrides: {
                 'paneProperties.backgroundType': 'solid',
-                'paneProperties.background': '#212121',
-                'paneProperties.vertGridProperties.color': '#191919',
-                'paneProperties.horzGridProperties.color': '#191919',
+                'paneProperties.background': CHAMBER,
+                'paneProperties.vertGridProperties.color': GRID,
+                'paneProperties.horzGridProperties.color': GRID,
                 'scalesProperties.fontSize': isMobile ? 5 : 12,
+                'scalesProperties.textColor': MUTED,
+                // Market direction is green/red only — never citron or plum rose (§08).
+                'mainSeriesProperties.candleStyle.upColor': UP,
+                'mainSeriesProperties.candleStyle.downColor': DOWN,
+                'mainSeriesProperties.candleStyle.borderUpColor': UP,
+                'mainSeriesProperties.candleStyle.borderDownColor': DOWN,
+                'mainSeriesProperties.candleStyle.wickUpColor': UP,
+                'mainSeriesProperties.candleStyle.wickDownColor': DOWN,
             }
         };
 
         const tvWidget = new widget(widgetOptions);
         // const document = tvWidget.._iFrame.contentDocument
-        tvWidget.setCSSCustomProperty('--tv-color-platform-background', '#191919')
-        tvWidget.setCSSCustomProperty('--tv-color-pane-background', '#21212180')
-        tvWidget.setCSSCustomProperty('--tv-color-popup-background', '#121212')
+        tvWidget.setCSSCustomProperty('--tv-color-platform-background', CHAMBER)
+        tvWidget.setCSSCustomProperty('--tv-color-pane-background', CHAMBER)
+        tvWidget.setCSSCustomProperty('--tv-color-popup-background', SURFACE)
         // tvWidget.setCSSCustomProperty('--ui-lib-button-color-bg', 'white')
         // tvWidget.setCSSCustomProperty('--ui-lib-button-color-border', 'white')
         return () => {

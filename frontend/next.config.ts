@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
       // @wagmi/core's unused "tempo" connectors barrel imports an
       // unresolvable 'accounts' module; the app uses explicit adapters, so stub it.
       accounts: false,
+      // Same shape: @wagmi/connectors ships a Porto connector whose 'porto' peer is
+      // declared optional and is not installed. We never construct that connector,
+      // but the barrel import still makes webpack resolve it, which surfaces as a
+      // console "Can't resolve 'porto/internal'" on every page.
+      porto: false,
+      'porto/internal': false,
     };
 
     // config.optimization.splitChunks = {

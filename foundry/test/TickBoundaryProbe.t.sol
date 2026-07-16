@@ -2,8 +2,8 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 import {Token} from "../src/Token.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TickMath} from "../src/v4-core/libraries/TickMath.sol";
@@ -21,7 +21,7 @@ import {
 /// needs WETH it cannot pay, and the launch reverts with MaximumAmountExceeded.
 /// Deleting the `+ 1` in the source makes this test revert.
 contract TickBoundaryProbe is Test {
-    ArrowpadLiquidityManager internal liquidityManager;
+    FyuzLiquidityManager internal liquidityManager;
 
     int24 internal constant TICK_SPACING = 60;
     uint256 internal constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
@@ -38,7 +38,7 @@ contract TickBoundaryProbe is Test {
 
         vm.deal(address(this), 10_000 ether);
 
-        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
+        liquidityManager = FyuzDeploy.deployLiquidityManager(
             vm.envOr("V2_ROUTER", 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
             vm.envOr("V3_FACTORY", 0x1F98431c8aD98523631AE4a59f267346ea31F984),
             vm.envOr("V3_POS_MGR", 0xC36442b4a4522E871399CD717aBDD847Ab11FE88),
@@ -103,7 +103,27 @@ contract TickBoundaryProbe is Test {
         revert("no aligned tick found");
     }
 
+    /// SKIPPED: gated off with the V4 / direct-launch paths, not deleted.
+    ///
+    /// createToken now accepts only poolType 1 (V2) and 2 (V3), createTokenDirect is
+    /// gone from the ABI, and the BSC deploy wires the V4 slots to the non-contract
+    /// sentinel 0x...dEaD — so addLiquidityV4SingleSided reverts at the first
+    /// PoolManager extsload, long before reaching the tick maths below.
+    ///
+    /// This is NOT repointable at V3. addLiquidityV3 mints FULL-RANGE and TWO-SIDED
+    /// via getFullRangeTicks(POOL_FEE): it never derives a startTick, and both sides
+    /// are funded, so a position cannot straddle spot with an unpayable capped side.
+    /// The `+ 1` this guards — and _alignUp/_alignDown — are reachable ONLY from
+    /// addLiquidityV4SingleSided. Pointing this test at V3 would make it vacuous
+    /// (deleting the `+ 1` would not fail it) while still looking like coverage.
+    ///
+    /// Kept because src/FyuzLiquidityManager.sol still CONTAINS that `+ 1` and both
+    /// align helpers — the V4 internals were "intentionally left in place". Deleting
+    /// the only guard for live code is how a subtle fix gets refactored away. Drop the
+    /// vm.skip if V4 is ever un-gated; delete this file if the V4 internals are removed.
     function test_singleSidedLaunch_survivesAlignedStartTick() public {
+        vm.skip(true);
+
         uint256 ethForPrice = _findAlignedEthAmount();
 
         // Setup must genuinely hit the boundary case, else this test is vacuous.

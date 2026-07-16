@@ -35,9 +35,8 @@ const HEADER = 64
 const paperBase = {
     top: HEADER,
     height: `calc(100% - ${HEADER}px)`,
-    background: 'rgba(6, 6, 10, 0.96)',
-    backdropFilter: 'blur(20px)',
-    borderRight: '1px solid rgba(255,255,255,0.06)',
+    background: '#131208',
+    borderRight: '1px solid rgba(234,230,218,0.08)',
 }
 
 const openedMixin = (theme: Theme): CSSObject => ({
@@ -74,18 +73,22 @@ type NavItem = { label: string; href: string; target?: string; icon: React.React
 
 // `target` overrides the navigation destination while `href` stays the active-
 // state match (so /profile?address=me still highlights on /profile).
+//
+// Labels use the fight-night dialect (§16) — the trending feed is Tonight's
+// Card, new launches are The Undercard, the leaderboard is The Rankings.
+// Plain terms stay in transactional and educational copy.
 const items: NavItem[] = [
-    { label: 'Home', href: '/', icon: <HomeIcon /> },
-    { label: 'Discover', href: '/discover', icon: <TravelExploreOutlinedIcon /> },
+    { label: "Tonight's Card", href: '/', icon: <HomeIcon /> },
+    { label: 'The Undercard', href: '/discover', icon: <TravelExploreOutlinedIcon /> },
     { label: 'Portfolio', href: '/portfolio', icon: <AccountBalanceWalletOutlinedIcon /> },
-    { label: 'Leaderboard', href: '/leaderboard', icon: <EmojiEventsIcon /> },
+    { label: 'The Rankings', href: '/leaderboard', icon: <EmojiEventsIcon /> },
     { label: 'Rewards', href: '/rewards', icon: <TrackChangesIcon /> },
     { label: 'Referrals', href: '/referrals', icon: <GroupAddOutlinedIcon /> },
     { label: 'Watchlist', href: '/watchlist', icon: <StarBorderIcon /> },
-    { label: 'Hall of Kings', href: '/kings', icon: <MilitaryTechOutlinedIcon /> },
+    { label: 'Hall of Champions', href: '/kings', icon: <MilitaryTechOutlinedIcon /> },
     { label: 'Tier', href: '/tier', icon: <WorkspacePremiumOutlinedIcon /> },
-    { label: 'Create Token', href: '/create', icon: <AddCircleOutlineIcon /> },
-    { label: 'Creator', href: '/creator', icon: <InsightsOutlinedIcon /> },
+    { label: 'Make a Match', href: '/create', icon: <AddCircleOutlineIcon /> },
+    { label: 'Promoter', href: '/creator', icon: <InsightsOutlinedIcon /> },
     { label: 'Profile', href: '/profile', target: '/profile?address=me', icon: <PersonOutlineIcon /> },
 ]
 
@@ -96,7 +99,7 @@ export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle
     return (
         <Drawer variant="permanent" open={open}>
             <Box sx={{ display: 'flex', justifyContent: open ? 'flex-end' : 'center', px: 1, py: 0.5 }}>
-                <IconButton onClick={onToggle} size="small" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                <IconButton onClick={onToggle} size="small" sx={{ color: 'rgba(234,230,218,0.7)' }}>
                     {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
                 </IconButton>
             </Box>
@@ -113,14 +116,13 @@ export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle
                                     my: 0.25,
                                     borderRadius: '10px',
                                     justifyContent: open ? 'initial' : 'center',
-                                    color: active ? '#0a0a0f' : 'rgba(255,255,255,0.8)',
-                                    background: active ? 'linear-gradient(135deg, #D3FF24, #e4ff66)' : 'transparent',
+                                    // Flat citron on moss for the active seat — no gradient (§10).
+                                    color: active ? '#131208' : 'rgba(234,230,218,0.8)',
+                                    background: active ? '#BFD143' : 'transparent',
                                     fontWeight: active ? 700 : 500,
                                     '&:hover': {
-                                        background: active
-                                            ? 'linear-gradient(135deg, #D3FF24, #e4ff66)'
-                                            : 'rgba(209,255,26,0.1)',
-                                        color: active ? '#0a0a0f' : '#e4ff66',
+                                        background: active ? '#BFD143' : 'rgba(191,209,67,0.1)',
+                                        color: active ? '#131208' : '#BFD143',
                                     },
                                 }}
                             >

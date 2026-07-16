@@ -4,12 +4,12 @@ pragma solidity ^0.8.26;
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/Arrowpad.sol";
-import "../src/ArrowpadLiquidityManager.sol";
+import "../src/Fyuz.sol";
+import "../src/FyuzLiquidityManager.sol";
 import "../src/MockPriceFeed.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 
-contract DeployArrowpad is Script {
+contract DeployFyuz is Script {
 
     /// @dev The proxies each deploy their own ProxyAdmin and record it in the
     ///      ERC-1967 admin slot. Log it: it is the only key that can upgrade, and
@@ -55,7 +55,7 @@ contract DeployArrowpad is Script {
         address priceFeed = DATA_FEED;
         console.log("PriceFeed (Chainlink):", priceFeed);
 
-        ArrowpadLiquidityManager liquidityManager = ArrowpadDeploy.deployLiquidityManager(
+        FyuzLiquidityManager liquidityManager = FyuzDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -69,24 +69,24 @@ contract DeployArrowpad is Script {
             10000,
             deployer
         );
-        console.log("ArrowpadLiquidityManager:", address(liquidityManager));
+        console.log("FyuzLiquidityManager:", address(liquidityManager));
 
-        Arrowpad arrowpad = ArrowpadDeploy.deployArrowpad(
+        Fyuz fyuz = FyuzDeploy.deployFyuz(
             priceFeed,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR,
             deployer
         );
-        console.log("Arrowpad:", address(arrowpad));
+        console.log("Fyuz:", address(fyuz));
 
-        liquidityManager.setAuthorizedCaller(address(arrowpad), true);
-        console.log("Arrowpad authorized as LiquidityManager caller");
+        liquidityManager.setAuthorizedCaller(address(fyuz), true);
+        console.log("Fyuz authorized as LiquidityManager caller");
 
-        arrowpad.setPlatformBuyFeeBps(300);
-        arrowpad.setPlatformSellFeeBps(300);
-        arrowpad.setMaxBuyPercent(10000);
-        arrowpad.setMaxSellPercent(10000);
+        fyuz.setPlatformBuyFeeBps(300);
+        fyuz.setPlatformSellFeeBps(300);
+        fyuz.setMaxBuyPercent(10000);
+        fyuz.setMaxSellPercent(10000);
         console.log("Fees configured: 3% buy/sell, 100% max buy/sell");
 
         vm.stopBroadcast();
@@ -96,8 +96,8 @@ contract DeployArrowpad is Script {
         console.log("DEPLOYMENT COMPLETE");
         console.log("==================================================");
         console.log("PriceFeed:        ", priceFeed);
-        console.log("Arrowpad:         ", address(arrowpad));
-        console.log("  ProxyAdmin:     ", _proxyAdmin(address(arrowpad)));
+        console.log("Fyuz:         ", address(fyuz));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(fyuz)));
         console.log("LiquidityManager: ", address(liquidityManager));
         console.log("  ProxyAdmin:     ", _proxyAdmin(address(liquidityManager)));
         console.log("==================================================");

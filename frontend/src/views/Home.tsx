@@ -12,6 +12,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CheckIcon from '@mui/icons-material/Check';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
 import { useTokens, useKing, useHandlers } from "@/hooks/token";
 import { useUserInfo } from "@/hooks/user";
 import PageBox from "@/components/layout/pageBox";
@@ -32,10 +34,10 @@ import EmptyState from "@/components/EmptyState";
 
 const CreateButton = styled(Link)`
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    color: white;
-    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    border: 1px solid rgba(234, 230, 218, 0.08);
+    background: rgba(234, 230, 218, 0.03);
+    color: var(--bone);
+    font-family: var(--font-body);
     font-weight: 600;
     font-size: 28px;
     display: flex;
@@ -46,10 +48,11 @@ const CreateButton = styled(Link)`
     text-decoration: none;
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     &:hover {
-        border-color: rgba(209, 255, 26, 0.3);
-        background: rgba(209, 255, 26, 0.05);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(209, 255, 26, 0.1);
+        border-color: rgba(191, 209, 67, 0.3);
+        background: rgba(191, 209, 67, 0.05);
+    }
+    &:active {
+        transform: scale(0.98);
     }
     ${({ theme }) => theme.breakpoints.down(800)} {
         font-size: 20px;
@@ -61,14 +64,14 @@ const SearchToken = styled(TextField)`
     flex: 1;
     & .MuiOutlinedInput-root {
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(234, 230, 218, 0.06);
+        background: rgba(234, 230, 218, 0.03);
         font-size: 14px;
         transition: all 0.2s ease;
 
         &:hover, &.Mui-focused {
-            border-color: rgba(209, 255, 26, 0.25);
-            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(191, 209, 67, 0.25);
+            background: rgba(234, 230, 218, 0.05);
         }
 
         & fieldset {
@@ -78,10 +81,10 @@ const SearchToken = styled(TextField)`
 `;
 
 const SearchButton = styled('button')`
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(234, 230, 218, 0.04);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(234, 230, 218, 0.06);
+    color: rgba(234, 230, 218, 0.5);
     font-size: 20px;
     display: flex;
     align-items: center;
@@ -90,13 +93,13 @@ const SearchButton = styled('button')`
     text-decoration: none;
     transition: all 0.2s ease;
     &:hover {
-        border-color: rgba(209, 255, 26, 0.25);
-        color: white;
-        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(191, 209, 67, 0.25);
+        color: var(--bone);
+        background: rgba(234, 230, 218, 0.06);
     }
 `
 
-// Glowing lime price line for the King of the Hill card (fetches recent closes).
+// Citron price line for the Main Event spotlight card (fetches recent closes).
 const KingSparkline = ({ address, network }: { address: string, network: string }) => {
     const [points, setPoints] = useState<number[]>([])
     useEffect(() => {
@@ -128,17 +131,11 @@ const KingSparkline = ({ address, network }: { address: string, network: string 
     ])
     const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
     const area = `${line} L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`
-    const stroke = '#D3FF24'
+    const stroke = '#BFD143'
     return (
         <Box sx={{ flex: '0 0 auto', display: { xs: 'none', md: 'block' }, width: w, pointerEvents: 'none' }}>
             <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible', display: 'block' }}>
-                <defs>
-                    <linearGradient id="king-spark-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={stroke} stopOpacity="0.28" />
-                        <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-                    </linearGradient>
-                </defs>
-                <path d={area} fill="url(#king-spark-fill)" />
+                <path d={area} fill={stroke} fillOpacity={0.12} />
                 <path
                     d={line}
                     fill="none"
@@ -146,7 +143,6 @@ const KingSparkline = ({ address, network }: { address: string, network: string 
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    style={{ filter: 'drop-shadow(0 0 6px rgba(209,255,26,0.7))' }}
                 />
             </svg>
         </Box>
@@ -156,8 +152,8 @@ const KingSparkline = ({ address, network }: { address: string, network: string 
 const KingCard = styled(Box)`
     position: relative;
     border-radius: 20px;
-    background: linear-gradient(135deg, rgba(209, 255, 26, 0.08) 0%, rgba(139, 92, 246, 0.06) 50%, rgba(209, 255, 26, 0.04) 100%);
-    border: 1px solid rgba(209, 255, 26, 0.2);
+    background: rgba(191, 209, 67, 0.06);
+    border: 1px solid rgba(191, 209, 67, 0.2);
     padding: 24px;
     display: flex;
     align-items: center;
@@ -165,24 +161,11 @@ const KingCard = styled(Box)`
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     overflow: hidden;
-    &::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(135deg, rgba(209, 255, 26, 0.5), rgba(228, 255, 102, 0.3), rgba(139, 92, 246, 0.2));
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        opacity: 0.6;
-        pointer-events: none;
-    }
     &:hover {
-        transform: translateY(-3px);
-        border-color: rgba(209, 255, 26, 0.4);
-        box-shadow: 0 12px 40px rgba(209, 255, 26, 0.12), 0 0 60px rgba(209, 255, 26, 0.06);
-        &::before { opacity: 1; }
+        border-color: rgba(191, 209, 67, 0.4);
+    }
+    &:active {
+        transform: scale(0.98);
     }
     ${({ theme }) => theme.breakpoints.down(800)} {
         padding: 16px;
@@ -194,18 +177,11 @@ const KingCrown = styled(Box)`
     display: flex;
     align-items: center;
     gap: 8px;
-    & .crown {
-        font-size: 24px;
-        filter: drop-shadow(0 0 8px rgba(228, 255, 102, 0.5));
-    }
-    ${({ theme }) => theme.breakpoints.down(800)} {
-        & .crown { font-size: 18px; }
-    }
 `
 
 const KingProgress = styled('div')<{ value: number }>`
     height: 4px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(234, 230, 218, 0.06);
     border-radius: 100px;
     overflow: hidden;
     width: 100%;
@@ -215,19 +191,18 @@ const KingProgress = styled('div')<{ value: number }>`
         display: block;
         height: 100%;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #D3FF24, #e4ff66);
-        box-shadow: 0 0 8px rgba(209, 255, 26, 0.4);
+        background: #BFD143;
         border-radius: 100px;
         transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
 `
 
 const QuickBuyButton = styled('button')<{ loading?: number }>`
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(234, 230, 218, 0.04);
+    border: 1px solid rgba(234, 230, 218, 0.08);
     border-radius: 100px;
-    color: rgba(255, 255, 255, 0.85);
-    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    color: rgba(234, 230, 218, 0.85);
+    font-family: var(--font-data);
     font-weight: 600;
     font-size: 13px;
     padding: 8px 18px;
@@ -240,12 +215,12 @@ const QuickBuyButton = styled('button')<{ loading?: number }>`
     pointer-events: ${({ loading }) => loading ? 'none' : 'auto'};
     opacity: ${({ loading }) => loading ? 0.6 : 1};
     &:hover {
-        background: rgba(209, 255, 26, 0.1);
-        border-color: rgba(209, 255, 26, 0.3);
-        color: #e4ff66;
+        background: rgba(191, 209, 67, 0.1);
+        border-color: rgba(191, 209, 67, 0.3);
+        color: #D3E063;
     }
     &:active {
-        transform: scale(0.96);
+        transform: scale(0.98);
     }
 `
 
@@ -265,41 +240,15 @@ const CardGrid = styled(Box) <{ min: number, space: number }>`
 const GraduatingSection = styled(Box)`
     position: relative;
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(168, 212, 0, 0.05) 0%, rgba(13, 13, 20, 0.8) 40%, rgba(209, 255, 26, 0.03) 100%);
-    border: 1px solid rgba(168, 212, 0, 0.15);
+    background: var(--surface-dark);
+    border: 1px solid rgba(191, 209, 67, 0.15);
     padding: 20px;
     overflow: hidden;
-    &::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: radial-gradient(ellipse at 30% 0%, rgba(168, 212, 0, 0.1) 0%, transparent 50%),
-                    radial-gradient(ellipse at 70% 100%, rgba(209, 255, 26, 0.06) 0%, transparent 50%);
-        pointer-events: none;
-    }
-    &::after {
-        content: "";
-        position: absolute;
-        top: -1px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, rgba(196, 239, 14, 0.6), rgba(228, 255, 102, 0.8), rgba(196, 239, 14, 0.6), transparent);
-        background-size: 200% 100%;
-        animation: graduating-border-glow 3s ease-in-out infinite;
-        border-radius: 16px 16px 0 0;
-    }
-    @keyframes graduating-border-glow {
-        0%, 100% { background-position: 200% 0; }
-        50% { background-position: -200% 0; }
-    }
     .graduation-card {
         animation: grad-card-enter 0.5s ease-out both;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        &:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 8px 32px rgba(196, 239, 14, 0.2);
+        transition: transform 0.3s ease;
+        &:active {
+            transform: scale(0.98);
         }
     }
     .graduation-card:nth-child(1) { animation-delay: 0s; }
@@ -316,7 +265,7 @@ const GraduatingSection = styled(Box)`
 const SectionDivider = () => (
     <Box sx={{
         height: '1px',
-        background: 'linear-gradient(90deg, transparent, rgba(209,255,26,0.15), transparent)',
+        background: 'var(--border)',
         my: 3
     }} />
 );
@@ -370,8 +319,8 @@ export default function Home() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <span style={{ fontWeight: 600 }}>Buy successful</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                        <a style={{ textDecoration: 'none', color: '#D3FF24', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
+                        <span style={{ color: '#6F6F68', fontSize: '12px', fontFamily: 'var(--font-data)' }}>TX: {shortHash}</span>
+                        <a style={{ textDecoration: 'none', color: '#BFD143', fontSize: '12px', fontWeight: 500 }} target="_blank" rel="noreferrer" href={link}>View</a>
                     </div>
                 </div>,
                 { duration: 8000 }
@@ -459,28 +408,35 @@ export default function Home() {
     };
 
     return (
+        <>
+            {/* Live-trades marquee, pinned to the very top of the view: outside
+                PageBox so it spans full-bleed instead of being boxed to 1440px,
+                with a negative margin cancelling Main's padding-top surplus over
+                the fixed 64px header (90px desktop / 72px under 800px). */}
+            <Box sx={{ mt: '-26px', '@media (max-width: 800px)': { mt: '-8px' } }}>
+                <ActivityTicker />
+            </Box>
         <PageBox>
-            <ActivityTicker />
             {/* SEO: crawlable heading + intro (visually hidden, no layout impact) */}
             <div style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
-                <h1>ArrowPad — Launch and Trade Tokens on Robinhood Chain</h1>
+                <h1>Fyuz — Launch and Trade Tokens on BNB Smart Chain</h1>
                 <p>
-                    ArrowPad is the token launchpad for Robinhood Chain. Create a memecoin in seconds on a fair
-                    bonding curve, trade instantly with low 1% fees, and automatically graduate liquidity to Uniswap.
-                    The pump.fun of Robinhood Chain.
+                    Fyuz is the token launchpad for BNB Smart Chain. Create a memecoin in seconds on a fair
+                    bonding curve, trade instantly with low 1% fees, and automatically graduate liquidity to PancakeSwap.
+                    The pump.fun of BNB Chain.
                 </p>
             </div>
-            {/* King of the Hill Section */}
+            {/* Main Event Section (highest market cap spotlight) */}
             {king === undefined ? (
                 <Box my={2}>
                     <Box display="flex" gap="8px" p="0 4px" mb={1.5} alignItems="center">
                         <KingCrown>
-                            <span className="crown">👑</span>
-                            <Typography fontSize={14} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em">
-                                King of the Hill
+                            <EmojiEventsIcon sx={{ fontSize: 24, color: 'var(--tangerine)' }} />
+                            <Typography fontSize={14} fontWeight={700} color="var(--bone)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em">
+                                Main Event
                             </Typography>
                         </KingCrown>
-                        <Typography fontSize={12} color="#64748B" ml="auto">Highest Market Cap</Typography>
+                        <Typography fontSize={12} color="#6F6F68" ml="auto">Highest Market Cap</Typography>
                     </Box>
                     <KingCardSkeleton />
                 </Box>
@@ -488,44 +444,44 @@ export default function Home() {
                 <Box my={2}>
                     <Box display="flex" gap="8px" p="0 4px" mb={1.5} alignItems="center">
                         <KingCrown>
-                            <span className="crown">👑</span>
-                            <Typography fontSize={14} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em">
-                                King of the Hill
+                            <EmojiEventsIcon sx={{ fontSize: 24, color: 'var(--tangerine)' }} />
+                            <Typography fontSize={14} fontWeight={700} color="var(--bone)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em">
+                                Main Event
                             </Typography>
                         </KingCrown>
-                        <Typography fontSize={12} color="#64748B" ml="auto">Highest Market Cap</Typography>
+                        <Typography fontSize={12} color="#6F6F68" ml="auto">Highest Market Cap</Typography>
                     </Box>
                     <KingCard onClick={() => router.push(`/token?network=${king.network}&address=${king.tokenAddress}`)}>
                         <TokenLogo logo={king.tokenImage} size={isMobile ? "64px" : "80px"} style={{ borderRadius: '12px', flexShrink: 0 }} />
                         <Box flex={1} minWidth={0}>
                             <Box display="flex" alignItems="center" gap="8px" flexWrap="wrap">
-                                <Typography fontSize={{ xs: 18, sm: 22 }} fontWeight={700} color="white" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.02em" noWrap>
+                                <Typography fontSize={{ xs: 18, sm: 22 }} fontWeight={700} color="var(--bone)" fontFamily="var(--font-display)" letterSpacing="-0.02em" noWrap>
                                     {king.tokenName}
                                 </Typography>
-                                <Typography fontSize={14} color="#94A3B8" fontWeight={500}>
+                                <Typography fontSize={14} color="#8C8C85" fontWeight={500} fontFamily="var(--font-data)">
                                     {king.tokenSymbol}
                                 </Typography>
                                 <img src={`/networks/${king.network}.svg`} height={18} alt="" />
                             </Box>
                             <Box display="flex" alignItems="center" gap="16px" mt={1} flexWrap="wrap">
                                 <Box>
-                                    <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Market Cap</Typography>
-                                    <Typography fontSize={20} fontWeight={700} color="#e4ff66" fontFamily="'Space Grotesk', sans-serif">
+                                    <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Market Cap</Typography>
+                                    <Typography fontSize={20} fontWeight={700} color="#BFD143" fontFamily="var(--font-data)">
                                         ${priceFormatter(king.marketcap, 2)}
                                     </Typography>
                                 </Box>
                                 {!isMobile && (
                                     <>
-                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(255,255,255,0.08)' }} />
+                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(234,230,218,0.08)' }} />
                                         <Box>
-                                            <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Volume</Typography>
-                                            <Typography fontSize={14} fontWeight={600} color="white">
+                                            <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Volume</Typography>
+                                            <Typography fontSize={14} fontWeight={600} color="var(--bone)" fontFamily="var(--font-data)">
                                                 ${priceFormatter(king.volume, 2, true, true)}
                                             </Typography>
                                         </Box>
-                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(255,255,255,0.08)' }} />
+                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(234,230,218,0.08)' }} />
                                         <Box>
-                                            <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">Creator</Typography>
+                                            <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Creator</Typography>
                                             <Box display="flex" alignItems="center" mt={0.5}>
                                                 <CreatorName token={king} fontSize={13} />
                                             </Box>
@@ -534,9 +490,9 @@ export default function Home() {
                                 )}
                                 {!king.launchedAt && (
                                     <>
-                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(255,255,255,0.08)' }} />
+                                        <Box sx={{ width: '1px', height: 32, background: 'rgba(234,230,218,0.08)' }} />
                                         <Box flex={1} minWidth={100}>
-                                            <Typography fontSize={11} color="#64748B" fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">
+                                            <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">
                                                 Progress {Number(king.progress ?? 0).toFixed(1)}%
                                             </Typography>
                                             <Box mt={0.5}>
@@ -551,8 +507,8 @@ export default function Home() {
                         {king.priceChange !== undefined && (
                             <Box
                                 sx={{
-                                    background: Number(king.priceChange) >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                    border: `1px solid ${Number(king.priceChange) >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                    background: Number(king.priceChange) >= 0 ? 'rgba(63, 169, 104, 0.1)' : 'rgba(214, 69, 69, 0.1)',
+                                    border: `1px solid ${Number(king.priceChange) >= 0 ? 'rgba(63, 169, 104, 0.2)' : 'rgba(214, 69, 69, 0.2)'}`,
                                     borderRadius: '10px',
                                     px: 1.5,
                                     py: 0.8,
@@ -562,7 +518,8 @@ export default function Home() {
                                 <Typography
                                     fontSize={13}
                                     fontWeight={700}
-                                    color={Number(king.priceChange) >= 0 ? '#10B981' : '#EF4444'}
+                                    fontFamily="var(--font-data)"
+                                    color={Number(king.priceChange) >= 0 ? 'var(--up)' : 'var(--down)'}
                                 >
                                     {Number(king.priceChange) >= 0 ? '+' : ''}{Number(king.priceChange).toFixed(2)}%
                                 </Typography>
@@ -576,8 +533,8 @@ export default function Home() {
                                 loading={quickBuyLoading === amt ? 1 : 0}
                                 onClick={(e) => { e.stopPropagation(); handleQuickBuy(amt, amt) }}
                             >
-                                {quickBuyLoading === amt && <CircularProgress size={12} sx={{ color: '#e4ff66' }} />}
-                                {amt} ETH
+                                {quickBuyLoading === amt && <CircularProgress size={12} sx={{ color: '#BFD143' }} />}
+                                {amt} BNB
                             </QuickBuyButton>
                         ))}
                     </Box>
@@ -586,15 +543,15 @@ export default function Home() {
 
             <SectionDivider />
 
-            {/* Trending Section */}
+            {/* Tonight's Card Section (trending feed) */}
             <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center">
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px #10B981', animation: 'glow-pulse 2s ease-in-out infinite' }} />
-                <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">Trending</Typography>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#3FA968', animation: 'glow-pulse 2s ease-in-out infinite' }} />
+                <Typography fontSize={13} fontWeight={600} color="rgba(234,230,218,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">Tonight's Card</Typography>
                 <Box sx={{ ml: "auto", display: "flex", gap: "4px" }}>
-                    <IconButton size="small" sx={{ background: 'rgba(255,255,255,0.04)', '&:hover': { background: 'rgba(255,255,255,0.08)' } }} onClick={() => pageTrendsNumber > 1 && setPageTrendsNumber(pageTrendsNumber - 1)}>
+                    <IconButton size="small" sx={{ background: 'rgba(234,230,218,0.04)', '&:hover': { background: 'rgba(234,230,218,0.08)' } }} onClick={() => pageTrendsNumber > 1 && setPageTrendsNumber(pageTrendsNumber - 1)}>
                         <ArrowBackIcon sx={{ width: 14, height: 14 }} />
                     </IconButton>
-                    <IconButton size="small" sx={{ background: 'rgba(255,255,255,0.04)', '&:hover': { background: 'rgba(255,255,255,0.08)' } }} onClick={() => pageTrendsNumber < 5 && setPageTrendsNumber(pageTrendsNumber + 1)}>
+                    <IconButton size="small" sx={{ background: 'rgba(234,230,218,0.04)', '&:hover': { background: 'rgba(234,230,218,0.08)' } }} onClick={() => pageTrendsNumber < 5 && setPageTrendsNumber(pageTrendsNumber + 1)}>
                         <ArrowForwardIcon sx={{ width: 14, height: 14 }} />
                     </IconButton>
                 </Box>
@@ -617,25 +574,21 @@ export default function Home() {
 
             <SectionDivider />
 
-            {/* About to Graduate Section */}
+            {/* Title Shot Section (About to Graduate) */}
             {filteredGraduatingTokens.length > 0 && (
                 <>
                     <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center">
-                        <Box sx={{
-                            fontSize: 16, lineHeight: 1,
-                            animation: 'pulse 2s ease-in-out infinite',
-                            filter: 'drop-shadow(0 0 4px rgba(168,212,0,0.5))',
-                        }}>🔥</Box>
-                        <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
-                            About to Graduate
+                        <WhatshotIcon sx={{ fontSize: 16, color: 'var(--citron)', animation: 'pulse 2s ease-in-out infinite' }} />
+                        <Typography fontSize={13} fontWeight={600} color="rgba(234,230,218,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
+                            Title Shot
                         </Typography>
                         <Box sx={{
                             display: 'flex', alignItems: 'center', gap: 1, ml: 'auto',
-                            background: 'rgba(196,239,14,0.08)', borderRadius: '8px', px: 1.5, py: 0.5,
-                            border: '1px solid rgba(196,239,14,0.15)',
+                            background: 'rgba(191,209,67,0.08)', borderRadius: '8px', px: 1.5, py: 0.5,
+                            border: '1px solid rgba(191,209,67,0.15)',
                         }}>
-                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#c4ef0e', boxShadow: '0 0 8px #c4ef0e', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                            <Typography fontSize={11} color="#D3FF24" fontWeight={600}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#BFD143', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                            <Typography fontSize={11} color="#BFD143" fontWeight={600} fontFamily="var(--font-data)">
                                 Progress &gt; 70%
                             </Typography>
                         </Box>
@@ -650,7 +603,7 @@ export default function Home() {
                                 justifyContent: filteredGraduatingTokens.length <= 3 ? 'center' : 'flex-start',
                                 '&::-webkit-scrollbar': { height: 4 },
                                 '&::-webkit-scrollbar-track': { background: 'transparent' },
-                                '&::-webkit-scrollbar-thumb': { background: 'rgba(209,255,26,0.3)', borderRadius: 2 },
+                                '&::-webkit-scrollbar-thumb': { background: 'rgba(191,209,67,0.3)', borderRadius: 2 },
                             }}
                         >
                             {filteredGraduatingTokens.map((item: any) => (
@@ -666,9 +619,8 @@ export default function Home() {
                                         left: 0,
                                         height: '3px',
                                         width: `${Math.min(99, Number(item.progress ?? 0))}%`,
-                                        background: 'linear-gradient(90deg, #a8d400, #e4ff66)',
+                                        background: '#BFD143',
                                         borderRadius: '0 3px 3px 0',
-                                        boxShadow: '0 0 12px rgba(228,255,102,0.4)',
                                         transition: 'width 1s ease-out',
                                     }
                                 }}>
@@ -682,21 +634,21 @@ export default function Home() {
                 </>
             )}
 
-            {/* All Tokens Section Header with Sort/Filter */}
+            {/* The Undercard Section Header with Sort/Filter (all tokens) */}
             <Box display="flex" gap="10px" p="0 4px" my={2} alignItems="center" flexWrap="wrap">
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#D3FF24', boxShadow: '0 0 8px #D3FF24' }} />
-                <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
-                    All Tokens
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#BFD143' }} />
+                <Typography fontSize={13} fontWeight={600} color="rgba(234,230,218,0.7)" fontFamily="'Space Grotesk', sans-serif" letterSpacing="-0.01em">
+                    The Undercard
                 </Typography>
                 <Box display="flex" gap="8px" ml="auto" flexWrap="wrap">
-                    <ComboBox label="Sort" border="1px solid #c4ef0e" values={{
+                    <ComboBox label="Sort" border="1px solid #BFD143" values={{
                         bump: 'Trending',
                         marketcap: 'Market cap',
                         creationTime: 'Creation time',
                         volume: 'Trading volume',
                         // progress: 'Progress'
                     }} value={orderType} onChange={setOrderType} />
-                    <ComboBox label="Network" border="1px solid #c4ef0e" values={{
+                    <ComboBox label="Network" border="1px solid #BFD143" values={{
                         all: 'All',
                         ...(
                             chains?.reduce((networks, c) => ({
@@ -719,7 +671,7 @@ export default function Home() {
                     </CardGrid> :
                     count === 0 && (searchWord || network !== 'all') ?
                         <EmptyState
-                            icon="🔍"
+                            icon={<SearchIcon sx={{ fontSize: 32, color: 'var(--muted)' }} />}
                             title="No tokens found"
                             description="Try adjusting your filters or search terms"
                         /> :
@@ -761,5 +713,6 @@ export default function Home() {
                 </Box>
             }
         </PageBox>
+        </>
     );
 }

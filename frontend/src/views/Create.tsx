@@ -20,11 +20,10 @@ import {
   Alert,
 } from "@mui/material";
 import React, { useMemo, useRef } from "react";
-import EditIcon from "@mui/icons-material/BorderColorOutlined";
 import ArrowRightIcon from "@mui/icons-material/KeyboardArrowRightOutlined";
 import ArrowDownIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import DollarIcon from "@mui/icons-material/MonetizationOn";
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { TransitionProps } from "@mui/material/transitions";
 import axios from "axios";
 import { NumericFormat } from "react-number-format";
@@ -49,31 +48,13 @@ import { socket } from "@/utils/socket";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "../hooks/config";
 //import { uploadImageToIPFS } from "../utils";
 
+// Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 48px;
   letter-spacing: -0.03em;
-  background: linear-gradient(
-    135deg,
-    #e4ff66 0%,
-    #D3FF24 25%,
-    #edff8f 50%,
-    #D3FF24 75%,
-    #e4ff66 100%
-  );
-  background-size: 200% 200%;
-  animation: gradientShift 4s ease infinite;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-fill-color: transparent;
-  text-shadow: 0 0 80px rgba(209, 255, 26, 0.3);
-
-  @keyframes gradientShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
+  color: var(--citron);
 `;
 
 export const BootstrapInput = styled(InputBase)(({ theme }) => ({
@@ -81,26 +62,26 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
     marginTop: theme.spacing(3),
   },
   "& .MuiInputBase-input": {
-    color: "#F8FAFC",
+    color: "var(--bone)",
     fontSize: "15px",
     fontWeight: 500,
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "var(--font-body)",
     borderRadius: "12px",
     position: "relative",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
+    backgroundColor: "rgba(234, 230, 218, 0.04)",
+    border: "1px solid rgba(234, 230, 218, 0.08)",
     padding: "14px 18px",
     transition: "border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
     "&:focus": {
-      borderColor: "#D3FF24",
-      backgroundColor: "rgba(255, 255, 255, 0.06)",
-      boxShadow: "0 0 0 3px rgba(211, 255, 36, 0.15)",
+      borderColor: "var(--citron)",
+      backgroundColor: "rgba(234, 230, 218, 0.06)",
+      boxShadow: "0 0 0 3px rgba(191, 209, 67, 0.15)",
     },
     "&:hover": {
-      borderColor: "rgba(211, 255, 36, 0.4)",
+      borderColor: "rgba(191, 209, 67, 0.4)",
     },
     "&::placeholder": {
-      color: "rgba(255, 255, 255, 0.35)",
+      color: "rgba(234, 230, 218, 0.35)",
       fontWeight: 400,
       opacity: 1,
     },
@@ -111,68 +92,6 @@ export const BootstrapInput = styled(InputBase)(({ theme }) => ({
 }));
 
 // Dashed drag-and-drop zone for the token logo.
-const DropZone = styled(Box)`
-  position: relative;
-  border: 2px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  padding: 16px;
-  transition: all 0.2s ease;
-  &:hover {
-    border-color: rgba(211, 255, 36, 0.5);
-    background: rgba(211, 255, 36, 0.04);
-  }
-  &.dragover {
-    border-color: #D3FF24;
-    background: rgba(211, 255, 36, 0.08);
-    box-shadow: 0 0 0 3px rgba(211, 255, 36, 0.15);
-  }
-  & .cloud {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.6);
-    transition: all 0.2s ease;
-  }
-  &:hover .cloud, &.dragover .cloud {
-    background: rgba(211, 255, 36, 0.15);
-    color: #D3FF24;
-  }
-  & img.preview {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  & .change {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  &:hover .change { opacity: 1; }
-`;
 
 const MaxButton = styled(Button)`
   &.MuiButton-root {
@@ -185,17 +104,19 @@ const MaxButton = styled(Button)`
 `;
 
 const CurrencyInput = styled(Box)`
-  color: black;
+  color: var(--bone);
   display: flex;
   flex-direction: column;
-  border-radius: 4px;
-  background: white;
+  border-radius: 12px;
+  background: var(--surface-dark);
+  border: 1px solid rgba(234, 230, 218, 0.06);
   padding: 10px 20px;
   gap: 8px;
   & input {
     font-size: 32px;
+    font-family: var(--font-data);
     background: transparent;
-    color: black;
+    color: var(--bone);
     border: none;
     outline: none;
   }
@@ -227,41 +148,28 @@ const AvatarWrapper = styled(Box)`
 
   & .MuiAvatar-root {
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    border: 3px solid rgba(255, 255, 255, 0.1);
+    border: 3px solid rgba(234, 230, 218, 0.1);
     box-shadow:
       0 8px 24px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      inset 0 1px 0 rgba(234, 230, 218, 0.1);
     &:hover {
-      border-color: rgba(209, 255, 26, 0.5);
+      border-color: rgba(191, 209, 67, 0.5);
       box-shadow:
-        0 12px 32px rgba(209, 255, 26, 0.3),
-        0 0 40px rgba(209, 255, 26, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        0 8px 24px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(234, 230, 218, 0.2);
       transform: scale(1.05);
     }
   }
 
   &.dragover .MuiAvatar-root {
-    border-color: rgba(209, 255, 26, 0.7);
+    border-color: rgba(191, 209, 67, 0.7);
     box-shadow:
-      0 12px 32px rgba(209, 255, 26, 0.4),
-      0 0 60px rgba(209, 255, 26, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(234, 230, 218, 0.2);
     transform: scale(1.03);
   }
 `;
 
-const HiddenInput = styled("input")`
-  clip: rect(0 0 0 0);
-  clippath: inset(50%);
-  height: 100%;
-  overflow: hidden;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  white-space: nowrap;
-  width: 100%;
-`;
 
 const Banner = styled("img")`
   border-radius: 48px 48px 0 0;
@@ -278,15 +186,14 @@ const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
   border-radius: 16px;
   background: ${({ checked }) =>
     checked
-      ? "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)"
-      : "rgba(255, 255, 255, 0.04)"
+      ? "var(--citron)"
+      : "rgba(234, 230, 218, 0.04)"
   };
-  backdrop-filter: blur(20px);
-  color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
+  color: ${({ checked }) => (checked ? "var(--moss-black)" : "var(--bone)")};
   border: 2px solid ${({ checked }) =>
     checked
-      ? "rgba(209, 255, 26, 0.5)"
-      : "rgba(255, 255, 255, 0.08)"
+      ? "rgba(191, 209, 67, 0.5)"
+      : "rgba(234, 230, 218, 0.08)"
   };
   display: flex;
   padding: 0;
@@ -294,39 +201,29 @@ const DexSelect = styled(IconButton)<{ label?: string; checked?: boolean }>`
   flex-wrap: wrap;
   overflow: hidden;
   font-size: 14px;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-weight: ${({ checked }) => (checked ? "700" : "500")};
   letter-spacing: -0.01em;
   padding: 12px 20px;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: ${({ checked }) =>
-    checked
-      ? "0 8px 24px rgba(209, 255, 26, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
-      : "0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)"
-  };
+  transition: all 0.2s ease;
+  box-shadow: ${({ checked }) => (checked ? "var(--shadow-sm)" : "none")};
 
   &:hover {
     background: ${({ checked }) =>
       checked
-        ? "linear-gradient(135deg, #daff47 0%, #edff8f 100%)"
-        : "rgba(255, 255, 255, 0.08)"
+        ? "var(--accent-light)"
+        : "rgba(234, 230, 218, 0.08)"
     };
-    color: ${({ checked }) => (checked ? "#0a0a0f" : "#FFF")};
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: ${({ checked }) =>
-      checked
-        ? "0 12px 32px rgba(209, 255, 26, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)"
-        : "0 8px 20px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06)"
-    };
+    color: ${({ checked }) => (checked ? "var(--moss-black)" : "var(--bone)")};
     border-color: ${({ checked }) =>
       checked
-        ? "rgba(209, 255, 26, 0.6)"
-        : "rgba(209, 255, 26, 0.3)"
+        ? "rgba(191, 209, 67, 0.6)"
+        : "rgba(191, 209, 67, 0.3)"
     };
   }
 
   &:active {
-    transform: translateY(-1px) scale(1.01);
+    transform: scale(0.98);
   }
 `;
 
@@ -354,6 +251,7 @@ export default function Create() {
   const [successModal, setSuccessModal] = React.useState(false);
   const [createdTokenData, setCreatedTokenData] = React.useState<any>(null);
   const [waitingForDeploy, setWaitingForDeploy] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
   // Redirect bookkeeping: keep the create button loading until the backend
   // confirms the deployment, then navigate straight to the token page.
   const awaitingDeployRef = React.useRef(false);
@@ -398,6 +296,8 @@ export default function Create() {
 
   const [coinName, setCoinName] = React.useState("");
   const [coinTicker, setCoinTicker] = React.useState("");
+  const [character1, setCharacter1] = React.useState("");
+  const [character2, setCharacter2] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
   const [telegramLink, setTelegramLink] = React.useState("");
@@ -412,8 +312,6 @@ export default function Create() {
   const [poolType, setPoolType] = React.useState(1);
   const [isDirectLaunch, setIsDirectLaunch] = React.useState(false);
 
-  const fileBannerRef = useRef<HTMLInputElement>(null);
-  const fileLogoRef = useRef<HTMLInputElement>(null);
 
   const chain = useMemo(
     () =>
@@ -439,12 +337,14 @@ export default function Create() {
   }, [chain, initBuyAmount]);
 
   const error = React.useMemo(() => {
+    if (!character1) return "You have to name the first character";
+    if (!character2) return "You have to name the second character";
     if (!coinName) return "You have to type token name";
     if (!coinTicker) return "You have to type token ticker";
     // if (maxBuyAmount && Number(initBuyAmount) > maxBuyAmount)
     //     return `The initial purchase cannot exceed ${priceFormatter(maxBuyAmount)} ETH`
     return undefined;
-  }, [coinName, coinTicker]);
+  }, [character1, character2, coinName, coinTicker]);
 
   // const setInitLiquidityPercent = (percent: number) => {
   //     const amount = maxLiquidity * (percent * 100) / 100
@@ -472,6 +372,11 @@ export default function Create() {
     //     return;
     // }
 
+    if (character1.trim() === "" || character2.trim() === "") {
+      toast.error("Please name both characters to fuse");
+      return;
+    }
+
     if (coinName === "") {
       toast.error("Please enter token name");
       return;
@@ -482,34 +387,38 @@ export default function Create() {
       return;
     }
 
-    if (description === "") {
-      toast.error("Please enter description");
-      return;
-    }
-
-    if (!avatar) {
-      toast.error("Please upload token logo");
-      return;
-    }
-
     if (![1, 2, 3, 4].includes(poolType)) {
-      toast.error("Please select Uniswap version to launch");
+      toast.error("Please select PancakeSwap version to launch");
       return;
     }
 
     setDeployModal(true);
+    // Kick off image generation as soon as the confirm step opens, so the
+    // preview is (usually) ready by the time the user reviews their buy amount.
+    if (!avatar || !String(avatar).startsWith("http")) {
+      generateFusionImage().catch((err: any) => {
+        toast.error(err?.response?.data?.error || err?.message || "Image generation failed");
+      });
+    }
   };
 
-  const uploadLogo = async (img: any) => {
-    let formData = new FormData(); // instantiate it
-    formData.set("image", img);
-    const r = await axios.post(`${API_ENDPOINT}/tokens/upload`, formData, {
-      headers: {
-        "api-key": "hola",
-        "content-type": "multipart/form-data", // do not forget this
-      },
-    });
-    return r;
+  // Generate the fused character image from the two characters. The backend
+  // calls OpenAI, stores the result on our S3, and returns the URL — the browser
+  // never touches the OpenAI key. Reused by "Regenerate" in the confirm modal.
+  const generateFusionImage = async () => {
+    setGenerating(true);
+    try {
+      const { data } = await axios.post(
+        `${API_ENDPOINT}/tokens/generate-image`,
+        { character1: character1.trim(), character2: character2.trim(), name: coinName },
+        { headers: { "api-key": "hola" } }
+      );
+      if (!data?.url) throw Error("No image returned");
+      setAvatar(data.url);
+      return data.url as string;
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const deployToken = async () => {
@@ -526,9 +435,8 @@ export default function Create() {
         throw Error(`Please connect wallet to a supported network. Current network: ${network?.name || 'unknown'} (${network?.id})`);
       }
       setIsLoading(true);
-      if (!fileLogoRef.current?.files) throw Error("Choose token logo");
-      const logoUploadResult = await uploadLogo(fileLogoRef.current.files[0]);
-      const logoLink = logoUploadResult.data.url;
+      // Reuse the already-generated preview if present, else generate now.
+      const logoLink = avatar && avatar.startsWith("http") ? avatar : await generateFusionImage();
 
       const metadata: any = {
         tokenDescription: description,
@@ -634,6 +542,8 @@ export default function Create() {
 
   const resetForm = () => {
     // reset state
+    setCharacter1("");
+    setCharacter2("");
     setCoinName("");
     setCoinTicker("");
     setDescription("");
@@ -643,36 +553,11 @@ export default function Create() {
     // setInitLiquidityAmount('0');
     setInitBuyAmount("0");
     setAvatar(undefined);
-    if (fileLogoRef.current?.files?.length) fileLogoRef.current.value = "";
-    if (fileBannerRef.current?.files?.length) fileBannerRef.current.value = "";
     // setTokenAddressDeployed(undefined)
   };
 
   const handleClose = () => {
     if (!isLoading) setDeployModal(false);
-  };
-
-  const handleAvatarFile = (file: File) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    // Set the file on the input ref so upload works
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    if (fileLogoRef.current) fileLogoRef.current.files = dt.files;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatar(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAvatar = (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatar(reader.result);
-    };
-    reader.readAsDataURL(file);
   };
 
   // const handleBanner = (e: any) => {
@@ -684,8 +569,6 @@ export default function Create() {
   //     }
   //     reader.readAsDataURL(file)
   // }
-  /* LAUNCH YOUR TOKEN */
-
   return (
     <PageBox mt={6}>
       <Box
@@ -694,13 +577,13 @@ export default function Create() {
         justifyContent="center"
         sx={{ position: "relative", zIndex: 1 }}
       >
+        {/* Approved create CTA (§15). Matches the nav and header entry points. */}
         <Title
           fontSize={[24, 28, 36]}
-          fontFamily="Londrina Solid"
-          color="white"
+          fontFamily="var(--font-display)"
           textTransform="uppercase"
         >
-          Launch your token
+          Make a match
         </Title>
         {/* <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', position: 'absolute', right: 0 }}>
                     <ArrowLeftIcon sx={{ color: 'white', height: 24 }} />
@@ -718,8 +601,8 @@ export default function Create() {
         sx={{
           boxSizing: "border-box",
           zIndex: 1,
-          background: "rgba(255, 255, 255, 0.02)",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          background: "rgba(234, 230, 218, 0.02)",
+          border: "1px solid rgba(234, 230, 218, 0.06)",
           borderRadius: "20px",
           p: { xs: 2.5, md: 4 },
         }}
@@ -729,87 +612,65 @@ export default function Create() {
           gap="1.5rem"
           flexDirection={{ xs: "column", sm: "column", md: "row" }}
         >
-          <div>
+          <FormControl variant="standard" sx={{ flex: 1 }}>
             <InputLabel shrink className="required">
-              Token logo <span style={{ color: "red" }}>*</span>
+              Character 1 <span style={{ color: "var(--down)" }}>*</span>
             </InputLabel>
-            <DropZone
-              sx={{ width: { xs: "100%", sm: "100%", md: 250 }, height: 160 }}
-              onClick={() => fileLogoRef.current?.click()}
-              onDragOver={(e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                (e.currentTarget as HTMLElement).classList.add('dragover');
-              }}
-              onDragLeave={(e: React.DragEvent) => {
-                e.preventDefault();
-                (e.currentTarget as HTMLElement).classList.remove('dragover');
-              }}
-              onDrop={(e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                (e.currentTarget as HTMLElement).classList.remove('dragover');
-                const file = e.dataTransfer.files?.[0];
-                if (file) handleAvatarFile(file);
-              }}
-            >
-              {avatar ? (
-                <>
-                  <img className="preview" src={avatar} alt="logo preview" />
-                  <Box className="change">
-                    <EditIcon sx={{ fontSize: 16 }} /> Change
-                  </Box>
-                </>
-              ) : (
-                <>
-                  <Box className="cloud">
-                    <CloudUploadIcon sx={{ fontSize: 26 }} />
-                  </Box>
-                  <Typography fontSize={13} fontWeight={600} color="rgba(255,255,255,0.85)">
-                    Drag your logo here
-                  </Typography>
-                  <Typography fontSize={11} color="rgba(255,255,255,0.4)">
-                    or click to browse · PNG, JPG
-                  </Typography>
-                </>
-              )}
-              <HiddenInput
-                ref={fileLogoRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatar}
-                style={{ pointerEvents: "none" }}
-              />
-            </DropZone>
-          </div>
-          <Box display="flex" flex="1" flexDirection="column" gap="1.5rem">
-            <FormControl variant="standard">
-              <InputLabel shrink className="required">
-                Token name <span style={{ color: "red" }}>*</span>
-              </InputLabel>
-              <BootstrapInput
-                fullWidth
-                placeholder="Token name"
-                value={coinName}
-                onChange={(e) => setCoinName(e.target.value)}
-              />
-            </FormControl>
-            <FormControl variant="standard">
-              <InputLabel shrink className="required">
-                Token ticker <span style={{ color: "red" }}>*</span>
-              </InputLabel>
-              <BootstrapInput
-                fullWidth
-                placeholder="Token ticker"
-                value={coinTicker}
-                onChange={(e) => setCoinTicker(e.target.value)}
-              />
-            </FormControl>
-          </Box>
+            <BootstrapInput
+              fullWidth
+              placeholder="e.g. Elon Musk"
+              value={character1}
+              onChange={(e) => setCharacter1(e.target.value)}
+            />
+          </FormControl>
+          <FormControl variant="standard" sx={{ flex: 1 }}>
+            <InputLabel shrink className="required">
+              Character 2 <span style={{ color: "var(--down)" }}>*</span>
+            </InputLabel>
+            <BootstrapInput
+              fullWidth
+              placeholder="e.g. Jeff Bezos"
+              value={character2}
+              onChange={(e) => setCharacter2(e.target.value)}
+            />
+          </FormControl>
+        </Box>
+        {/* Two icons enter, one image leaves — the fused character is generated
+            by AI from the two names above when you launch. */}
+        <Typography fontSize={12} color="var(--muted)" fontFamily="var(--font-data)" sx={{ mt: -1 }}>
+          The fused character image is generated by AI from these two — no upload needed.
+        </Typography>
+        <Box
+          display="flex"
+          gap="1.5rem"
+          flexDirection={{ xs: "column", sm: "row" }}
+        >
+          <FormControl variant="standard" sx={{ flex: 1 }}>
+            <InputLabel shrink className="required">
+              Token name <span style={{ color: "var(--down)" }}>*</span>
+            </InputLabel>
+            <BootstrapInput
+              fullWidth
+              placeholder="Token name"
+              value={coinName}
+              onChange={(e) => setCoinName(e.target.value)}
+            />
+          </FormControl>
+          <FormControl variant="standard" sx={{ flex: 1 }}>
+            <InputLabel shrink className="required">
+              Token ticker <span style={{ color: "var(--down)" }}>*</span>
+            </InputLabel>
+            <BootstrapInput
+              fullWidth
+              placeholder="Token ticker"
+              value={coinTicker}
+              onChange={(e) => setCoinTicker(e.target.value)}
+            />
+          </FormControl>
         </Box>
         <FormControl variant="standard">
-          <InputLabel shrink className="required">
-            Description <span style={{ color: "red" }}>*</span>
+          <InputLabel shrink>
+            Description <span style={{ color: "var(--muted)" }}>(optional)</span>
           </InputLabel>
           <BootstrapInput
             fullWidth
@@ -823,14 +684,14 @@ export default function Create() {
         {!!address && (
           <FormControl variant="standard">
             <InputLabel shrink>
-              Choose Target Pool <span style={{ color: "red" }}>*</span>
+              Choose Target Pool <span style={{ color: "var(--down)" }}>*</span>
             </InputLabel>
             <Box display="flex" alignItems="center" gap="8px" mt={3}>
               {chain?.pools.map((pool: string, index) => (
                 <DexSelect
                   key={pool}
                   checked={poolType === index + 1}
-                  label="Uniswap"
+                  label="PancakeSwap"
                   onClick={() => {
                     setPoolType(index + 1);
                     setIsDirectLaunch(pool.includes('direct'));
@@ -839,7 +700,7 @@ export default function Create() {
                   <Avatar
                     src={`/pools/${pool?.split(":")?.[0]}.png`}
                     sx={{ width: 16, height: 16 }}
-                    alt="unitswap"
+                    alt="pancakeswap"
                   />
                   {pool?.split(":")?.[1]}
                 </DexSelect>
@@ -850,12 +711,12 @@ export default function Create() {
         <Box
         >
           {more ? (
-            <ArrowDownIcon sx={{ color: "white", height: 24 }} />
+            <ArrowDownIcon sx={{ color: "var(--bone)", height: 24 }} />
           ) : (
-            <ArrowRightIcon sx={{ color: "white", height: 24 }} />
+            <ArrowRightIcon sx={{ color: "var(--bone)", height: 24 }} />
           )}
           <Typography
-            sx={{ color: "white", textDecoration: "none" }}
+            sx={{ color: "var(--bone)", textDecoration: "none" }}
             fontSize="small"
             onClick={() => setMore(!more)}
           >
@@ -920,48 +781,42 @@ export default function Create() {
         {address ? (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
-              color: "black",
+              background: "var(--citron)",
+              color: "var(--moss-black)",
               padding: "14px 24px",
               borderRadius: "12px",
               fontWeight: 700,
               fontSize: "16px",
               textTransform: "none",
-              boxShadow: "0 4px 12px rgba(209, 255, 26, 0.3)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "all 0.2s ease",
               "&:hover": {
-                background: "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 20px rgba(209, 255, 26, 0.4)",
+                background: "var(--accent-light)",
               },
               "&:active": {
-                transform: "translateY(0px)",
+                transform: "scale(0.98)",
               },
             }}
             fullWidth
             onClick={handleClickOpen}
           >
-            Deploy on {network?.name}
+            Start a fusion on {network?.name}
           </Button>
         ) : (
           <Button
             sx={{
-              background: "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
-              color: "black",
+              background: "var(--citron)",
+              color: "var(--moss-black)",
               padding: "14px 24px",
               borderRadius: "12px",
               fontWeight: 700,
               fontSize: "16px",
               textTransform: "none",
-              boxShadow: "0 4px 12px rgba(209, 255, 26, 0.3)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "all 0.2s ease",
               "&:hover": {
-                background: "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 20px rgba(209, 255, 26, 0.4)",
+                background: "var(--accent-light)",
               },
               "&:active": {
-                transform: "translateY(0px)",
+                transform: "scale(0.98)",
               },
             }}
             fullWidth
@@ -980,12 +835,46 @@ export default function Create() {
         aria-describedby="alert-dialog-slide-description"
       >
         <DialogTitle>
-          {isDirectLaunch ? "Create Token" : "Buy now"}
+          {isDirectLaunch ? "Make a match" : "Buy now"}
           <IconButton aria-label="close" onClick={handleClose}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
         <DialogContent>
+          {/* Fused character preview — generated from the two characters. */}
+          <Box display="flex" flexDirection="column" alignItems="center" mb="1rem" gap={1}>
+            <Box
+              sx={{
+                width: 160,
+                height: 160,
+                borderRadius: "16px",
+                overflow: "hidden",
+                border: "1px solid var(--border)",
+                background: "var(--surface-dark)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              {avatar && String(avatar).startsWith("http") ? (
+                <img src={avatar} alt="fused character" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: generating ? 0.4 : 1 }} />
+              ) : (
+                <Box className="fyuz-loader"><span className="fyuz-loader__disc fyuz-loader__disc--a" /><span className="fyuz-loader__disc fyuz-loader__disc--b" /></Box>
+              )}
+              {generating && avatar && String(avatar).startsWith("http") && (
+                <CircularProgress size={28} sx={{ position: "absolute", color: "var(--citron)" }} />
+              )}
+            </Box>
+            <Button
+              size="small"
+              disabled={generating}
+              onClick={() => generateFusionImage().catch((err: any) => toast.error(err?.response?.data?.error || err?.message || "Image generation failed"))}
+              sx={{ textTransform: "none", color: "var(--muted)", fontSize: 12 }}
+            >
+              {generating ? "Fusing…" : "↻ Regenerate"}
+            </Button>
+          </Box>
           <DialogContentText mb="1rem" fontSize={14}>
             {isDirectLaunch
               ? "Create token with 1B supply. No bonding curve."
@@ -1001,12 +890,13 @@ export default function Create() {
           {!isDirectLaunch && (
           <FormControl fullWidth variant="standard">
             <Box display="flex" gap="8px">
-              <Typography component="span" color="#FFF8" fontSize={14}>
+              <Typography component="span" color="rgba(234,230,218,0.53)" fontSize={14}>
                 Spend
               </Typography>
               <Typography
                 component="span"
-                color="#FFF8"
+                color="rgba(234,230,218,0.53)"
+                fontFamily="var(--font-data)"
                 fontSize={14}
                 ml="auto"
               >
@@ -1018,7 +908,6 @@ export default function Create() {
             </Box>
             <CurrencyInput mt={1}>
               <NumericFormat
-                color="black"
                 placeholder="0.0"
                 thousandSeparator
                 valueIsNumericString
@@ -1052,41 +941,34 @@ export default function Create() {
             disabled={isLoading || !!error}
             endIcon={
               isLoading ? (
-                <CircularProgress size={18} sx={{ color: "#000" }} />
+                <CircularProgress size={18} sx={{ color: "var(--moss-black)" }} />
               ) : undefined
             }
             onClick={deployToken}
             fullWidth
             sx={{
               background: isLoading || !!error
-                ? "rgba(209, 255, 26, 0.3)"
-                : "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
-              color: "black",
+                ? "rgba(191, 209, 67, 0.3)"
+                : "var(--citron)",
+              color: "var(--moss-black)",
               padding: "14px 24px",
               borderRadius: "12px",
               fontWeight: 700,
               fontSize: "16px",
               textTransform: "none",
-              boxShadow: isLoading || !!error
-                ? "none"
-                : "0 4px 12px rgba(209, 255, 26, 0.3)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "all 0.2s ease",
               "&:hover": {
                 background: isLoading || !!error
-                  ? "rgba(209, 255, 26, 0.3)"
-                  : "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
-                transform: isLoading || !!error ? "none" : "translateY(-2px)",
-                boxShadow: isLoading || !!error
-                  ? "none"
-                  : "0 8px 20px rgba(209, 255, 26, 0.4)",
+                  ? "rgba(191, 209, 67, 0.3)"
+                  : "var(--accent-light)",
               },
               "&:active": {
-                transform: isLoading || !!error ? "none" : "translateY(0px)",
+                transform: isLoading || !!error ? "none" : "scale(0.98)",
               },
               "&:disabled": {
-                // Pure-black loading label + spinner for clear contrast on the
+                // Pure moss-black loading label + spinner for clear contrast on the
                 // dimmed button; only the error-disabled state stays muted.
-                color: isLoading ? "#000" : "rgba(0, 0, 0, 0.4)",
+                color: isLoading ? "var(--moss-black)" : "rgba(19, 18, 8, 0.4)",
               },
             }}
           >
@@ -1094,7 +976,7 @@ export default function Create() {
               ? waitingForDeploy
                 ? "Confirming on-chain..."
                 : "Creating token..."
-              : "Create token"}
+              : "Book the bout"}
           </Button>
         </DialogActions>
         {
@@ -1140,10 +1022,8 @@ export default function Create() {
         )}
         <DialogTitle sx={{ pb: 1.5, pt: 2.5, px: 4 }}>
           <Box display="flex" alignItems="center" gap={1}>
-            <Typography fontSize={20} component="span" sx={{ color: "#e4ff66" }}>
-              ✓
-            </Typography>
-            <Typography fontSize={20} fontWeight={600}>Token Created Successfully!</Typography>
+            <CheckCircleOutlineIcon sx={{ fontSize: 22, color: "var(--tangerine)" }} />
+            <Typography fontSize={20} fontWeight={600} fontFamily="var(--font-display)" color="var(--tangerine)">Token Created Successfully!</Typography>
           </Box>
           <IconButton
             aria-label="close"
@@ -1161,7 +1041,7 @@ export default function Create() {
                 alignItems="center"
                 gap={2.5}
                 p={2.5}
-                bgcolor="rgba(255, 255, 255, 0.05)"
+                bgcolor="rgba(234, 230, 218, 0.05)"
                 borderRadius={2}
                 mb={2.5}
               >
@@ -1172,8 +1052,8 @@ export default function Create() {
                   />
                 )}
                 <Box sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
-                  <Typography fontSize={20} fontWeight={600} noWrap>{createdTokenData.name}</Typography>
-                  <Typography fontSize={16} color="text.secondary" noWrap>
+                  <Typography fontSize={20} fontWeight={600} fontFamily="var(--font-display)" noWrap>{createdTokenData.name}</Typography>
+                  <Typography fontSize={16} fontFamily="var(--font-data)" color="text.secondary" noWrap>
                     ${createdTokenData.symbol}
                   </Typography>
                 </Box>
@@ -1186,7 +1066,7 @@ export default function Create() {
                 {waitingForDeploy || !createdTokenData.tokenAddress ? (
                   <Box
                     sx={{
-                      bgcolor: "rgba(255, 255, 255, 0.05)",
+                      bgcolor: "rgba(234, 230, 218, 0.05)",
                       p: 2,
                       borderRadius: 1,
                       display: "flex",
@@ -1202,7 +1082,7 @@ export default function Create() {
                 ) : (
                   <Box
                     sx={{
-                      bgcolor: "rgba(255, 255, 255, 0.05)",
+                      bgcolor: "rgba(234, 230, 218, 0.05)",
                       p: 2,
                       borderRadius: 1,
                       maxWidth: "100%",
@@ -1212,7 +1092,7 @@ export default function Create() {
                     <Typography
                       fontSize={12}
                       sx={{
-                        fontFamily: "monospace",
+                        fontFamily: "var(--font-data)",
                         wordBreak: "break-all",
                         lineHeight: 1.6,
                       }}
@@ -1237,41 +1117,34 @@ export default function Create() {
             disabled={waitingForDeploy || !createdTokenData?.tokenAddress}
             startIcon={
               waitingForDeploy ? (
-                <CircularProgress size={20} sx={{ color: "rgba(0, 0, 0, 0.4)" }} />
+                <CircularProgress size={20} sx={{ color: "rgba(19, 18, 8, 0.4)" }} />
               ) : undefined
             }
             sx={{
+              // Win state: this button only appears after a successful fusion,
+              // so it earns tangerine rather than the everyday citron accent.
               background: waitingForDeploy || !createdTokenData?.tokenAddress
-                ? "rgba(209, 255, 26, 0.3)"
-                : "linear-gradient(135deg, #D3FF24 0%, #e4ff66 100%)",
-              color: "black",
+                ? "rgba(232, 106, 43, 0.3)"
+                : "var(--tangerine)",
+              color: "var(--moss-black)",
               py: 2.5,
               fontSize: 18,
               fontWeight: 700,
               textTransform: "none",
               borderRadius: "12px",
-              boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
-                ? "none"
-                : "0 4px 12px rgba(209, 255, 26, 0.3)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "all 0.2s ease",
               "&:hover": {
                 background: waitingForDeploy || !createdTokenData?.tokenAddress
-                  ? "rgba(209, 255, 26, 0.3)"
-                  : "linear-gradient(135deg, #daff47 0%, #edff8f 100%)",
-                transform: waitingForDeploy || !createdTokenData?.tokenAddress
-                  ? "none"
-                  : "translateY(-2px)",
-                boxShadow: waitingForDeploy || !createdTokenData?.tokenAddress
-                  ? "none"
-                  : "0 8px 20px rgba(209, 255, 26, 0.4)",
+                  ? "rgba(232, 106, 43, 0.3)"
+                  : "#F08A52",
               },
               "&:active": {
                 transform: waitingForDeploy || !createdTokenData?.tokenAddress
                   ? "none"
-                  : "translateY(0px)",
+                  : "scale(0.98)",
               },
               "&:disabled": {
-                color: "rgba(0, 0, 0, 0.4)",
+                color: "rgba(19, 18, 8, 0.4)",
               },
             }}
           >

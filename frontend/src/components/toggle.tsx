@@ -1,14 +1,14 @@
 import { Box, styled } from "@mui/material";
 
 const Toggle = styled(Box)<{ inner?: "true" }>`
-    background: ${({inner}) => inner ? 'transparent' : 'rgba(255, 255, 255, 0.03)'};
-    border: 1px solid ${({inner}) => inner ? 'transparent' : 'rgba(255, 255, 255, 0.06)'};
+    background: ${({inner}) => inner ? 'transparent' : 'rgba(234, 230, 218, 0.03)'};
+    border: 1px solid ${({inner}) => inner ? 'transparent' : 'rgba(234, 230, 218, 0.06)'};
     border-radius: 10px;
     overflow: hidden;
     display: flex;
     gap: 4px;
     padding: 3px;
-    font-family: 'Inter';
+    font-family: var(--font-body);
     font-size: 13px;
     font-weight: 500;
     width: fit-content;
@@ -17,26 +17,24 @@ const Toggle = styled(Box)<{ inner?: "true" }>`
     & > div {
         padding: 8px 20px;
         border-radius: 8px;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(234, 230, 218, 0.5);
         text-align: center;
         flex: 1;
         transition: all 0.2s ease;
         cursor: pointer;
         &.active[data-tradetype="buy"] {
-            background: linear-gradient(135deg, #10B981, #059669);
-            color: white;
+            background: var(--up);
+            color: var(--moss-black);
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
         }
         &.active[data-tradetype="sell"] {
-            background: linear-gradient(135deg, #EF4444, #DC2626);
-            color: white;
+            background: var(--down);
+            color: var(--moss-black);
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
         &:not(.active):hover {
-            color: white;
-            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            background: rgba(234, 230, 218, 0.05);
         }
     }
 `

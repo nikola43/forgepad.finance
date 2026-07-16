@@ -4,16 +4,16 @@ pragma solidity ^0.8.26;
 import {
     TransparentUpgradeableProxy
 } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Arrowpad} from "./Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "./ArrowpadLiquidityManager.sol";
+import {Fyuz} from "./Fyuz.sol";
+import {FyuzLiquidityManager} from "./FyuzLiquidityManager.sol";
 
 /// @notice Deploys implementation + TransparentUpgradeableProxy + initialize in one
 ///         call, so scripts and tests can't drift apart on the wiring.
 /// @dev TransparentUpgradeableProxy deploys its own ProxyAdmin owned by
 ///      `proxyAdminOwner`; that address is the only one that can upgrade. Read it
-///      back off-chain from the ERC-1967 admin slot (see ArrowpadUpgrade.t.sol).
+///      back off-chain from the ERC-1967 admin slot (see FyuzUpgrade.t.sol).
 ///      Callers are `internal`, so this library inlines — nothing extra deployed.
-library ArrowpadDeploy {
+library FyuzDeploy {
     function deployLiquidityManager(
         address routerV2,
         address factoryV3,
@@ -27,10 +27,10 @@ library ArrowpadDeploy {
         uint16 ethAmountPercentToLP,
         uint16 tokenAmountPercentToLP,
         address proxyAdminOwner
-    ) internal returns (ArrowpadLiquidityManager) {
-        ArrowpadLiquidityManager impl = new ArrowpadLiquidityManager();
+    ) internal returns (FyuzLiquidityManager) {
+        FyuzLiquidityManager impl = new FyuzLiquidityManager();
         bytes memory data = abi.encodeCall(
-            ArrowpadLiquidityManager.initialize,
+            FyuzLiquidityManager.initialize,
             (
                 routerV2,
                 factoryV3,
@@ -46,7 +46,7 @@ library ArrowpadDeploy {
             )
         );
         return
-            ArrowpadLiquidityManager(
+            FyuzLiquidityManager(
                 payable(
                     address(
                         new TransparentUpgradeableProxy(
@@ -59,22 +59,22 @@ library ArrowpadDeploy {
             );
     }
 
-    /// @dev Arrowpad.initialize sets the owner to msg.sender, which — because the
+    /// @dev Fyuz.initialize sets the owner to msg.sender, which — because the
     ///      proxy constructor delegatecalls it — is whoever calls this function.
-    function deployArrowpad(
+    function deployFyuz(
         address dataFeed,
         address liquidityManager,
         address feeAddress,
         address distributorAddress,
         address proxyAdminOwner
-    ) internal returns (Arrowpad) {
-        Arrowpad impl = new Arrowpad();
+    ) internal returns (Fyuz) {
+        Fyuz impl = new Fyuz();
         bytes memory data = abi.encodeCall(
-            Arrowpad.initialize,
+            Fyuz.initialize,
             (dataFeed, liquidityManager, feeAddress, distributorAddress)
         );
         return
-            Arrowpad(
+            Fyuz(
                 payable(
                     address(
                         new TransparentUpgradeableProxy(

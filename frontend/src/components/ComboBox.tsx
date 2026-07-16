@@ -9,15 +9,15 @@ const ComboBoxRoot = styled(Box)`
   & > label {
     padding: 8px 16px;
     height: 100%;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(234, 230, 218, 0.04);
+    border: 1px solid rgba(234, 230, 218, 0.06);
     border-radius: 10px;
-    color: white;
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
     &:hover {
-      border-color: rgba(209, 255, 26, 0.25);
-      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(191, 209, 67, 0.25);
+      background: rgba(234, 230, 218, 0.06);
     }
   }
   position: relative;
@@ -35,33 +35,32 @@ const ComboBoxRoot = styled(Box)`
     z-index: 3;
   }
   & ul {
-    background: rgba(13, 13, 20, 0.95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-dark);
+    border: 1px solid var(--border);
     list-style: none;
     padding: 4px;
     margin: 0;
     border-radius: 12px;
     color: #222;
-    font-family: Inter;
+    font-family: var(--font-body);
     font-size: 13px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     li {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #94A3B8;
+      color: var(--muted);
       cursor: pointer;
       padding: 8px 12px;
       border-radius: 8px;
       transition: all 0.15s ease;
       &.active {
-        color: white;
+        color: var(--text-primary);
         font-weight: 600;
       }
       &:hover {
-        color: white;
-        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-primary);
+        background: rgba(234, 230, 218, 0.06);
       }
     }
   }

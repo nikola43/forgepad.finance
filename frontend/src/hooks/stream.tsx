@@ -18,7 +18,7 @@ export type StreamToken = {
     viewers: number
 }
 
-// Live status for the 🔴 LIVE badge + viewer count. Polls while mounted.
+// Live status for the LIVE badge + viewer count. Polls while mounted.
 export function useStreamStatus(tokenAddress?: string) {
     const { data, mutate } = useSWR<StreamStatus>(
         tokenAddress ? ['/stream', tokenAddress] : null,

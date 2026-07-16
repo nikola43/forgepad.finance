@@ -5,6 +5,19 @@ import { API_ENDPOINT } from "@/config";
 import axios from "axios";
 import { useEffect, useRef } from "react";
 
+const REF_STORAGE_KEY = 'fyuz_ref'
+// Pre-rebrand key. Still read (and cleared) so a visitor who landed with a
+// ?ref= before the Fyuz rename still gets attributed when they connect.
+const LEGACY_REF_STORAGE_KEY = 'arrowpad_ref'
+
+const readRefCode = () =>
+    localStorage.getItem(REF_STORAGE_KEY) || localStorage.getItem(LEGACY_REF_STORAGE_KEY)
+
+const clearRefCode = () => {
+    localStorage.removeItem(REF_STORAGE_KEY)
+    localStorage.removeItem(LEGACY_REF_STORAGE_KEY)
+}
+
 export function useUserInfo() {
     const { address } = useAppKitAccount()
     const { walletProvider } = useAppKitProvider<EVMProvider>("eip155")
@@ -16,7 +29,7 @@ export function useUserInfo() {
         try {
           const provider = walletProvider
             ? new ethers.BrowserProvider(walletProvider)
-            : new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com")
+            : new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_BSC_RPC_URL || "https://bsc-dataseed.bnbchain.org")
           const balanceWei = await provider.getBalance(address)
           const balanceInEther = ethers.formatEther(balanceWei)
           return {
@@ -64,7 +77,7 @@ export function useAccount() {
     useEffect(() => {
         if (typeof window === 'undefined') return
         const ref = new URLSearchParams(window.location.search).get('ref')
-        if (ref) localStorage.setItem('arrowpad_ref', ref)
+        if (ref) localStorage.setItem(REF_STORAGE_KEY, ref)
     }, [])
 
     // Auto-register on first connect if user doesn't exist
@@ -80,16 +93,16 @@ export function useAccount() {
             try {
                 const provider = new BrowserProvider(walletProvider)
                 const signer = await provider.getSigner()
-                const msg = `Register on Arrowpad\n${address}\n${Date.now()}`
+                const msg = `Register on Fyuz\n${address}\n${Date.now()}`
                 const signature = await signer.signMessage(msg)
-                const refCode = (typeof window !== 'undefined' && localStorage.getItem('arrowpad_ref')) || undefined
+                const refCode = (typeof window !== 'undefined' && readRefCode()) || undefined
                 await axios.post(`${API_ENDPOINT}/users`, {
                     user: { username: '', bio: '', avatar: '' },
                     signature,
                     msg,
                     refCode,
                 })
-                localStorage.removeItem('arrowpad_ref')
+                clearRefCode()
                 mutate()
             } catch (err) {
                 console.error('Auto-register failed:', err)

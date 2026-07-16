@@ -1,7 +1,7 @@
 import axios from "axios";
 import useSWR from "swr";
 import { API_ENDPOINT } from "@/config";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { socket } from "@/utils/socket";
 import { CaipNetwork, type Provider as EVMProvider, useAppKitAccount, useAppKitNetworkCore, useAppKitProvider } from "@reown/appkit/react";
 import type { Connection, Provider as SOLProvider } from "@reown/appkit-adapter-solana/react";
@@ -180,6 +180,12 @@ export function useKing() {
 
 export function useNewTrades() {
     const [latestTradeId, setLatestTradeId] = useState<string>()
+    // /trades/recent is a DELTA feed: with latestTradeId set it only returns
+    // trades newer than that id, so any quiet poll yields []. Returning that
+    // directly would blank consumers every 5s of market silence (the activity
+    // ticker unmounted this way). Accumulate deltas into a capped rolling
+    // buffer instead — "recent activity", not "activity since the last poll".
+    const bufferRef = useRef<any[]>([])
 
     const { data, mutate } = useSWR(
         '/list/trades',
@@ -191,8 +197,13 @@ export function useNewTrades() {
             })
             if (trades.length) {
                 setLatestTradeId(trades[0].id)
+                // Dedupe by id: a socket-triggered mutate can race the 5s
+                // interval, and both fetches may carry the same delta.
+                const seen = new Set(bufferRef.current.map((t: any) => t.id))
+                const fresh = trades.slice().reverse().filter((t: any) => !seen.has(t.id))
+                bufferRef.current = [...bufferRef.current, ...fresh].slice(-50)
             }
-            return trades.reverse()
+            return bufferRef.current
         }, {
         refreshInterval: 5000,
     }

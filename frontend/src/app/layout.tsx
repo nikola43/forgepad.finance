@@ -2,37 +2,38 @@ import type { Metadata, Viewport } from "next";
 
 import ContextProvider from '@/context'
 import MainLayout from "@/components/layout"
+import { FYUZ_TWITTER_URL } from "@/config"
 import '@/assets/globals.css'
 
-const SITE_URL = "https://arrowpad.io";
+const SITE_URL = "https://fyuz.fun";
 const DESCRIPTION =
-  "ArrowPad is the token launchpad built for Robinhood Chain. Launch a coin in seconds on a fair bonding curve, trade instantly with 1% fees, and auto-graduate to Uniswap. The pump.fun of Robinhood Chain.";
+  "Fyuz is the cultural launchpad where the internet fuses personalities, narratives and communities into live meme markets. Pick two icons, fuse them into a character, launch a token on BNB Smart Chain. A bonding curve sets the price; graduated tokens migrate to PancakeSwap.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "ArrowPad — Launch & Trade Tokens on Robinhood Chain",
-    template: "%s | ArrowPad",
+    default: "Fyuz — Two Icons Enter. One Market Leaves.",
+    template: "%s | Fyuz",
   },
   description: DESCRIPTION,
-  applicationName: "ArrowPad",
+  applicationName: "Fyuz",
   keywords: [
-    "ArrowPad",
-    "Robinhood Chain",
-    "Robinhood Chain launchpad",
-    "Robinhood Chain pump fun",
-    "Robinhood Chain memecoin",
-    "launch token on Robinhood Chain",
-    "Robinhood Chain token launch",
-    "Robinhood Chain DEX",
+    "Fyuz",
+    "BNB Smart Chain",
+    "BNB Chain launchpad",
+    "BNB Chain memecoin",
+    "launch token on BNB Chain",
+    "BNB Chain token launch",
+    "memecoin launchpad",
+    "fusion memecoin",
     "create memecoin",
     "bonding curve launchpad",
-    "Uniswap graduation",
-    "pump fun clone",
+    "PancakeSwap graduation",
+    "cultural launchpad",
   ],
-  authors: [{ name: "ArrowPad" }],
-  creator: "ArrowPad",
-  publisher: "ArrowPad",
+  authors: [{ name: "Fyuz" }],
+  creator: "Fyuz",
+  publisher: "Fyuz",
   alternates: { canonical: "/" },
   icons: {
     icon: '/favicon.png',
@@ -42,18 +43,18 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: SITE_URL,
-    siteName: "ArrowPad",
-    title: "ArrowPad — Launch & Trade Tokens on Robinhood Chain",
+    siteName: "Fyuz",
+    title: "Fyuz — Two Icons Enter. One Market Leaves.",
     description: DESCRIPTION,
     images: [
-      { url: "/images/logo.png", width: 1024, height: 1024, alt: "ArrowPad" },
+      { url: "/images/logo.png", width: 1024, height: 1024, alt: "Fyuz" },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@arrowpad",
-    creator: "@arrowpad",
-    title: "ArrowPad — Launch & Trade Tokens on Robinhood Chain",
+    site: "@fyuzfun",
+    creator: "@fyuzfun",
+    title: "Fyuz — Two Icons Enter. One Market Leaves.",
     description: DESCRIPTION,
     images: ["/images/logo.png"],
   },
@@ -72,7 +73,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#D3FF24",
+  themeColor: "#131208",
   colorScheme: "dark",
 };
 
@@ -82,23 +83,23 @@ const jsonLd = {
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
-      name: "ArrowPad",
+      name: "Fyuz",
       url: SITE_URL,
       logo: `${SITE_URL}/images/logo.png`,
       description: DESCRIPTION,
-      sameAs: ["https://x.com/RobinArrowPad"],
+      sameAs: [FYUZ_TWITTER_URL],
     },
     {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
       url: SITE_URL,
-      name: "ArrowPad",
+      name: "Fyuz",
       description: DESCRIPTION,
       publisher: { "@id": `${SITE_URL}/#organization` },
     },
     {
       "@type": "WebApplication",
-      name: "ArrowPad",
+      name: "Fyuz",
       url: SITE_URL,
       applicationCategory: "FinanceApplication",
       operatingSystem: "Web",

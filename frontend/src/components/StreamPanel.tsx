@@ -7,6 +7,7 @@ import "@livekit/components-styles"
 import { BrowserProvider } from "ethers"
 import { useAppKitAccount, useAppKitProvider, type Provider as EVMProvider } from "@reown/appkit/react"
 import toast from "react-hot-toast"
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord'
 import {
     useStreamStatus,
     joinStream,
@@ -88,7 +89,7 @@ export default function StreamPanel({ tokenAddress, creatorAddress }: { tokenAdd
     if (session) {
         return (
             <Box sx={{ my: 2 }}>
-                <Box data-lk-theme="default" sx={{ height: 480, borderRadius: "14px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <Box data-lk-theme="default" sx={{ height: 480, borderRadius: "14px", overflow: "hidden", border: "1px solid var(--border)" }}>
                     <LiveKitRoom
                         token={session.token}
                         serverUrl={session.url}
@@ -104,15 +105,15 @@ export default function StreamPanel({ tokenAddress, creatorAddress }: { tokenAdd
                     </LiveKitRoom>
                 </Box>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mt={1.5}>
-                    <Typography fontSize={12} color="#94A3B8">
+                    <Typography fontSize={12} color="var(--muted)">
                         {session.isPublisher ? "You are broadcasting live" : "Watching live"}
                     </Typography>
                     {session.isPublisher ? (
-                        <Button onClick={endLive} disabled={busy} sx={{ textTransform: "none", color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "10px", px: 2 }}>
+                        <Button onClick={endLive} disabled={busy} sx={{ textTransform: "none", color: "#D64545", border: "1px solid rgba(214,69,69,0.4)", borderRadius: "10px", px: 2 }}>
                             {busy ? <CircularProgress size={16} /> : "End Stream"}
                         </Button>
                     ) : (
-                        <Button onClick={() => setSession(null)} sx={{ textTransform: "none", color: "#94A3B8", borderRadius: "10px", px: 2 }}>
+                        <Button onClick={() => setSession(null)} sx={{ textTransform: "none", color: "var(--muted)", borderRadius: "10px", px: 2 }}>
                             Leave
                         </Button>
                     )}
@@ -123,11 +124,11 @@ export default function StreamPanel({ tokenAddress, creatorAddress }: { tokenAdd
 
     // Idle — show the right call-to-action.
     return (
-        <Box sx={{ my: 2, p: 3, borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, textAlign: "center" }}>
+        <Box sx={{ my: 2, p: 3, borderRadius: "16px", border: "1px solid var(--border)", background: "rgba(234,230,218,0.03)", display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, textAlign: "center" }}>
             {isLive && (
                 <Box display="flex" alignItems="center" gap={1}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 8px #EF4444" }} />
-                    <Typography fontSize={13} color="white" fontWeight={700}>LIVE · {status?.viewers ?? 0} watching</Typography>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#D64545" }} />
+                    <Typography fontSize={13} color="var(--text-primary)" fontWeight={700} fontFamily="var(--font-data)">LIVE · {status?.viewers ?? 0} watching</Typography>
                 </Box>
             )}
             {isCreator ? (
@@ -136,15 +137,15 @@ export default function StreamPanel({ tokenAddress, creatorAddress }: { tokenAdd
                         <Button onClick={goLive} disabled={busy} sx={{ textTransform: "none", background: ACCENT, color: "#04120A", fontWeight: 700, borderRadius: "12px", px: 3, "&:hover": { background: "#16A34A" } }}>
                             {busy ? <CircularProgress size={18} /> : "Resume broadcast"}
                         </Button>
-                        <Button onClick={endLive} disabled={busy} sx={{ textTransform: "none", color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "12px", px: 3 }}>
+                        <Button onClick={endLive} disabled={busy} sx={{ textTransform: "none", color: "#D64545", border: "1px solid rgba(214,69,69,0.4)", borderRadius: "12px", px: 3 }}>
                             End Stream
                         </Button>
                     </Box>
                 ) : (
                     <>
-                        <Typography fontSize={14} color="#94A3B8">Broadcast to your holders — camera, mic, or screen-share, live on your coin page.</Typography>
+                        <Typography fontSize={14} color="var(--muted)">Broadcast to your holders — camera, mic, or screen-share, live on your coin page.</Typography>
                         <Button onClick={goLive} disabled={busy} sx={{ textTransform: "none", background: ACCENT, color: "#04120A", fontWeight: 700, borderRadius: "12px", px: 3, py: 1, "&:hover": { background: "#16A34A" } }}>
-                            {busy ? <CircularProgress size={18} /> : "🔴 Go Live"}
+                            {busy ? <CircularProgress size={18} /> : <><FiberManualRecordIcon sx={{ fontSize: 12, mr: 0.75 }} />Go Live</>}
                         </Button>
                     </>
                 )
@@ -153,7 +154,7 @@ export default function StreamPanel({ tokenAddress, creatorAddress }: { tokenAdd
                     {busy ? <CircularProgress size={18} /> : `Watch Live (${status?.viewers ?? 0} watching)`}
                 </Button>
             ) : (
-                <Typography fontSize={14} color="#64748B">No live stream right now. Check back later.</Typography>
+                <Typography fontSize={14} color="var(--text-muted)">No live stream right now. Check back later.</Typography>
             )}
         </Box>
     )

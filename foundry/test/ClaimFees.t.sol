@@ -3,9 +3,9 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {Fyuz, IFyuz} from "../src/Fyuz.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
@@ -50,11 +50,36 @@ contract V3PoolSwapper {
     }
 
     /// Pay whatever the pool says we owe.
+    ///
+    /// @dev PancakeSwap V3 is a FORK, not a drop-in: it renamed the swap callback from
+    ///      `uniswapV3SwapCallback` to `pancakeV3SwapCallback` (selector 0x23a69e75), so a
+    ///      Uniswap-only swapper reverts with a bare "unrecognized function selector"
+    ///      inside pool.swap(). Same divergence family as IV3PoolSlot0.sol. This is a
+    ///      TEST-ONLY concern — the production contract never calls pool.swap() directly;
+    ///      it mints through the NonfungiblePositionManager, which implements the
+    ///      Pancake-named mint callback itself. Both names are kept so this helper stays
+    ///      usable against a Uniswap fork too.
     function uniswapV3SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
         bytes calldata data
     ) external {
+        _pay(amount0Delta, amount1Delta, data);
+    }
+
+    function pancakeV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) external {
+        _pay(amount0Delta, amount1Delta, data);
+    }
+
+    function _pay(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) internal {
         address pool = abi.decode(data, (address));
         require(msg.sender == pool, "only pool");
         if (amount0Delta > 0) {
@@ -129,8 +154,8 @@ contract ClaimFeesTest is Test {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
-    Arrowpad public arrowpad;
-    ArrowpadLiquidityManager public liquidityManager;
+    Fyuz public fyuz;
+    FyuzLiquidityManager public liquidityManager;
 
     address UNISWAP_V2_ROUTER;
     address V3_FACTORY;
@@ -174,7 +199,7 @@ contract ClaimFeesTest is Test {
         vm.deal(creator, 100_000 ether);
         vm.deal(trader, 100_000 ether);
 
-        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
+        liquidityManager = FyuzDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -188,19 +213,19 @@ contract ClaimFeesTest is Test {
             10000,
             address(this)
         );
-        arrowpad = ArrowpadDeploy.deployArrowpad(
+        fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR,
             address(this)
         );
-        liquidityManager.setAuthorizedCaller(address(arrowpad), true);
+        liquidityManager.setAuthorizedCaller(address(fyuz), true);
         // Match the live Robinhood config (DeployRobinhood.s.sol): that chain's
         // ETH/USD feed has a ~2h heartbeat, so the 1h default reads it as stale,
         // mcap comes back 0 and nothing ever graduates. Harmless on mainnet, where
         // the feed is fresh at the fork block.
-        arrowpad.setPriceStalenessThreshold(86400);
+        fyuz.setPriceStalenessThreshold(86400);
     }
 
     // ==================== HELPERS ====================
@@ -211,7 +236,7 @@ contract ClaimFeesTest is Test {
         uint8 poolType
     ) internal returns (address t) {
         vm.prank(creator);
-        t = arrowpad.createToken{value: 0.01 ether}(
+        t = fyuz.createToken{value: 0.01 ether}(
             name,
             sym,
             0,
@@ -222,7 +247,7 @@ contract ClaimFeesTest is Test {
         );
         for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
             vm.prank(trader);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether}(
+            fyuz.swapExactETHForTokens{value: 0.05 ether}(
                 t,
                 0.05 ether,
                 0,
@@ -232,8 +257,8 @@ contract ClaimFeesTest is Test {
         require(_pool(t).launched, "did not graduate");
     }
 
-    function _pool(address t) internal view returns (IArrowpad.PoolInfo memory) {
-        return IArrowpad(address(arrowpad)).tokenPools(t);
+    function _pool(address t) internal view returns (IFyuz.PoolInfo memory) {
+        return IFyuz(address(fyuz)).tokenPools(t);
     }
 
     /// @dev Round-trip swaps on the real V3 pool to accrue genuine trading fees.
@@ -299,7 +324,7 @@ contract ClaimFeesTest is Test {
         uint256 creatorTokBefore = IERC20(t).balanceOf(creator);
         uint256 platformTokBefore = IERC20(t).balanceOf(FEE_WALLET);
 
-        (uint256 ethFees, uint256 tokenFees) = arrowpad.claimFees(t);
+        (uint256 ethFees, uint256 tokenFees) = fyuz.claimFees(t);
 
         assertGt(ethFees, 0, "real ETH fees accrued");
         assertGt(tokenFees, 0, "real token fees accrued");
@@ -330,7 +355,7 @@ contract ClaimFeesTest is Test {
         uint128 liqBefore = _v3Liquidity(id);
         assertGt(liqBefore, 0, "position has liquidity");
 
-        arrowpad.claimFees(t);
+        fyuz.claimFees(t);
 
         assertEq(_v3Liquidity(id), liqBefore, "liquidity unchanged by claim");
         assertEq(
@@ -344,62 +369,24 @@ contract ClaimFeesTest is Test {
         address t = _graduate("TwiceV3", "TV3", 2);
         _generateV3Fees(t);
 
-        (uint256 eth1, uint256 tok1) = arrowpad.claimFees(t);
+        (uint256 eth1, uint256 tok1) = fyuz.claimFees(t);
         assertGt(eth1 + tok1, 0, "first claim pays");
 
-        (uint256 eth2, uint256 tok2) = arrowpad.claimFees(t);
+        (uint256 eth2, uint256 tok2) = fyuz.claimFees(t);
         assertEq(eth2, 0, "no ETH fees left immediately after claiming");
         assertEq(tok2, 0, "no token fees left immediately after claiming");
 
         _generateV3Fees(t);
-        (uint256 eth3, uint256 tok3) = arrowpad.claimFees(t);
+        (uint256 eth3, uint256 tok3) = fyuz.claimFees(t);
         assertGt(eth3 + tok3, 0, "new trading accrues new fees");
     }
 
-    // ==================== V4 ====================
-
-    function test_Claim04_V4FeesSplit5050() public {
-        address t = _graduate("FeeV4", "FV4", 3);
-        _generateV4Fees(t);
-
-        uint256 creatorEthBefore = creator.balance;
-        uint256 platformEthBefore = FEE_WALLET.balance;
-        uint256 creatorTokBefore = IERC20(t).balanceOf(creator);
-        uint256 platformTokBefore = IERC20(t).balanceOf(FEE_WALLET);
-
-        (uint256 ethFees, uint256 tokenFees) = arrowpad.claimFees(t);
-        assertGt(ethFees + tokenFees, 0, "real V4 fees accrued and collected");
-
-        uint256 creatorEth = creator.balance - creatorEthBefore;
-        uint256 platformEth = FEE_WALLET.balance - platformEthBefore;
-        uint256 creatorTok = IERC20(t).balanceOf(creator) - creatorTokBefore;
-        uint256 platformTok = IERC20(t).balanceOf(FEE_WALLET) - platformTokBefore;
-
-        assertEq(creatorEth + platformEth, ethFees, "all ETH fees paid out");
-        assertEq(creatorTok + platformTok, tokenFees, "all token fees paid out");
-        assertEq(creatorEth, ethFees / 2, "creator gets 50% of ETH");
-        assertEq(creatorTok, tokenFees / 2, "creator gets 50% of tokens");
-
-        console.log("V4 ETH fees claimed  :", ethFees);
-        console.log("V4 token fees claimed:", tokenFees);
-    }
-
-    function test_Claim05_V4ClaimDoesNotTouchPrincipal() public {
-        address t = _graduate("PrinV4", "PV4", 3);
-        _generateV4Fees(t);
-
-        uint256 id = liquidityManager.v4PositionOf(t);
-        uint128 liqBefore = IPositionManager(V4_POS_MGR).getPositionLiquidity(id);
-        assertGt(liqBefore, 0, "position has liquidity");
-
-        arrowpad.claimFees(t);
-
-        assertEq(
-            IPositionManager(V4_POS_MGR).getPositionLiquidity(id),
-            liqBefore,
-            "liquidity unchanged by claim"
-        );
-    }
+    // ==================== V4 (gated off) ====================
+    // test_Claim04_V4FeesSplit5050 and test_Claim05_V4ClaimDoesNotTouchPrincipal
+    // were removed: both graduated a poolType 3 token, which createToken now
+    // rejects. The V4 fee-collection code in FyuzLiquidityManager is intentionally
+    // left dormant, and the V4Swapper/_generateV4Fees harness below is kept so the
+    // coverage can be restored verbatim if V4 is ever re-enabled.
 
     // ==================== GUARDS ====================
 
@@ -409,30 +396,30 @@ contract ClaimFeesTest is Test {
     function test_Claim06_V2HasNothingToClaim() public {
         address t = _graduate("FeeV2", "FV2", 1);
         vm.expectRevert("No claimable position");
-        arrowpad.claimFees(t);
+        fyuz.claimFees(t);
     }
 
     function test_Claim07_UnknownTokenReverts() public {
         vm.expectRevert("Unknown token");
-        arrowpad.claimFees(makeAddr("nope"));
+        fyuz.claimFees(makeAddr("nope"));
     }
 
     function test_Claim08_UnlaunchedTokenReverts() public {
         vm.prank(creator);
-        address t = arrowpad.createToken{value: 0.01 ether}(
+        address t = fyuz.createToken{value: 0.01 ether}(
             "NoGrad",
             "NG",
             0,
             0,
             0,
-            3,
+            2, // was 3 (V4); V4 is gated off and would revert before the claim check
             block.timestamp + 1
         );
         vm.expectRevert("Not launched");
-        arrowpad.claimFees(t);
+        fyuz.claimFees(t);
     }
 
-    /// @dev collectFees moves real money, so only Arrowpad may drive it — otherwise
+    /// @dev collectFees moves real money, so only Fyuz may drive it — otherwise
     ///      anyone could redirect the split by passing their own addresses.
     function test_Claim09_OnlyAuthorizedCanCollect() public {
         address t = _graduate("AuthV3", "AV3", 2);
@@ -454,7 +441,7 @@ contract ClaimFeesTest is Test {
         uint256 creatorEthBefore = creator.balance;
 
         vm.prank(trader);
-        (uint256 ethFees, ) = arrowpad.claimFees(t);
+        (uint256 ethFees, ) = fyuz.claimFees(t);
 
         assertGt(ethFees, 0, "fees were claimed");
         assertEq(trader.balance, traderEthBefore, "caller gets nothing");
@@ -484,98 +471,37 @@ contract ClaimFeesTest is Test {
         }
     }
 
-    // ==================== V4 DIRECT (no bonding curve) ====================
+    // ==================== V4 DIRECT (removed) ====================
+    // test_Claim12/13 covered createTokenDirect's single-sided V4 LP fees. That
+    // entry point no longer exists on Fyuz, so the tests and their _createDirect
+    // helper are gone. CreateTokenRefund.t.sol now asserts the selector is absent.
 
-    /// Direct launches skip the curve entirely: the whole supply is seeded as
-    /// single-sided V4 liquidity at creation. That LP still earns real trading fees,
-    /// and they must be claimable and split 50/50 like any other position.
-    /// @dev Read the fee BEFORE pranking. A getter call inside the `{value: ...}`
-    ///      expression is evaluated first and consumes the prank, so the launch would
-    ///      run as this test contract and pool.owner would be wrong.
-    function _createDirect(
-        string memory name,
-        string memory sym
-    ) internal returns (address t) {
-        uint256 fee = arrowpad.CREATE_TOKEN_FEE_AMOUNT();
-        vm.prank(creator);
-        t = arrowpad.createTokenDirect{value: fee}(
-            name,
-            sym,
-            0,
-            block.timestamp + 1
-        );
-    }
-
-    function test_Claim12_V4DirectFeesSplit5050() public {
-        address t = _createDirect("DirectFee", "DFE");
-        _generateV4Fees(t);
-
-        uint256 creatorEthBefore = creator.balance;
-        uint256 platformEthBefore = FEE_WALLET.balance;
-        uint256 creatorTokBefore = IERC20(t).balanceOf(creator);
-        uint256 platformTokBefore = IERC20(t).balanceOf(FEE_WALLET);
-
-        (uint256 ethFees, uint256 tokenFees) = arrowpad.claimFees(t);
-        assertGt(ethFees + tokenFees, 0, "direct-launch LP accrued real fees");
-
-        uint256 creatorEth = creator.balance - creatorEthBefore;
-        uint256 platformEth = FEE_WALLET.balance - platformEthBefore;
-        uint256 creatorTok = IERC20(t).balanceOf(creator) - creatorTokBefore;
-        uint256 platformTok = IERC20(t).balanceOf(FEE_WALLET) - platformTokBefore;
-
-        assertEq(creatorEth + platformEth, ethFees, "all ETH fees paid out");
-        assertEq(creatorTok + platformTok, tokenFees, "all token fees paid out");
-        assertEq(creatorEth, ethFees / 2, "creator gets 50% of ETH");
-        assertEq(creatorTok, tokenFees / 2, "creator gets 50% of tokens");
-
-        console.log("V4-direct ETH fees  :", ethFees);
-        console.log("V4-direct token fees:", tokenFees);
-    }
-
-    /// Claiming a direct launch must never eat into the locked principal.
-    function test_Claim13_V4DirectClaimDoesNotTouchPrincipal() public {
-        address t = _createDirect("DirectPrin", "DPR");
-        _generateV4Fees(t);
-
-        uint256 posBefore = liquidityManager.v4PositionOf(t);
-        arrowpad.claimFees(t);
-
-        assertEq(liquidityManager.v4PositionOf(t), posBefore, "LP position still held");
-        assertGt(posBefore, 0, "position exists");
-
-        // A second claim with no trading in between yields nothing — proof the first
-        // claim took fees only and left the principal alone.
-        (uint256 eth2, uint256 tok2) = arrowpad.claimFees(t);
-        assertEq(eth2 + tok2, 0, "nothing left to claim without more trading");
-    }
-
-    /// End-to-end: every pool type the protocol can produce (V3 + V4 via the curve,
-    /// and V4 direct) must trade and pay out claimable fees.
+    /// End-to-end: every pool type the protocol can still produce must behave
+    /// correctly on claim — V3 pays out real fees, V2 has nothing claimable.
+    /// @dev Was V3 + V4 + V4-direct; V4 is gated off, so V2's guard rail is the
+    ///      other half of "all pool types" now. Kept as an end-to-end sweep rather
+    ///      than folded into Claim01, which only exercises V3 in isolation.
     function test_Claim14_AllPoolTypesTradeAndClaim() public {
         address v3 = _graduate("AllV3", "AV3", 2);
-        address v4 = _graduate("AllV4", "AV4", 3);
-        address v4d = _createDirect("AllV4D", "AV4D");
+        address v2 = _graduate("AllV2", "AV2", 1);
 
         _generateV3Fees(v3);
-        _generateV4Fees(v4);
-        _generateV4Fees(v4d);
 
-        string[3] memory labels = ["V3      ", "V4      ", "V4direct"];
-        address[3] memory toks = [v3, v4, v4d];
+        uint256 cEth = creator.balance;
+        uint256 pEth = FEE_WALLET.balance;
 
-        for (uint256 i = 0; i < 3; i++) {
-            uint256 cEth = creator.balance;
-            uint256 pEth = FEE_WALLET.balance;
+        (uint256 ethFees, uint256 tokenFees) = fyuz.claimFees(v3);
+        assertGt(ethFees + tokenFees, 0, "V3 must accrue claimable fees");
 
-            (uint256 ethFees, uint256 tokenFees) = arrowpad.claimFees(toks[i]);
-            assertGt(ethFees + tokenFees, 0, "each pool type must accrue fees");
+        uint256 paidEth = (creator.balance - cEth) + (FEE_WALLET.balance - pEth);
+        assertEq(paidEth, ethFees, "all ETH fees paid out");
 
-            uint256 paidEth = (creator.balance - cEth) + (FEE_WALLET.balance - pEth);
-            assertEq(paidEth, ethFees, "all ETH fees paid out");
+        console.log("V3 eth:", ethFees);
+        console.log("V3 tok:", tokenFees);
 
-            console.log(labels[i], "eth:", ethFees);
-            console.log(labels[i], "tok:", tokenFees);
-        }
+        // V2 fees are only realisable by burning LP, so there is nothing to claim.
+        vm.expectRevert("No claimable position");
+        fyuz.claimFees(v2);
     }
 
     receive() external payable {}

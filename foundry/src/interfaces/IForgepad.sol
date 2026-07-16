@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-interface IArrowpad {
+interface IFyuz {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;

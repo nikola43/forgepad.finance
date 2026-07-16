@@ -46,6 +46,8 @@ pub struct UserResponse {
     pub bio: Option<String>,
     pub likes: i32,
     pub is_admin: Option<bool>,
+    /// X/Twitter handle (no @), user-set from the profile page.
+    pub twitter_username: Option<String>,
 }
 
 impl From<User> for UserResponse {
@@ -58,6 +60,7 @@ impl From<User> for UserResponse {
             bio: u.bio,
             likes: u.likes,
             is_admin: None,
+            twitter_username: u.twitter_username,
         }
     }
 }

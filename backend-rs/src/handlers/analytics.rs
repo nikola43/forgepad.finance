@@ -13,7 +13,7 @@ use crate::AppState;
 // ---------------------------------------------------------------------------
 // Token analytics / safety panel + per-token Top Traders (PnL). Derived live
 // from tokens/holders/trades. Holder % is against the fixed 1e9 total supply
-// (matches Arrowpad TOTAL_SUPPLY). Bundle heuristic = distinct buyers in the
+// (matches Fyuz TOTAL_SUPPLY). Bundle heuristic = distinct buyers in the
 // token's first-seen block (min traded_at).
 // ---------------------------------------------------------------------------
 

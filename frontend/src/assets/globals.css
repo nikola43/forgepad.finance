@@ -1,67 +1,127 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+/* ==========================================================================
+   FYUZ — Brand guidelines v1.0
+   Two reagents, one product. Flat ink on flat ground: energy comes from
+   color logic and motion, never from glows, gradients or noise.
+   ========================================================================== */
 
 :root {
-  --bg-primary: #06060a;
-  --bg-secondary: #0d0d14;
-  --bg-card: rgba(14, 14, 22, 0.7);
-  --bg-surface: rgba(255, 255, 255, 0.03);
-  --accent: #d1ff1a;
-  --accent-light: #e4ff66;
-  --accent-glow: rgba(209, 255, 26, 0.15);
-  --purple: #8B5CF6;
-  --purple-glow: rgba(139, 92, 246, 0.15);
-  --green: #10B981;
-  --red: #EF4444;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(209, 255, 26, 0.25);
-  --glass: rgba(255, 255, 255, 0.02);
+  /* --- Reagents & product (§08) ------------------------------------------ */
+  --citron: #BFD143;        /* Reagent A — identity one */
+  --plum-rose: #C74B8E;     /* Reagent B — identity two */
+  --tangerine: #E86A2B;     /* Product — fused results, wins, graduation ONLY */
+  --moss-black: #131208;    /* The chamber */
+  --bone: #EAE6DA;          /* The page */
+
+  /* --- Functional & trading (§08) ---------------------------------------- */
+  --up: #3FA968;
+  --down: #D64545;
+  --warning: #E8B93B;
+  --muted: #8C8C85;
+  --surface-dark: #1E1C10;
+  --surface-light: #F5F2EA;
+
+  /* --- Surfaces ---------------------------------------------------------- */
+  --bg-primary: var(--moss-black);
+  --bg-secondary: var(--surface-dark);
+  --bg-card: var(--surface-dark);
+  --bg-surface: rgba(234, 230, 218, 0.04);
+
+  /* --- Ink --------------------------------------------------------------- */
+  --text-primary: var(--bone);      /* 16.2:1 on moss — AAA */
+  --text-secondary: var(--muted);
+  --text-muted: #6F6F68;
+
+  /* --- Accent (citron on moss = 10.9:1 AAA) ------------------------------ */
+  --accent: var(--citron);
+  --accent-light: #D3E063;
+
+  /* Legacy alias — reagent B replaces the old purple. */
+  --purple: var(--plum-rose);
+
+  /* Chart colors stay conventional for trader trust (§08). */
+  --green: var(--up);
+  --red: var(--down);
+
+  /* --- Lines ------------------------------------------------------------- */
+  --border: rgba(234, 230, 218, 0.08);
+  --border-hover: rgba(191, 209, 67, 0.35);
+  --glass: rgba(234, 230, 218, 0.02);
+
+  /* --- Typography (§09) --------------------------------------------------
+     Unbounded  — display only, never below 18px, never paragraphs.
+     Space Grotesk — body & UI. The workhorse, ~90% of all text.
+     Space Mono — data: tickers, prices, mcaps, %, timestamps, labels.        */
+  --font-display: 'Unbounded', 'Arial Black', sans-serif;
+  --font-body: 'Space Grotesk', Helvetica, Arial, sans-serif;
+  --font-data: 'Space Mono', Menlo, 'Courier New', monospace;
+
+  /* Product type scale (§09) */
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-26: 26px;
+  --text-34: 34px;
+  --text-44: 44px;
+  --text-58: 58px;
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 24px;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 40px var(--accent-glow);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --tv-color-pane-background: #0d0d14;
+
+  /* Shadows carry depth, never light. No colored halos. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  /* Retired: glows are banned (§10, §20). Kept inert so legacy refs no-op. */
+  --accent-glow: transparent;
+  --purple-glow: transparent;
+  --shadow-glow: none;
+
+  /* --- Motion (§13) ------------------------------------------------------ */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ease-slam: cubic-bezier(0.7, 0, 1, 1);          /* convergence */
+  --ease-overshoot: cubic-bezier(0.2, 1.4, 0.3, 1); /* reveal */
+  --ease-spring: var(--ease-overshoot);
+  --micro: 150ms;                                    /* UI micro-motion 120–180ms */
+
+  --tv-color-pane-background: #1E1C10;
 }
 
+/* The chamber is flat and constant. No scenes, no vignette washes. */
 body {
   background: var(--bg-primary);
-  background-image:
-    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(209, 255, 26, 0.06) 0px, transparent 60%),
-    radial-gradient(ellipse 60% 80% at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 60%),
-    radial-gradient(ellipse 50% 50% at 50% 100%, rgba(209, 255, 26, 0.04) 0px, transparent 60%);
-  background-attachment: fixed;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text-primary);
   font-weight: 400;
-  letter-spacing: -0.01em;
-  line-height: 1.5;
+  font-size: var(--text-16);
+  letter-spacing: 0;
+  line-height: 1.6;
 }
 
-/* Smooth transitions for all interactive elements */
 a, button, input, select, textarea {
-  transition: all 0.2s var(--ease-out);
+  transition: color var(--micro) var(--ease-out),
+              background-color var(--micro) var(--ease-out),
+              border-color var(--micro) var(--ease-out),
+              transform var(--micro) var(--ease-out),
+              opacity var(--micro) var(--ease-out);
 }
 
 ::selection {
-  background: rgba(209, 255, 26, 0.3);
-  color: white;
+  background: var(--citron);
+  color: var(--moss-black);
 }
 
-/* Focus ring for accessibility */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--citron);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -75,42 +135,153 @@ a, button, input, select, textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(209, 255, 26, 0.3);
+  background: rgba(191, 209, 67, 0.3);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(209, 255, 26, 0.5);
-}
-
-@font-face {
-  font-family: Jura;
-  src: url("./font/Jura.ttf");
-}
-
-@font-face {
-  font-family: JosefinSans;
-  src: url("./font/JosefinSans.ttf");
-}
-
-@font-face {
-  font-family: Lato;
-  src: url("./font/Lato-Regular.ttf");
+  background: rgba(191, 209, 67, 0.5);
 }
 
 .App {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
 }
 
+/* Display voice: headlines, character names, section titles (§09). */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
+
+h1 { font-weight: 900; }
 
 * {
   box-sizing: border-box;
 }
+
+/* ==========================================================================
+   §10 · THE CHAMBER KIT — five devices, used with restraint.
+   Max one Split OR one Core per layout, never both at hero scale.
+   ========================================================================== */
+
+/* 01 · THE SPLIT — skewed divider carrying the reagent gradient. Always 12°. */
+.fyuz-split {
+  position: relative;
+  overflow: hidden;
+}
+
+.fyuz-split::after {
+  content: "";
+  position: absolute;
+  top: -25%;
+  left: 50%;
+  width: 3px;
+  height: 150%;
+  background: linear-gradient(180deg, var(--citron) 0%, var(--plum-rose) 100%);
+  transform: translateX(-50%) rotate(12deg);
+  pointer-events: none;
+}
+
+/* 02 · THE CORE — concentric reaction rings around a tangerine core.
+   The brand's "live" signal. */
+.fyuz-core {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--tangerine);
+  flex: none;
+}
+
+.fyuz-core::before,
+.fyuz-core::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--tangerine);
+  opacity: 0.5;
+}
+
+.fyuz-core::before { inset: -5px; }
+.fyuz-core::after  { inset: -10px; opacity: 0.22; }
+
+/* Trending: core pulse at 1.6s — the only permanently looping element (§13). */
+.fyuz-core--live::before {
+  animation: core-pulse 1.6s var(--ease-out) infinite;
+}
+
+@keyframes core-pulse {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  60%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* 03 · SPECIMEN LABELS — mono, all-caps, dot-separated metadata strips.
+   Labels on everything: it's how Fyuz content stays recognizable when cropped. */
+.specimen-label {
+  font-family: var(--font-data);
+  font-weight: 400;
+  font-size: var(--text-12);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 04 · THE TITLE SHOT — market-cap progress as a title run.
+   FUSED → CONTENDER → CHAMPION. */
+.title-shot-bar {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  border-radius: 100px;
+  background: rgba(234, 230, 218, 0.08);
+  overflow: hidden;
+}
+
+.title-shot-bar__fill {
+  height: 100%;
+  border-radius: 100px;
+  background: var(--citron);
+  transition: width 400ms var(--ease-out);
+}
+
+/* Graduation is the championship moment — tangerine is earned here. */
+.title-shot-bar__fill--champion {
+  background: var(--tangerine);
+}
+
+/* 05 · DNA TYPE — fused names show their ancestry: letters from icon A in
+   citron, icon B in plum rose, the joining letters in tangerine. */
+.dna-type {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.dna-type__a    { color: var(--citron); }
+.dna-type__join { color: var(--tangerine); }
+.dna-type__b    { color: var(--plum-rose); }
+
+/* Data voice — numbers never jump (§09). */
+.fyuz-data,
+.MuiTypography-root {
+  font-variant-numeric: tabular-nums;
+}
+
+.fyuz-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Product chrome
+   ========================================================================== */
 
 main [id^=tradingview_][id$=-wrapper] {
   border-radius: var(--radius-lg);
@@ -131,9 +302,8 @@ main .tradingview-widget-copyright {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(6, 6, 10, 0.5);
-  backdrop-filter: blur(12px);
+  border-right: 1px solid var(--border);
+  background: var(--bg-primary);
 }
 
 .sidebar.minimized {
@@ -144,34 +314,26 @@ main .tradingview-widget-copyright {
 
 .MuiDialog-root .MuiDialog-paper {
   border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-lg), 0 0 80px rgba(209, 255, 26, 0.05);
-  background: rgba(10, 10, 16, 0.95);
-  backdrop-filter: blur(40px) saturate(150%);
+  box-shadow: var(--shadow-lg);
+  background: var(--surface-dark);
   border: 1px solid var(--border);
   margin: 0;
   width: 100%;
 }
 
 .MuiDialog-root .MuiBackdrop-root {
-  backdrop-filter: blur(20px);
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(19, 18, 8, 0.82);
 }
 
 .MuiDialog-root .MuiDialogTitle-root {
-  font-size: 24px;
+  font-size: var(--text-26);
   padding: 32px 24px;
   display: flex;
   justify-content: space-between;
-}
-
-.MuiDialog-root .MuiDialogTitle-root {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.01em;
+  color: var(--bone);
 }
 
 .MuiDialog-root .MuiDialogContent-root {
@@ -194,79 +356,68 @@ main .tradingview-widget-copyright {
   gap: 1rem;
 }
 
+/* Primary action: flat citron on moss. No gradient, no halo, no shimmer. */
 .MuiButton-root.MuiButton-colorPrimary {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
-  color: #0a0a0f;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  box-shadow: 0 4px 16px rgba(209, 255, 26, 0.2);
+  background: var(--citron);
+  color: var(--moss-black);
+  font-family: var(--font-body);
+  box-shadow: none;
   text-transform: none;
   font-size: 15px;
   border-radius: var(--radius-lg);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  transition: all 0.25s var(--ease-out);
-  position: relative;
-  overflow: hidden;
-}
-
-.MuiButton-root.MuiButton-colorPrimary::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.MuiButton-root.MuiButton-colorPrimary:hover::before {
-  left: 100%;
+  font-weight: 700;
+  letter-spacing: 0;
+  transition: background-color var(--micro) var(--ease-out),
+              transform var(--micro) var(--ease-out);
 }
 
 .MuiButton-root.MuiButton-colorPrimary:hover {
-  background: linear-gradient(135deg, #daff47 0%, #edff8f 100%);
-  color: #0a0a0f;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(209, 255, 26, 0.3);
+  background: var(--accent-light);
+  color: var(--moss-black);
+  box-shadow: none;
 }
 
+/* Buttons compress 2% on press (§13). */
 .MuiButton-root.MuiButton-colorPrimary:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .MuiButton-root.MuiButton-colorSecondary {
   background: var(--bg-surface);
-  backdrop-filter: blur(12px);
-  color: white;
+  color: var(--bone);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.25s var(--ease-out);
+  box-shadow: none;
+  transition: background-color var(--micro) var(--ease-out),
+              border-color var(--micro) var(--ease-out),
+              transform var(--micro) var(--ease-out);
 }
 
 .MuiButton-root.MuiButton-colorSecondary:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(234, 230, 218, 0.08);
   border-color: var(--border-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
+}
+
+.MuiButton-root.MuiButton-colorSecondary:active {
+  transform: scale(0.98);
 }
 
 .MuiButton-root.Mui-disabled {
   opacity: 0.35;
-  color: rgba(255, 255, 255, 0.3) !important;
+  color: rgba(234, 230, 218, 0.3) !important;
   cursor: not-allowed;
   transform: none !important;
 }
 
 @media (max-width: 1280px) {
   body {
-    font-size: 14px;
+    font-size: var(--text-14);
   }
 }
 
 @media (max-width: 600px) {
   body {
-    font-size: 13px;
+    font-size: var(--text-14);
   }
 
   .MuiDialog-root .MuiDialog-paper {
@@ -280,149 +431,82 @@ main .tradingview-widget-copyright {
   }
 }
 
-/* tv-color var moved to :root at top */
-
+/* Legacy hook. The shimmer sweep is retired — energy comes from color and
+   motion, not effects (§10). Kept as a press/hover affordance only. */
 .effect-button {
-  transition: all 0.25s var(--ease-out);
-  position: relative;
-  overflow: hidden;
+  transition: background-color var(--micro) var(--ease-out),
+              border-color var(--micro) var(--ease-out),
+              color var(--micro) var(--ease-out),
+              transform var(--micro) var(--ease-out);
 }
 
-.effect-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-  transition: left 0.6s ease;
-  z-index: 1;
-  pointer-events: none;
+.effect-button:active {
+  transform: scale(0.98);
 }
 
-.effect-button:hover::before {
-  left: 100%;
-}
-
-/* Add shimmer animation */
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
-/* Pulse animation for important elements */
 @keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
-/* Fade in animation */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Slide in from right */
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .Toastify__toast {
   border-radius: var(--radius-lg) !important;
-  backdrop-filter: blur(20px);
-  font-family: Inter;
+  font-family: var(--font-body);
   font-weight: 500;
-  font-size: 14px;
+  font-size: var(--text-14);
   border: 1px solid var(--border);
+  background: var(--surface-dark) !important;
+  color: var(--bone);
 }
 
 .Toastify__toast--success {
-  background: rgba(16, 185, 129, 0.12) !important;
-  border-color: rgba(16, 185, 129, 0.2);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.1);
+  background: var(--surface-dark) !important;
+  border-color: rgba(63, 169, 104, 0.4);
 }
 
 .Toastify__toast--error {
-  background: rgba(239, 68, 68, 0.12) !important;
-  border-color: rgba(239, 68, 68, 0.2);
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.1);
+  background: var(--surface-dark) !important;
+  border-color: rgba(214, 69, 69, 0.4);
 }
 
 .Toastify__toast--info {
-  background: rgba(209, 255, 26, 0.12) !important;
-  border-color: rgba(209, 255, 26, 0.2);
-  box-shadow: 0 8px 24px rgba(209, 255, 26, 0.1);
+  background: var(--surface-dark) !important;
+  border-color: rgba(191, 209, 67, 0.4);
 }
 
 .Toastify__progress-bar {
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%) !important;
+  background: var(--citron) !important;
 }
 
 @keyframes opacity-animation1 {
-  0% {
-    opacity: .1;
-  }
-  25% {
-    opacity: 1;
-  }
-  50% {
-    opacity: .2;
-  }
-  80% {
-    opacity: .1;
-  }
-  100% {
-    opacity: .1;
-  }
+  0% { opacity: .1; }
+  25% { opacity: 1; }
+  50% { opacity: .2; }
+  80% { opacity: .1; }
+  100% { opacity: .1; }
 }
 
 @keyframes opacity-animation2 {
-  0% {
-    transform: scaleY(.8);
-  }
-  25% {
-    transform: scaleY(1);
-  }
-  50% {
-    transform: scaleY(.5);
-  }
-  75% {
-    transform: scaleY(1);
-  }
-  100% {
-    transform: scaleY(.8);
-  }
+  0% { transform: scaleY(.8); }
+  25% { transform: scaleY(1); }
+  50% { transform: scaleY(.5); }
+  75% { transform: scaleY(1); }
+  100% { transform: scaleY(.8); }
 }
 
 @keyframes rotate-animation {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -359;
-  }
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -359; }
 }
 
 .animation-g1 {
@@ -457,62 +541,78 @@ main .tradingview-widget-copyright {
   z-index: 9999;
 }
 
-.spin-box svg {
-  animation: pulse 2s ease-in-out infinite;
+/* Loading: the two discs orbit and touch on loop (§13). */
+@keyframes disc-orbit-a {
+  0%, 100% { transform: translateX(-22%); }
+  50%      { transform: translateX(6%); }
 }
 
-.spin-box svg rect {
-  animation: rotate-animation 1.5s linear infinite;
+@keyframes disc-orbit-b {
+  0%, 100% { transform: translateX(22%); }
+  50%      { transform: translateX(-6%); }
+}
+
+.fyuz-loader {
+  position: relative;
+  width: 64px;
+  height: 34px;
+}
+
+.fyuz-loader__disc {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+}
+
+.fyuz-loader__disc--a {
+  background: var(--citron);
+  animation: disc-orbit-a 900ms var(--ease-out) infinite;
+}
+
+.fyuz-loader__disc--b {
+  background: var(--plum-rose);
+  animation: disc-orbit-b 900ms var(--ease-out) infinite;
 }
 
 @keyframes rotate-animation-loading {
-  0% {
-    stroke-dashoffset: 0;
-  }
-  100% {
-    stroke-dashoffset: -397;
-  }
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -397; }
 }
 
-/* Noise texture overlay */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.015'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Grid background for hero */
+/* Grid background for hero — flat ink, bone at low alpha. */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(234, 230, 218, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(234, 230, 218, 0.02) 1px, transparent 1px);
   background-size: 60px 60px;
 }
 
-/* Glow dot */
+/* Live dot — the core, not a glow. */
+.glow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--up);
+  animation: glow-pulse 2s var(--ease-out) infinite;
+}
+
 @keyframes glow-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
 
-.glow-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
-  animation: glow-pulse 2s ease-in-out infinite;
-}
-
-/* Pagination */
 .MuiPagination-root .MuiPaginationItem-root {
   color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
+  font-family: var(--font-data);
+  transition: background-color var(--micro) var(--ease-out),
+              border-color var(--micro) var(--ease-out);
 }
 
 .MuiPagination-root .MuiPaginationItem-root:hover {
@@ -521,39 +621,30 @@ body::before {
 }
 
 .MuiPagination-root .MuiPaginationItem-root.Mui-selected {
-  background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  color: #0a0a0f;
-  font-weight: 600;
+  background: var(--citron);
+  color: var(--moss-black);
+  font-weight: 700;
   border-color: transparent;
 }
 
-/* Input labels */
 .MuiInputLabel-root {
   color: var(--text-secondary) !important;
-  font-family: 'Space Grotesk', 'Inter', sans-serif !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.01em !important;
+  font-family: var(--font-body) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
 }
 
-/* Staggered fade-in for grid items */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fadeInUp 0.4s ease-out both;
+  animation: fadeInUp 0.4s var(--ease-out) both;
 }
 
-/* Stagger children animation */
 .stagger-children > * {
-  animation: fadeInUp 0.4s ease-out both;
+  animation: fadeInUp 0.4s var(--ease-out) both;
 }
 .stagger-children > *:nth-child(1) { animation-delay: 0.02s; }
 .stagger-children > *:nth-child(2) { animation-delay: 0.04s; }
@@ -572,152 +663,132 @@ body::before {
 .stagger-children > *:nth-child(15) { animation-delay: 0.3s; }
 .stagger-children > *:nth-child(n+16) { animation-delay: 0.32s; }
 
-/* Price flash animations */
+/* Live numbers flicker once — an unstable reading — before settling (§13). */
 @keyframes flash-green {
-  0% { background-color: rgba(16, 185, 129, 0.2); }
+  0% { background-color: rgba(63, 169, 104, 0.22); }
   100% { background-color: transparent; }
 }
 @keyframes flash-red {
-  0% { background-color: rgba(239, 68, 68, 0.2); }
+  0% { background-color: rgba(214, 69, 69, 0.22); }
   100% { background-color: transparent; }
 }
-.flash-green { animation: flash-green 0.6s ease-out; }
-.flash-red { animation: flash-red 0.6s ease-out; }
+.flash-green { animation: flash-green 0.6s var(--ease-out); }
+.flash-red { animation: flash-red 0.6s var(--ease-out); }
 
-/* Scale in animation for modals/dropdowns */
 @keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 .animate-scale-in {
-  animation: scaleIn 0.2s ease-out both;
+  animation: scaleIn 0.2s var(--ease-out) both;
 }
 
-/* Gradient text shimmer for headings */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
+/* Gradient text is retired (§20). Flat citron carries emphasis instead. */
 .gradient-text-animated {
-  background: linear-gradient(135deg, #d1ff1a, #e4ff66, #d1ff1a, #e4ff66);
-  background-size: 300% 300%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: gradient-shift 4s ease infinite;
+  color: var(--citron);
 }
 
-/* Floating animation for decorative elements */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
 }
 .animate-float {
-  animation: float 3s ease-in-out infinite;
+  animation: float 3s var(--ease-out) infinite;
 }
 
-/* Smooth counter number transition */
 .number-transition {
-  transition: all 0.3s ease-out;
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
   display: inline-block;
 }
 
-/* Card entrance for new tokens */
 @keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .card-enter {
   animation: card-enter 0.35s var(--ease-out) both;
 }
 
-/* Bonding curve glow when near graduation */
-@keyframes graduation-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(209, 255, 26, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(209, 255, 26, 0.6), 0 0 40px rgba(228, 255, 102, 0.2); }
+/* Near graduation: the ring cascade, not a halo. Tangerine is earned here. */
+@keyframes graduation-ring {
+  0%   { transform: scale(1); opacity: 0.55; }
+  70%  { transform: scale(1.04); opacity: 0; }
+  100% { transform: scale(1.04); opacity: 0; }
 }
+
 .graduation-glow {
-  animation: graduation-glow 2s ease-in-out infinite;
+  position: relative;
 }
 
-/* Tooltip animation */
+.graduation-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--tangerine);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: graduation-ring 1.6s var(--ease-out) infinite;
+}
+
 @keyframes tooltip-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Badge pulse for new/trending */
 @keyframes badge-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
 
+/* Badges: flat ink. Mono labels, no gradients (§10). */
 .badge-new {
-  background: linear-gradient(135deg, #10B981, #059669);
-  color: white;
+  background: var(--up);
+  color: var(--moss-black);
+  font-family: var(--font-data);
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 100px;
-  letter-spacing: 0.05em;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
 .badge-trending {
-  background: linear-gradient(135deg, #d1ff1a, #e4ff66);
-  color: #0a0a0f;
+  background: var(--citron);
+  color: var(--moss-black);
+  font-family: var(--font-data);
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 100px;
-  letter-spacing: 0.05em;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
+/* Graduation is a win — the one place tangerine belongs (§06, §08). */
 .badge-graduated {
-  background: linear-gradient(135deg, #10B981, #059669);
-  color: white;
+  background: var(--tangerine);
+  color: var(--moss-black);
+  font-family: var(--font-data);
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 100px;
-  letter-spacing: 0.05em;
-  text-transform: none;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
-/* Smooth section transitions */
 .section-enter {
-  animation: fadeInUp 0.5s ease-out both;
+  animation: fadeInUp 0.5s var(--ease-out) both;
 }
 
-/* Enhanced skeleton loading */
 .MuiSkeleton-root {
-  background: rgba(255, 255, 255, 0.04) !important;
+  background: rgba(234, 230, 218, 0.04) !important;
   background-image: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(209, 255, 26, 0.06) 40%,
-    rgba(255, 255, 255, 0.04) 80%
+    rgba(234, 230, 218, 0.04) 0%,
+    rgba(234, 230, 218, 0.09) 40%,
+    rgba(234, 230, 218, 0.04) 80%
   ) !important;
   background-size: 400% 100% !important;
   animation: skeleton-shimmer 1.8s ease-in-out infinite !important;
@@ -727,37 +798,29 @@ body::before {
   100% { background-position: -200% 0; }
 }
 
-/* Smooth image loading */
 img {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s var(--ease-out);
 }
 img[src=""] {
   opacity: 0;
 }
 
-/* Enhanced tooltip styles */
 .MuiTooltip-tooltip {
-  background: rgba(10, 10, 16, 0.95) !important;
-  backdrop-filter: blur(20px) !important;
+  background: var(--surface-dark) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-sm) !important;
-  font-size: 12px !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-12) !important;
   padding: 8px 12px !important;
   box-shadow: var(--shadow-md) !important;
-  animation: tooltip-in 0.15s ease-out !important;
+  animation: tooltip-in 0.15s var(--ease-out) !important;
 }
 
-/* Link hover underline animation */
 a:not(.MuiButton-root):not([class*="styled"]) {
   text-decoration: none;
 }
 
-/* Number counter smooth transitions */
-.MuiTypography-root {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Responsive improvements */
+/* §19 · Respect prefers-reduced-motion: loops stop, impact becomes a crossfade. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

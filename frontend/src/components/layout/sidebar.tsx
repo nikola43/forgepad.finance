@@ -1,47 +1,27 @@
-// import imgLogo from '@/assets/images/logo.png';
 import TwitterIcon from '@/assets/images/x.svg';
 import LogoutIcon from '@mui/icons-material/Logout';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import styled, { useTheme } from "styled-components";
-import { FORGE_TWITTER_URL } from "@/config";
-import { Box, Dialog, DialogContent, DialogTitle, Typography, useMediaQuery } from "@mui/material";
+import { FYUZ_TWITTER_URL } from "@/config";
+import { Box, Dialog, DialogContent, Typography, useMediaQuery } from "@mui/material";
 import { useState } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
-// import imgForge3 from '@/assets/images/forge3.png'
-// import imgForge4 from '@/assets/images/forge4.png'
 import CloseIcon from "@mui/icons-material/Close";
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import { FyuzLockup, FyuzSymbol } from "../brand/FyuzMark";
 
 interface Props {
   minimized: boolean
   setMinimize: (m: boolean) => void
 }
 
-const Title = styled.div`
-  font-size: 24px;
-  font-weight: bold;
-  color: white;
-  text-align: center;
-  margin-bottom: 20px;
-  letter-spacing: 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 15px;
-  margin-top: 20px;
-`
-
 const Logo = styled.div`
   margin-top: 10px;
   display: flex;
   align-items: center;
-  span {
-    color: white;
-    display: block;
-    font-size: 21px;
-    font-weight: 700;
-    border: none;
-  }
   text-decoration: none !important;
 `
 
@@ -51,7 +31,7 @@ const SocialLinks = styled.div<{ vertical?: boolean }>`
   justify-content: center;
   gap: 24px;
   a {
-    background: white;
+    background: var(--bone);
     border-radius: 8px;
     width: 40px;
     height: 40px;
@@ -123,26 +103,25 @@ const Button = styled.button`
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #D3FF24, #e4ff66);
+  background: var(--citron);
   border: none;
   outline: none;
   border-radius: 10px;
-  color: #0a0a0f;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  color: var(--moss-black);
+  font-family: var(--font-body);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--micro) var(--ease-out), transform var(--micro) var(--ease-out);
   width: 100%;
   justify-content: flex-start;
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(209, 255, 26, 0.25);
+    background: var(--accent-light);
   }
 
   &:active {
-    transform: translateY(0);
+    transform: scale(0.98);
   }
 
   svg {
@@ -173,17 +152,17 @@ const CloseButton = styled.button`
     display: flex;
     justify-content: center;
     align-items: center;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(234, 230, 218, 0.06);
+    border: 1px solid var(--border);
     outline: none;
     border-radius: 8px;
-    color: white;
+    color: var(--bone);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color var(--micro) var(--ease-out), border-color var(--micro) var(--ease-out);
 
     &:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(209, 255, 26, 0.3);
+        background: rgba(234, 230, 218, 0.1);
+        border-color: var(--border-hover);
     }
 `
 
@@ -214,6 +193,13 @@ export const TokenIcon = () => (
   </svg>
 )
 
+/** A step in the how-it-works equation. Specimen-label voice (§10). */
+const Step = ({ label }: { label: string }) => (
+  <Typography className="specimen-label" fontSize={14} color="var(--bone)">
+    {label}
+  </Typography>
+)
+
 export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
   const isMobile = useMediaQuery('(max-width: 800px)')
 
@@ -223,29 +209,46 @@ export const DialogHowItWorks = ({ open, onClose }: { open: boolean, onClose: ()
     onClose={onClose}
   >
     <DialogContent>
-      {
-        isMobile
-        ? <img src="/images/forge3.png" width={431} height={22} style={{ maxWidth: "100%" }} alt="" />
-        : <Box display="flex" justifyContent="space-between" alignItems="center">
-          <img src="/images/forge3.png" width={431} height={22} alt="" />
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        <FyuzLockup size={24} />
+        {
+          !isMobile &&
           <CloseButton onClick={onClose}>
-              <CloseIcon style={{ color: "#D3FF24" }} />
+            <CloseIcon style={{ color: "var(--citron)" }} />
           </CloseButton>
-        </Box>
-      }
-      <Box display="flex" flexDirection="column" gap="16px" alignItems="center" pt="16px" fontFamily="Arial">
-        <img src="/images/forge4.png" width={isMobile ? 300 : 351} height={isMobile ? 160 : 198} alt="logo" />
+        }
+      </Box>
+      <Box display="flex" flexDirection="column" gap="20px" alignItems="center" pt="8px">
+        <FyuzSymbol size={isMobile ? 72 : 96} />
+
+        <Typography
+          fontFamily="var(--font-display)"
+          fontWeight={900}
+          fontSize={isMobile ? 20 : 26}
+          textAlign="center"
+          color="var(--bone)"
+        >
+          Two icons enter. One market leaves.
+        </Typography>
+
+        {/* The equation, in the product's own steps (§05, §17). */}
         <Box display="flex" flexDirection={["column", "column", "row"]} gap="8px" alignItems="center">
-          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>💡 idea</Typography>
+          <Step label="Pick two" />
           { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
-          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🧪 token</Typography>
+          <Step label="Fuse" />
           { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
-          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🏛️ conviction</Typography>
+          <Step label="Launch" />
           { isMobile ? <ArrowDownwardIcon /> : <ArrowForwardIcon /> }
-          <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>🧑 cult classic</Typography>
+          <Step label="Graduate" />
         </Box>
-        <Typography textTransform="uppercase" fontFamily="Londrina Solid" fontSize={24}>repeat until decentralized.</Typography>
-        <Button style={{ justifyContent: 'center' }} onClick={onClose}>Let's START</Button>
+
+        {/* Education = the plainest English on the platform (§15). */}
+        <Typography fontSize={14} textAlign="center" color="var(--text-secondary)" maxWidth={440} lineHeight={1.6}>
+          Pick two public figures and fuse them into a character. Early buys are cheaper — the
+          curve sets the price. Hit the market cap target and the token graduates to PancakeSwap.
+        </Typography>
+
+        <Button style={{ justifyContent: 'center' }} onClick={onClose}>Make a match</Button>
       </Box>
     </DialogContent>
   </HowDialog>
@@ -260,8 +263,8 @@ function Sidebar({ minimized, setMinimize }: Props) {
 
   if (minimized)
     return <div className="sidebar minimized">
-      <Logo as={Link} href="/">
-        <img src="/images/logo.png" height={90} alt="logo" />
+      <Logo as={Link} href="/" aria-label="Fyuz — home">
+        <FyuzSymbol size={28} />
       </Logo>
       <Maximize onClick={() => setMinimize(false)}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -275,9 +278,9 @@ function Sidebar({ minimized, setMinimize }: Props) {
             <HomeIcon />
           </Button>
         </StyledLink>
-        <StyledLink href="/leaderboard" title="Leaderboard">
+        <StyledLink href="/leaderboard" title="The Rankings">
           <Button className="effect-button">
-            <span style={{ fontSize: 18, lineHeight: 1 }}>🏆</span>
+            <EmojiEventsIcon sx={{ fontSize: 18 }} />
           </Button>
         </StyledLink>
         {
@@ -291,7 +294,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
           <CubeIcon />
         </Button>
 
-        <Link href="/create" style={{ textDecoration: 'none' }} title="Create Token" >
+        <Link href="/create" style={{ textDecoration: 'none' }} title="Make a Match" >
           <Button className="effect-button">
             <TokenIcon />
           </Button>
@@ -306,7 +309,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
       </Buttons>
 
       <SocialLinks vertical>
-        <Link href={FORGE_TWITTER_URL} target="_blank">
+        <Link href={FYUZ_TWITTER_URL} target="_blank">
           <Image src={TwitterIcon} width={20} height={20} alt="twitter" />
         </Link>
       </SocialLinks>
@@ -316,25 +319,24 @@ function Sidebar({ minimized, setMinimize }: Props) {
 
   return (
     <div className="sidebar">
-      <Title>ArrowPad</Title>
+      
 
-      <Logo as={Link} href="/">
-        <img src="/images/logo.png" height={90} alt="logo" />
-        <span>ArrowPad</span>
+      <Logo as={Link} href="/" aria-label="Fyuz — home">
+        <FyuzLockup size={26} />
       </Logo>
 
       <Buttons>
         <StyledLink href="/">
           <Button className="effect-button">
             <HomeIcon />
-            Home
+            Tonight's Card
           </Button>
         </StyledLink>
 
         <StyledLink href="/leaderboard">
           <Button className="effect-button">
-            <span style={{ fontSize: 18, lineHeight: 1 }}>🏆</span>
-            Leaderboard
+            <EmojiEventsIcon sx={{ fontSize: 18 }} />
+            The Rankings
           </Button>
         </StyledLink>
 
@@ -354,7 +356,7 @@ function Sidebar({ minimized, setMinimize }: Props) {
         <Link href="/create" style={{ textDecoration: 'none' }} >
           <Button className="effect-button">
             <TokenIcon />
-            Create Token
+            Make a Match
           </Button>
         </Link>
 
@@ -368,11 +370,11 @@ function Sidebar({ minimized, setMinimize }: Props) {
       </Buttons>
 
       <LogoWrapper>
-        <img src="/images/logo.png" style={{ alignSelf: 'center', objectFit: 'cover' }} width={422} height={388} alt="logo" />
+        <FyuzSymbol size={120} />
       </LogoWrapper>
 
       <SocialLinks>
-        <Link href={FORGE_TWITTER_URL} target="_blank">
+        <Link href={FYUZ_TWITTER_URL} target="_blank">
           <Image src={TwitterIcon} width={20} height={20} alt="twitter" />
         </Link>
       </SocialLinks>

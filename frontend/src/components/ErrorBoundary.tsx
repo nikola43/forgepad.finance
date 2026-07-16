@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Box, Button, Typography } from '@mui/material'
+import BuildIcon from '@mui/icons-material/Build'
 
 interface Props {
   children: React.ReactNode
@@ -42,22 +43,17 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           p={4}
           textAlign="center"
         >
-          <Typography fontSize={48}>&#x1F6E0;&#xFE0F;</Typography>
+          <BuildIcon sx={{ fontSize: 48, color: 'var(--muted)' }} />
           <Typography
             fontSize={24}
             fontWeight={700}
-            fontFamily="'Space Grotesk', sans-serif"
-            sx={{
-              background: 'linear-gradient(135deg, #D3FF24, #e4ff66)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            fontFamily="var(--font-display)"
+            color="var(--citron)"
           >
-            Something went wrong
+            The reaction fizzled.
           </Typography>
-          <Typography fontSize={14} color="#94A3B8" maxWidth={400}>
-            An unexpected error occurred. Try refreshing the page.
+          <Typography fontSize={14} color="var(--muted)" maxWidth={400}>
+            Something broke on our end. Try refreshing the page.
           </Typography>
           <Box display="flex" gap={2}>
             <Button
@@ -82,13 +78,13 @@ export default class ErrorBoundary extends React.Component<Props, State> {
               mt={2}
               p={2}
               borderRadius="12px"
-              bgcolor="rgba(239, 68, 68, 0.08)"
-              border="1px solid rgba(239, 68, 68, 0.15)"
+              bgcolor="rgba(214, 69, 69, 0.08)"
+              border="1px solid rgba(214, 69, 69, 0.15)"
               maxWidth={600}
               width="100%"
               textAlign="left"
             >
-              <Typography fontSize={12} fontFamily="monospace" color="#EF4444" sx={{ wordBreak: 'break-all' }}>
+              <Typography fontSize={12} fontFamily="var(--font-data)" color="#D64545" sx={{ wordBreak: 'break-all' }}>
                 {this.state.error.message}
               </Typography>
             </Box>

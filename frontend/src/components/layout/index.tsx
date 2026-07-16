@@ -1,17 +1,17 @@
 'use client'
 
-import { ReactNode, useEffect, useState, lazy, Suspense } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import Header from "./header";
 import Footer from "./footer";
 import AppSidebar from "./AppSidebar";
 import { Box, styled, useMediaQuery } from "@mui/material";
 import MobileMenu from "./menu";
-import imgBackground from "../../assets/images/bg.jpg"
 import { Toaster } from "react-hot-toast"
 import ErrorBoundary from "@/components/ErrorBoundary"
 import { ScrollRestoration, ScrollToTopButton } from "@/components/ScrollToTop"
 
-const ParticleBackground = lazy(() => import("@/components/ParticleBackground"))
+// The chamber is the constant: moss black, flat (§11). The animated noise
+// shader that used to sit here is retired — no noise, no glows, no 3D (§10).
 
 const Main = styled('div')`
     position: relative;
@@ -36,9 +36,6 @@ function MainLayout({ children }: { children: ReactNode }) {
 
     return (
         <>
-            <Suspense fallback={null}>
-                <ParticleBackground />
-            </Suspense>
             {isMobile ? (
                 <Main>
                     <Header />
@@ -70,33 +67,32 @@ function MainLayout({ children }: { children: ReactNode }) {
                 toastOptions={{
                     duration: 5000,
                     style: {
-                        background: 'rgba(13, 13, 20, 0.95)',
-                        backdropFilter: 'blur(20px)',
-                        color: '#F8FAFC',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: '#1E1C10',
+                        color: '#EAE6DA',
+                        border: '1px solid rgba(234, 230, 218, 0.08)',
                         borderRadius: '12px',
                         fontSize: '14px',
-                        fontFamily: "'Inter', sans-serif",
+                        fontFamily: "'Space Grotesk', Helvetica, Arial, sans-serif",
                         padding: '12px 16px',
-                        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)',
+                        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
                         maxWidth: '420px',
                     },
                     success: {
                         iconTheme: {
-                            primary: '#10B981',
-                            secondary: '#0a0a0f',
+                            primary: '#3FA968',
+                            secondary: '#131208',
                         },
                         style: {
-                            borderColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: 'rgba(63, 169, 104, 0.4)',
                         },
                     },
                     error: {
                         iconTheme: {
-                            primary: '#EF4444',
-                            secondary: '#0a0a0f',
+                            primary: '#D64545',
+                            secondary: '#131208',
                         },
                         style: {
-                            borderColor: 'rgba(239, 68, 68, 0.2)',
+                            borderColor: 'rgba(214, 69, 69, 0.4)',
                         },
                     },
                 }}

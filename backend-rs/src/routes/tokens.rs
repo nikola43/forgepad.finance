@@ -16,5 +16,6 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
             get(handlers::tokens::get_token_details),
         )
         .route("/upload", post(handlers::tokens::upload_logo))
+        .route("/generate-image", post(handlers::tokens::generate_image))
         .with_state(state)
 }

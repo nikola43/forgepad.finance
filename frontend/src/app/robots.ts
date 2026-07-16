@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export const dynamic = "force-static";
 
-const SITE_URL = "https://arrowpad.io";
+const SITE_URL = "https://fyuz.fun";
 
 export default function robots(): MetadataRoute.Robots {
   return {

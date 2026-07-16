@@ -1,24 +1,15 @@
 import styled from "styled-components"
 import TwitterIcon from '@/assets/images/x.svg';
-import { FORGE_TWITTER_URL } from "@/config";
+import { FYUZ_TWITTER_URL } from "@/config";
+import { FyuzLockup } from "../brand/FyuzMark";
 import Link from "next/link";
 import Image from "next/image";
 
 const FooterWrapper = styled.footer`
     position: relative;
     margin-top: 80px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
-    background: linear-gradient(180deg, transparent 0%, rgba(6, 6, 10, 0.8) 100%);
-
-    &::before {
-        content: "";
-        position: absolute;
-        top: -1px;
-        left: 10%;
-        right: 10%;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(209, 255, 26, 0.2), transparent);
-    }
+    border-top: 1px solid var(--border);
+    background: var(--moss-black);
 `
 
 const FooterInner = styled.div`
@@ -50,20 +41,9 @@ const Brand = styled.div`
     flex-direction: column;
     gap: 8px;
 
-    .brand-name {
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 20px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #D3FF24, #e4ff66);
-        background-clip: text;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -0.02em;
-    }
-
     .brand-tagline {
         font-size: 13px;
-        color: #64748B;
+        color: var(--text-muted);
         max-width: 260px;
         line-height: 1.5;
     }
@@ -85,22 +65,24 @@ const LinkGroup = styled.div`
     flex-direction: column;
     gap: 10px;
 
+    /* Specimen label voice: mono, all-caps, tracked (§10). */
     .group-title {
+        font-family: var(--font-data);
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #64748B;
+        letter-spacing: 2px;
+        color: var(--text-muted);
         margin-bottom: 4px;
     }
 
     a {
         font-size: 13px;
-        color: #94A3B8;
+        color: var(--text-secondary);
         text-decoration: none;
-        transition: color 0.2s ease;
+        transition: color var(--micro) var(--ease-out);
         &:hover {
-            color: #D3FF24;
+            color: var(--citron);
         }
     }
 `
@@ -117,15 +99,19 @@ const SocialLinks = styled.div`
         width: 36px;
         height: 36px;
         border-radius: 10px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        transition: all 0.25s ease;
+        background: rgba(234, 230, 218, 0.04);
+        border: 1px solid var(--border);
+        transition: background-color var(--micro) var(--ease-out),
+                    border-color var(--micro) var(--ease-out),
+                    transform var(--micro) var(--ease-out);
 
         &:hover {
-            background: rgba(209, 255, 26, 0.1);
-            border-color: rgba(209, 255, 26, 0.25);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(209, 255, 26, 0.15);
+            background: rgba(191, 209, 67, 0.1);
+            border-color: var(--border-hover);
+        }
+
+        &:active {
+            transform: scale(0.98);
         }
     }
 `
@@ -135,7 +121,7 @@ const FooterBottom = styled.div`
     justify-content: space-between;
     align-items: center;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--border);
     flex-wrap: wrap;
     gap: 12px;
 
@@ -145,20 +131,15 @@ const FooterBottom = styled.div`
 
     .copyright {
         font-size: 12px;
-        color: #475569;
+        color: var(--text-muted);
     }
 
     .built-with {
+        font-family: var(--font-data);
         font-size: 12px;
-        color: #475569;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-
-        .heart {
-            color: #EF4444;
-            animation: pulse 2s ease-in-out infinite;
-        }
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
     }
 `
 
@@ -167,12 +148,12 @@ export default function Footer() {
         <FooterInner>
             <FooterTop>
                 <Brand>
-                    <span className="brand-name">Arrowpad</span>
+                    <FyuzLockup size={22} />
                     <span className="brand-tagline">
-                        The token launchpad for Robinhood Chain. Launch on a fair bonding curve, trade instantly, and graduate to Uniswap.
+                        The cultural launchpad where the internet fuses personalities, narratives and communities into live meme markets.
                     </span>
                     <SocialLinks>
-                        <Link href={FORGE_TWITTER_URL} target="_blank">
+                        <Link href={FYUZ_TWITTER_URL} target="_blank">
                             <Image src={TwitterIcon} width={16} height={16} alt="Twitter" />
                         </Link>
                     </SocialLinks>
@@ -181,20 +162,20 @@ export default function Footer() {
                 <FooterLinks>
                     <LinkGroup>
                         <span className="group-title">Platform</span>
-                        <Link href="/">Explore Tokens</Link>
-                        <Link href="/create">Create Token</Link>
+                        <Link href="/">Tonight&apos;s Card</Link>
+                        <Link href="/create">Make a Match</Link>
                         <Link href="/profile">My Profile</Link>
                     </LinkGroup>
                     <LinkGroup>
                         <span className="group-title">Resources</span>
-                        <Link href={FORGE_TWITTER_URL} target="_blank">Twitter / X</Link>
+                        <Link href={FYUZ_TWITTER_URL} target="_blank">Twitter / X</Link>
                     </LinkGroup>
                 </FooterLinks>
             </FooterTop>
 
             <FooterBottom>
-                <span className="copyright">&copy; {new Date().getFullYear()} Arrowpad. All rights reserved.</span>
-                <span className="built-with">Built with <span className="heart">&hearts;</span> on Robinhood Chain</span>
+                <span className="copyright">&copy; {new Date().getFullYear()} Fyuz. All rights reserved.</span>
+                <span className="built-with">Two icons enter. One market leaves.</span>
             </FooterBottom>
         </FooterInner>
     </FooterWrapper>

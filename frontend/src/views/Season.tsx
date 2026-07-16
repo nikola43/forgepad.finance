@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { Box, CircularProgress, Typography } from "@mui/material"
+import EventIcon from '@mui/icons-material/Event'
+import FlagIcon from '@mui/icons-material/Flag'
 import PageBox from "@/components/layout/pageBox"
 import { priceFormatter } from "@/utils/price"
 import { useSeason, type SeasonEntry } from "@/hooks/season"
@@ -28,10 +30,10 @@ function computeCountdown(endsAt: number): Countdown {
 function CountdownBlock({ value, label }: { value: number; label: string }) {
     return (
         <Box sx={{ textAlign: 'center', minWidth: 56 }}>
-            <Typography fontSize={30} fontWeight={800} color="#fff" fontFamily="'Space Grotesk', sans-serif" lineHeight={1}>
+            <Typography fontSize={30} fontWeight={800} color="var(--bone)" fontFamily="var(--font-data)" lineHeight={1}>
                 {String(value).padStart(2, '0')}
             </Typography>
-            <Typography fontSize={10} color="#94A3B8" textTransform="uppercase" letterSpacing="0.08em" mt={0.5}>{label}</Typography>
+            <Typography fontSize={10} color="var(--muted)" textTransform="uppercase" letterSpacing="0.08em" mt={0.5} fontFamily="var(--font-data)">{label}</Typography>
         </Box>
     )
 }
@@ -52,26 +54,28 @@ export default function Season() {
     return (
         <PageBox pt={6} maxWidth="900px" mx="auto" width="100%">
             {!season ? (
-                <Box display="flex" justifyContent="center" py={6}><CircularProgress sx={{ color: '#D3FF24' }} /></Box>
+                <Box display="flex" justifyContent="center" py={6}><CircularProgress sx={{ color: 'var(--citron)' }} /></Box>
             ) : (
                 <>
                     {/* Header + prize pot */}
-                    <Box sx={{ mb: 3, p: 3, borderRadius: '18px', border: '1px solid rgba(211,255,36,0.25)', background: 'linear-gradient(135deg, rgba(211,255,36,0.10), rgba(211,255,36,0.02))' }}>
+                    <Box sx={{ mb: 3, p: 3, borderRadius: '18px', border: '1px solid rgba(191,209,67,0.25)', background: 'rgba(191,209,67,0.06)' }}>
                         <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
                             <Box>
-                                <Typography fontSize={12} color="#e4ff66" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>🏆 Current Season</Typography>
-                                <Typography fontSize={30} fontWeight={800} color="#fff" fontFamily="'Space Grotesk', sans-serif">{season.name}</Typography>
+                                <Typography fontSize={12} color="var(--citron)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700} display="flex" alignItems="center" gap={0.5}>
+                                    <EventIcon sx={{ fontSize: 14 }} /> Current Fight Week
+                                </Typography>
+                                <Typography fontSize={30} fontWeight={800} color="var(--bone)" fontFamily="var(--font-display)">{season.name}</Typography>
                             </Box>
                             <Box textAlign="right">
-                                <Typography fontSize={11} color="#94A3B8" textTransform="uppercase" letterSpacing="0.08em">Prize Pot</Typography>
-                                <Typography fontSize={28} fontWeight={800} color="#e4ff66" fontFamily="'Space Grotesk', sans-serif">{priceFormatter(season.prizePotEth, 4)} ETH</Typography>
+                                <Typography fontSize={11} color="var(--muted)" textTransform="uppercase" letterSpacing="0.08em" fontFamily="var(--font-data)">Prize Pot</Typography>
+                                <Typography fontSize={28} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)">{priceFormatter(season.prizePotEth, 4)} BNB</Typography>
                             </Box>
                         </Box>
 
                         {/* Countdown */}
                         <Box mt={2.5}>
-                            <Typography fontSize={11} color="#94A3B8" textTransform="uppercase" letterSpacing="0.08em" mb={1}>
-                                {countdown?.ended ? 'Season ended' : 'Ends in'}
+                            <Typography fontSize={11} color="var(--muted)" textTransform="uppercase" letterSpacing="0.08em" mb={1} fontFamily="var(--font-data)">
+                                {countdown?.ended ? 'Fight Week ended' : 'Ends in'}
                             </Typography>
                             {countdown && !countdown.ended ? (
                                 <Box display="flex" gap={1.5} alignItems="center">
@@ -81,22 +85,24 @@ export default function Season() {
                                     <CountdownBlock value={countdown.seconds} label="Secs" />
                                 </Box>
                             ) : (
-                                <Typography fontSize={22} fontWeight={700} color="#fff">🏁 Finished</Typography>
+                                <Typography fontSize={22} fontWeight={700} color="var(--bone)" display="flex" alignItems="center" gap={0.75}>
+                                    <FlagIcon sx={{ fontSize: 22 }} /> Finished
+                                </Typography>
                             )}
                         </Box>
                     </Box>
 
                     {/* Leaderboard */}
-                    <Typography color="white" fontSize={18} fontWeight={700} mb={1.5}>Leaderboard</Typography>
+                    <Typography color="var(--bone)" fontSize={18} fontWeight={700} fontFamily="var(--font-display)" mb={1.5}>The Rankings</Typography>
                     <Box sx={{ overflowX: 'auto' }}>
                         <Box sx={{ minWidth: 420 }}>
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '60px 1fr 140px', px: 2, py: 1, color: '#64748B', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '60px 1fr 140px', px: 2, py: 1, color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-data)' }}>
                                 <Box>Rank</Box>
                                 <Box>Trader</Box>
                                 <Box textAlign="right">Points</Box>
                             </Box>
                             {season.leaderboard.length === 0 ? (
-                                <Typography color="#64748B" py={4} textAlign="center">No competitors yet — be the first to climb the board.</Typography>
+                                <Typography color="var(--text-muted)" py={4} textAlign="center">No competitors yet — be the first to climb the board.</Typography>
                             ) : (
                                 season.leaderboard.map((e: SeasonEntry) => (
                                     <Box
@@ -104,15 +110,15 @@ export default function Season() {
                                         sx={{
                                             display: 'grid', gridTemplateColumns: '60px 1fr 140px', alignItems: 'center',
                                             px: 2, py: 1.25, borderRadius: '10px',
-                                            border: '1px solid rgba(255,255,255,0.05)', mb: 0.75,
-                                            background: e.rank <= 3 ? 'rgba(211,255,36,0.05)' : 'rgba(255,255,255,0.02)',
+                                            border: '1px solid rgba(234,230,218,0.05)', mb: 0.75,
+                                            background: e.rank <= 3 ? 'rgba(191,209,67,0.05)' : 'rgba(234,230,218,0.02)',
                                         }}
                                     >
-                                        <Typography color={e.rank <= 3 ? '#e4ff66' : '#94A3B8'} fontWeight={700} fontSize={15}>#{e.rank}</Typography>
-                                        <Typography color="white" fontSize={14} fontWeight={600} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <Typography color={e.rank <= 3 ? 'var(--citron)' : 'var(--muted)'} fontWeight={700} fontSize={15} fontFamily="var(--font-data)">#{e.rank}</Typography>
+                                        <Typography color="var(--bone)" fontSize={14} fontWeight={600} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {e.username || shortAddress(e.address)}
                                         </Typography>
-                                        <Typography color="#e4ff66" fontSize={14} fontWeight={700} textAlign="right">{priceFormatter(e.points, 2)}</Typography>
+                                        <Typography color="var(--citron)" fontSize={14} fontWeight={700} textAlign="right" fontFamily="var(--font-data)">{priceFormatter(e.points, 2)}</Typography>
                                     </Box>
                                 ))
                             )}

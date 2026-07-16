@@ -12,6 +12,8 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
+import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import { useWatchlist } from "@/hooks/watchlist";
 import copy from 'copy-to-clipboard';
 import { ethers, MaxUint256, BrowserProvider } from 'ethers';
@@ -57,16 +59,17 @@ const SlippageInput = styled("input") <{ slippage: number }>`
   height: 24px;
   padding: 12px;
   font-size: 16px;
+  font-family: var(--font-data);
   border-radius: 16px;
-  border: 2px solid ${({ slippage }) => (slippage !== 0.1 && slippage !== 0.5 && slippage !== 1 ? 'white' : '#333')};
+  border: 2px solid ${({ slippage }) => (slippage !== 0.1 && slippage !== 0.5 && slippage !== 1 ? 'var(--bone)' : '#333')};
   outline: none;
   background-color: transparent;
-  color: white;
+  color: var(--bone);
   transition: border-color 0.2s ease-in-out;
   text-align: center;
 
   &:focus {
-    border-color: #6a5acd;
+    border-color: var(--citron);
   }
 
   &::placeholder {
@@ -79,14 +82,16 @@ const Divider = styled('hr')`
     margin: 0;
     padding: 0;
     border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(234, 230, 218, 0.04);
 `
 
+// The Title Shot bar (§04): flat citron fill; tangerine only once fully
+// filled — the moment the bout is won and the token is about to graduate.
 const Progress = styled('div') <{ value: number }>`
     max-width: 400px;
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(234, 230, 218, 0.08);
     position: relative;
     border-radius: 100px;
     overflow: hidden;
@@ -97,24 +102,10 @@ const Progress = styled('div') <{ value: number }>`
         top: 0;
         bottom: 0;
         width: ${({ value }) => value}%;
-        background: linear-gradient(90deg, #D3FF24, #e4ff66);
-        box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
+        background: ${({ value }) => value >= 100 ? 'var(--tangerine)' : 'var(--citron)'};
         border-radius: 100px;
-        transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: width 400ms var(--ease-out);
     }
-    ${({ value }) => value > 90 ? `
-        &::after {
-            animation: graduation-glow 1.5s ease-in-out infinite;
-        }
-        @keyframes graduation-glow {
-            0%, 100% {
-                box-shadow: 0 0 12px rgba(209, 255, 26, 0.4);
-            }
-            50% {
-                box-shadow: 0 0 24px rgba(228, 255, 102, 0.8), 0 0 48px rgba(209, 255, 26, 0.4);
-            }
-        }
-    ` : ''}
     @media(max-width: 800px) {
         min-width: 200px;
     }
@@ -122,19 +113,19 @@ const Progress = styled('div') <{ value: number }>`
 
 const SmallButton = styled(Button)`
     &.MuiButton-root {
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(234, 230, 218, 0.04);
+        border: 1px solid rgba(234, 230, 218, 0.06);
         border-radius: 8px;
-        color: #94A3B8;
+        color: var(--text-secondary);
         font-size: 12px;
         font-weight: 500;
         padding: 3px 10px;
         text-transform: none;
         transition: all 0.2s ease;
         &:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(209, 255, 26, 0.2);
-            color: white;
+            background: rgba(234, 230, 218, 0.08);
+            border-color: rgba(191, 209, 67, 0.2);
+            color: var(--bone);
         }
     }
 `
@@ -150,23 +141,22 @@ const TradeMenu = styled('div')`
     gap: 8px;
     padding: 8px 12px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
-    background: rgba(6, 6, 10, 0.9);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--moss-black);
+    border-top: 1px solid rgba(234, 230, 218, 0.06);
     & > button {
         flex: 1;
         padding: 12px 16px;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(234, 230, 218, 0.05);
+        border: 1px solid rgba(234, 230, 218, 0.06);
         outline: none;
         border-radius: 10px;
-        color: white;
+        color: var(--bone);
         font-size: 15px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
         &:active {
-            transform: scale(0.97);
+            transform: scale(0.98);
         }
     }
 `
@@ -174,8 +164,8 @@ const TradeMenu = styled('div')`
 const StatsBox = styled('div')`
     margin-top: 4px;
     display: flex;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(234, 230, 218, 0.03);
+    border: 1px solid rgba(234, 230, 218, 0.04);
     border-radius: 8px;
     padding: 6px 10px;
     gap: 6px;
@@ -184,30 +174,32 @@ const StatsBox = styled('div')`
 const CurrencyInput = styled(Box)`
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(234, 230, 218, 0.03);
+  border: 1px solid rgba(234, 230, 218, 0.06);
   border-radius: 12px;
   padding: 12px 16px;
   gap: 8px;
   transition: border-color 0.2s ease;
   &:focus-within {
-    border-color: rgba(209, 255, 26, 0.3);
+    border-color: rgba(191, 209, 67, 0.3);
   }
   & span.balance {
     align-self: flex-end;
-    color: #64748B;
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 500;
+    font-family: var(--font-data);
   }
   & input {
     font-size: 20px;
     background: transparent;
-    color: white;
+    color: var(--bone);
     border: none;
     outline: none;
     width: 100%;
     text-align: right;
     font-weight: 600;
+    font-family: var(--font-data);
   }
   ${({ theme }) => theme.breakpoints.down("sm")} {
     padding: 10px 14px;
@@ -226,16 +218,14 @@ const CurrencyInput = styled(Box)`
 
 const MarketCapValue = styled('span')<{ direction?: string }>`
     font-size: 48px;
-    font-family: Arial;
+    font-family: var(--font-data);
     font-weight: bold;
-    color: white;
-    transition: color 0.3s ease, text-shadow 0.3s ease;
+    color: var(--bone);
+    transition: color 0.3s ease;
     ${({ direction }) => direction === 'up' ? `
-        color: #10B981;
-        text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        color: var(--up);
     ` : direction === 'down' ? `
-        color: #EF4444;
-        text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        color: var(--down);
     ` : ''}
     @keyframes mcFlash {
         0% { opacity: 1; }
@@ -246,12 +236,12 @@ const MarketCapValue = styled('span')<{ direction?: string }>`
 `;
 
 const SocialLink = styled(Link)`
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(234, 230, 218, 0.04);
+  border: 1px solid rgba(234, 230, 218, 0.06);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: #94A3B8;
+  color: var(--text-secondary);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -259,9 +249,9 @@ const SocialLink = styled(Link)`
   padding: 6px 12px;
   transition: all 0.2s ease;
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(209, 255, 26, 0.2);
-    color: white;
+    background: rgba(234, 230, 218, 0.08);
+    border-color: rgba(191, 209, 67, 0.2);
+    color: var(--bone);
   }
   ${({ theme }) => theme.breakpoints.down("sm")} {
     background: transparent;
@@ -275,8 +265,8 @@ const SocialLink = styled(Link)`
 `;
 
 const ChatContainer = styled(Box)`
-    background: rgba(13, 13, 20, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(30, 28, 16, 0.6);
+    border: 1px solid rgba(234, 230, 218, 0.05);
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -293,7 +283,7 @@ const ChatMessages = styled(Box)`
     flex-direction: column;
     gap: 12px;
     &::-webkit-scrollbar { width: 4px; }
-    &::-webkit-scrollbar-thumb { background: rgba(209, 255, 26, 0.2); border-radius: 10px; }
+    &::-webkit-scrollbar-thumb { background: rgba(191, 209, 67, 0.2); border-radius: 10px; }
 `
 
 const ChatBubble = styled(Box)<{ depth?: number }>`
@@ -301,12 +291,12 @@ const ChatBubble = styled(Box)<{ depth?: number }>`
     gap: 10px;
     padding: 12px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(234, 230, 218, 0.03);
+    border: 1px solid rgba(234, 230, 218, 0.04);
     margin-left: ${({ depth }) => Math.min((depth ?? 0) * 24, 72)}px;
     transition: background 0.2s ease;
     &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(234, 230, 218, 0.05);
     }
 `
 
@@ -314,15 +304,15 @@ const ChatInputBox = styled(Box)`
     display: flex;
     gap: 8px;
     padding: 12px 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid rgba(234, 230, 218, 0.06);
     align-items: flex-end;
     & textarea {
         flex: 1;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(234, 230, 218, 0.04);
+        border: 1px solid rgba(234, 230, 218, 0.06);
         border-radius: 10px;
-        color: white;
-        font-family: 'Inter', sans-serif;
+        color: var(--bone);
+        font-family: var(--font-body);
         font-size: 13px;
         padding: 10px 14px;
         outline: none;
@@ -331,29 +321,31 @@ const ChatInputBox = styled(Box)`
         max-height: 100px;
         transition: border-color 0.2s ease;
         &:focus {
-            border-color: rgba(209, 255, 26, 0.3);
+            border-color: rgba(191, 209, 67, 0.3);
         }
         &::placeholder {
-            color: #64748B;
+            color: var(--text-muted);
         }
     }
 `
 
 const ChatSendButton = styled(IconButton)`
     &.MuiIconButton-root {
-        background: linear-gradient(135deg, #D3FF24, #e4ff66);
+        background: var(--citron);
         border-radius: 10px;
         width: 40px;
         height: 40px;
-        color: #0a0a0f;
+        color: var(--moss-black);
         transition: all 0.2s ease;
         &:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(209, 255, 26, 0.3);
+            filter: brightness(1.08);
+        }
+        &:active {
+            transform: scale(0.98);
         }
         &.Mui-disabled {
-            background: rgba(255, 255, 255, 0.06);
-            color: rgba(255, 255, 255, 0.2);
+            background: rgba(234, 230, 218, 0.06);
+            color: rgba(234, 230, 218, 0.2);
         }
     }
 `
@@ -363,11 +355,11 @@ const ReplyBadge = styled(Box)`
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(209, 255, 26, 0.08);
-    border: 1px solid rgba(209, 255, 26, 0.15);
+    background: rgba(191, 209, 67, 0.08);
+    border: 1px solid rgba(191, 209, 67, 0.15);
     border-radius: 8px;
     font-size: 12px;
-    color: #D3FF24;
+    color: var(--citron);
     margin: 0 16px;
 `
 
@@ -385,31 +377,31 @@ const TradeBox = styled(Box)`
 `;
 
 const HolderBox = styled(Box)`
-  background: rgba(13, 13, 20, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(30, 28, 16, 0.6);
+  border: 1px solid rgba(234, 230, 218, 0.06);
   border-radius: 16px;
   list-style-position: inside;
   padding: 20px;
-  color: white;
+  color: var(--bone);
   h3 {
     font-size: 16px;
-    font-family: 'Space Grotesk', 'Inter', sans-serif;
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-weight: 700;
     line-height: 18px;
     margin: 0;
     margin-bottom: 16px;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(234, 230, 218, 0.9);
   }
   li {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(234, 230, 218, 0.04);
     padding: 10px 0;
     gap: 8px;
     & > :first-of-type {
       flex: 0 0 1.5em;
-      color: #64748B;
+      color: var(--text-muted);
     }
     & > :nth-of-type(2) {
       flex: 1;
@@ -420,7 +412,8 @@ const HolderBox = styled(Box)`
       flex: 0 0 auto;
       text-align: right;
       white-space: nowrap;
-      color: #94A3B8;
+      color: var(--text-secondary);
+      font-family: var(--font-data);
     }
   }
   max-width: 100%;
@@ -440,8 +433,8 @@ const HolderBox = styled(Box)`
 `;
 
 const SwapBox = styled(Box)`
-  background: rgba(13, 13, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(30, 28, 16, 0.8);
+  border: 1px solid rgba(234, 230, 218, 0.06);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -453,14 +446,13 @@ const SwapBox = styled(Box)`
   max-width: 385px;
   margin: 0 auto;
   box-sizing: border-box;
-  backdrop-filter: blur(12px);
 
   & button.medium, & button.small {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: #94A3B8;
+    background: rgba(234, 230, 218, 0.04);
+    border: 1px solid rgba(234, 230, 218, 0.06);
+    color: var(--text-secondary);
     border-radius: 8px;
-    font-family: Inter;
+    font-family: var(--font-body);
     font-size: 12px;
     font-weight: 500;
     padding: 6px 14px;
@@ -471,9 +463,9 @@ const SwapBox = styled(Box)`
     min-width: unset;
     transition: all 0.2s ease;
     &.medium:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(209, 255, 26, 0.2);
-      color: white;
+      background: rgba(234, 230, 218, 0.08);
+      border-color: rgba(191, 209, 67, 0.2);
+      color: var(--bone);
     }
   }
 
@@ -559,7 +551,7 @@ const SwapContent = ({
                     Balance: {isConnected ? priceFormatter(tradeType === "buy" && exactInput ? ethBalance : ethers.formatUnits(tokenBalance ?? 0n)) : '0'}
                 </Typography>
                 <Box display="flex" alignItems="center" gap="4px">
-                    <Typography color="white">{exactInput && tradeType === "buy" ? tokenNetwork?.nativeCurrency.symbol : detailData.tokenSymbol.toUpperCase()}</Typography>
+                    <Typography color="var(--bone)" fontFamily="var(--font-data)">{exactInput && tradeType === "buy" ? tokenNetwork?.nativeCurrency.symbol : detailData.tokenSymbol.toUpperCase()}</Typography>
                     {(exactInput && tradeType === "buy") ? (
                         <Avatar src={AssetUtil.getNetworkImage(tokenNetwork) ?? `/networks/${detailData?.network}.svg`} sx={{ width: 20, height: 20 }} />
                     ) : (
@@ -625,23 +617,22 @@ const SwapContent = ({
                         : <Button fullWidth sx={{
                             borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none',
                             display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                            color: 'white',
-                            background: tradeType === "buy"
-                                ? 'linear-gradient(135deg, #10B981, #059669)'
-                                : 'linear-gradient(135deg, #EF4444, #DC2626)',
+                            color: 'var(--bone)',
+                            background: tradeType === "buy" ? 'var(--up)' : 'var(--down)',
                             '&:hover': {
-                                background: tradeType === "buy"
-                                    ? 'linear-gradient(135deg, #059669, #047857)'
-                                    : 'linear-gradient(135deg, #DC2626, #B91C1C)',
+                                filter: 'brightness(0.92)',
+                            },
+                            '&:active': {
+                                transform: 'scale(0.98)',
                             },
                             // Button stays enabled even at 0; only dims while a swap is in flight.
-                            '&.Mui-disabled': { color: 'rgba(255,255,255,0.85)' },
+                            '&.Mui-disabled': { color: 'rgba(234,230,218,0.85)' },
                         }} disabled={isLoading} onClick={() => {
                             if (!amountIn || Number(amountIn) <= 0) { toast.error('Enter an amount greater than 0'); return; }
                             if (error) { toast.error(error); return; }
                             swapHandler();
                         }}>
-                            {isLoading ? <CircularProgress size={20} style={{ color: "white" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
+                            {isLoading ? <CircularProgress size={20} style={{ color: "var(--bone)" }} /> : (tradeType === "buy" ? "Buy" : "Sell")}
                         </Button>
                 : <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.open()}>
                     Connect Wallet
@@ -669,21 +660,24 @@ const SwapContent = ({
                 priceImpact = Math.abs((currentPrice - effectivePrice) / currentPrice) * 100
             }
             if (priceImpact <= 5) return null
+            // Severity ladder, not a market-direction reading - warning amber for the
+            // moderate tier, down/red once it's actually severe (no citron here).
             return (
                 <Box sx={{
                     display: 'flex',
                     gap: 1,
                     alignItems: 'center',
-                    background: priceImpact > 15 ? 'rgba(239,68,68,0.08)' : 'rgba(209,255,26,0.08)',
-                    border: `1px solid ${priceImpact > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(209,255,26,0.15)'}`,
+                    background: priceImpact > 15 ? 'rgba(214,69,69,0.08)' : 'rgba(232,185,59,0.08)',
+                    border: `1px solid ${priceImpact > 15 ? 'rgba(214,69,69,0.15)' : 'rgba(232,185,59,0.15)'}`,
                     borderRadius: '8px',
                     p: '6px 10px',
                     mt: 1,
                     width: '100%',
                     boxSizing: 'border-box',
                 }}>
-                    <Typography fontSize={11} color={priceImpact > 15 ? '#EF4444' : '#D3FF24'} fontWeight={500}>
-                        {'\u26A0\uFE0F'} Price impact: ~{priceImpact.toFixed(1)}%
+                    <WarningAmberRoundedIcon sx={{ fontSize: 14, color: priceImpact > 15 ? 'var(--down)' : 'var(--warning)' }} />
+                    <Typography fontSize={11} fontFamily="var(--font-data)" color={priceImpact > 15 ? 'var(--down)' : 'var(--warning)'} fontWeight={500}>
+                        Price impact: ~{priceImpact.toFixed(1)}%
                     </Typography>
                 </Box>
             )
@@ -722,7 +716,7 @@ export default function Token() {
     // const [candleList, setCandleList] = React.useState<any[]>()
     // const [poolInfo, setPoolInfo] = React.useState<any>()
     const [errorCustom, setError] = React.useState<string>()
-    const selectedDex = "Forge Finance"; // useMemo(() => dexList?.[0], [dexList])
+    const selectedDex = "Fyuz"; // useMemo(() => dexList?.[0], [dexList])
 
     // const [marketCap, setMarketCap] = useState<number>()
     // const [now, setNow] = useState(0)
@@ -881,6 +875,7 @@ export default function Token() {
     // }, [isWrongChain, switchNetwork])
 
     const launched = useMemo(() => poolInfo?.launched || !!detailData?.launchedAt, [poolInfo, detailData])
+    const pancakeSwapUrl = `https://pancakeswap.finance/swap?inputCurrency=BNB&outputCurrency=${detailData?.tokenAddress}`
 
     // const routerContract = useMemo(() => {
     //     if (selectedDex === undefined)
@@ -1006,8 +1001,8 @@ export default function Token() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span style={{ fontWeight: 600 }}>{type === 'sell' ? 'Sell' : 'Buy'} successful</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'monospace' }}>TX: {shortHash}</span>
-                    <a style={{ textDecoration: 'none', color: '#D3FF24', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontFamily: 'var(--font-data)' }}>TX: {shortHash}</span>
+                    <a style={{ textDecoration: 'none', color: 'var(--citron)', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px' }} target="_blank" rel="noreferrer" href={link}>View <LinkIcon sx={{ fontSize: 12 }} /></a>
                 </div>
             </div>,
             { duration: 8000 }
@@ -1128,16 +1123,16 @@ export default function Token() {
             <PageBox display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="1em" minHeight="60vh" pt={6}>
                 {tokenInfoError && !tokenInfoLoading ? (
                     <>
-                        <Typography color="white" fontSize={20} fontWeight="bold">Token not found or still indexing</Typography>
+                        <Typography color="var(--bone)" fontSize={20} fontWeight="bold">Token not found or still indexing</Typography>
                         <Typography color="#AAA" fontSize={14} textAlign="center" maxWidth={420}>
                             If you just created this token it can take a few seconds to be indexed. This page refreshes automatically.
                         </Typography>
-                        <Button onClick={() => reloadTokenInfo()} sx={{ borderRadius: '16px', textTransform: 'none', color: 'black', bgcolor: '#D3FF24', px: 3, py: 1 }}>
+                        <Button onClick={() => reloadTokenInfo()} sx={{ borderRadius: '16px', textTransform: 'none', color: 'var(--moss-black)', bgcolor: 'var(--citron)', px: 3, py: 1 }}>
                             Retry
                         </Button>
                     </>
                 ) : (
-                    <CircularProgress sx={{ color: '#D3FF24' }} />
+                    <CircularProgress sx={{ color: 'var(--citron)' }} />
                 )}
             </PageBox>
         )
@@ -1152,9 +1147,9 @@ export default function Token() {
                 <Box display="flex" flexDirection="column" justifyContent="space-between" gap="0.5em">
                     <Box display="flex" gap="8px" alignItems="center">
                         <img src={`/networks/${detailData?.network}.svg`} height={isMobile ? 18 : 24} alt="" />
-                        <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="Arial" fontWeight="bold" color="white">{detailData?.tokenName}</Typography>
-                        <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="Arial" fontWeight="bold" color="#AAA">({detailData?.tokenSymbol})</Typography>
-                        <Typography fontSize={12} color="#AAA" ml={{ md: "1em", sm: "auto", xs: "auto" }}>{detailData?.tokenAddress?.slice(0, 6)}...{detailData?.tokenAddress?.slice(-4)}</Typography>
+                        <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="var(--font-display)" fontWeight="bold" color="var(--bone)">{detailData?.tokenName}</Typography>
+                        <Typography fontSize={{ md: 24, sm: 18, xs: 16 }} fontFamily="var(--font-data)" fontWeight="bold" color="#AAA">({detailData?.tokenSymbol})</Typography>
+                        <Typography fontSize={12} fontFamily="var(--font-data)" color="#AAA" ml={{ md: "1em", sm: "auto", xs: "auto" }}>{detailData?.tokenAddress?.slice(0, 6)}...{detailData?.tokenAddress?.slice(-4)}</Typography>
                         <IconButton sx={{ width: 'fit-content' }} onClick={() => {
                             copy(detailData?.tokenAddress)
                             toast.success('Contract address copied!', { duration: 2000 })
@@ -1164,7 +1159,7 @@ export default function Token() {
                         {address && detailData?.tokenAddress && (
                             <IconButton sx={{ width: 'fit-content' }} title="Add to watchlist" onClick={() => toggleWatch(detailData.tokenAddress, detailData.network)}>
                                 {isWatched(detailData.tokenAddress)
-                                    ? <StarIcon sx={{ color: '#e4ff66', width: 16, height: 16 }} />
+                                    ? <StarIcon sx={{ color: 'var(--citron)', width: 16, height: 16 }} />
                                     : <StarBorderIcon sx={{ color: '#9E9E9E', width: 16, height: 16 }} />}
                             </IconButton>
                         )}
@@ -1185,9 +1180,9 @@ export default function Token() {
                         {
                             streamStatus?.isLive &&
                             <Box onClick={() => setMode("live")}
-                                sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: '4px', px: '8px', py: '3px', borderRadius: '8px', background: 'rgba(239,68,68,0.9)', cursor: 'pointer', zIndex: 2 }}>
-                                <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: 'white' }} />
-                                <Typography fontSize={11} fontWeight={800} color="white">LIVE {streamStatus.viewers > 0 ? `· ${streamStatus.viewers}` : ''}</Typography>
+                                sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: '4px', px: '8px', py: '3px', borderRadius: '8px', background: 'rgba(214,69,69,0.9)', cursor: 'pointer', zIndex: 2 }}>
+                                <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bone)' }} />
+                                <Typography fontSize={11} fontWeight={800} fontFamily="var(--font-data)" letterSpacing="1px" color="var(--bone)">LIVE {streamStatus.viewers > 0 ? `· ${streamStatus.viewers}` : ''}</Typography>
                             </Box>
                         }
                         {
@@ -1204,36 +1199,36 @@ export default function Token() {
                                             preserveValue
                                         />
                                     </MarketCapValue>
-                                    <Typography fontSize={12} color="rgba(255,255,255,0.6)">Market cap</Typography>
+                                    <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Market cap</Typography>
                                     <Box
                                         position="absolute"
                                         right={0} top={12}
                                         display="flex" justifyContent="center" alignItems="center" gap="4px"
-                                    // title={`When marcket cap reaches at $${priceFormatter(tokenChain?.targetMarketCap, 2)}, all the liquidity will be listed on Uniswap`}
+                                    // title={`When marcket cap reaches at $${priceFormatter(tokenChain?.targetMarketCap, 2)}, all the liquidity will be listed on PancakeSwap`}
                                     >
-                                        <Avatar src={`/pools/${pool?.name}.png`} sx={{ width: 20, height: 20 }} alt="unitswap" />
+                                        <Avatar src={`/pools/${pool?.name}.png`} sx={{ width: 20, height: 20 }} alt="pancakeswap" />
                                         {
                                             !!pool?.version &&
-                                            <Typography fontSize={12} color="white">{pool.version}</Typography>
+                                            <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--bone)">{pool.version}</Typography>
                                         }
                                     </Box>
                                 </Box>
                                 <Box display="flex" gap="8px" alignItems="baseline">
-                                    <Typography fontSize={14} color={Number(detailData?.price15m ?? 0) >= 0 ? "#10B981" : "#D3FF24"}>
+                                    <Typography fontSize={14} fontFamily="var(--font-data)" color={Number(detailData?.price15m ?? 0) >= 0 ? "var(--up)" : "var(--down)"}>
                                         {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                                     </Typography>
-                                    <Typography fontSize={12} color="white">Past 15m</Typography>
+                                    <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Past 15m</Typography>
                                 </Box>
                                 <Box display="flex" gap="8px">
                                     <StatsBox>
-                                        <Typography fontSize={12} color="#9E9E9E">Volume:</Typography>
-                                        <Typography fontSize={12} color="white">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
+                                        <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="#9E9E9E">Volume:</Typography>
+                                        <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--bone)">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
                                     </StatsBox>
                                     {
                                         !!detailData?.creationTime &&
                                         <StatsBox>
-                                            <Typography fontSize={12} color="#9E9E9E">Created At:</Typography>
-                                            <Typography fontSize={12} color="white">
+                                            <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="#9E9E9E">Created At:</Typography>
+                                            <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--bone)">
                                                 {
                                                     Date.now() - new Date(detailData.creationTime).getTime() < 3600000
                                                         ? <TimeDiff time={new Date(detailData.creationTime)} postfix="ago" />
@@ -1255,24 +1250,26 @@ export default function Token() {
                                     gap: 1,
                                     p: 2,
                                     borderRadius: '12px',
-                                    background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))',
-                                    border: '1px solid rgba(16,185,129,0.2)',
-                                    maxWidth: '400px',
+                                    background: 'rgba(232,106,43,0.06)',
+                                    border: '1px solid rgba(232,106,43,0.2)',
+                                    width: '370px',
+                                    maxWidth: '100%',
                                 }}>
                                     <Box display="flex" alignItems="center" gap={1}>
-                                        <Typography fontSize={16} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
-                                            🎓 Graduated
+                                        <WorkspacePremiumOutlinedIcon sx={{ fontSize: 18, color: 'var(--tangerine)' }} />
+                                        <Typography fontSize={16} fontWeight={700} color="var(--tangerine)" fontFamily="var(--font-display)">
+                                            Graduated
                                         </Typography>
                                         <span className="badge-graduated" style={{ fontSize: 11 }}>LIVE ON DEX</span>
                                     </Box>
-                                    <Typography fontSize={12} color="#94A3B8" textAlign="right" lineHeight={1.4}>
+                                    <Typography fontSize={12} color="var(--text-secondary)" textAlign="right" lineHeight={1.4}>
                                         This token has graduated from the bonding curve and is now trading on a decentralized exchange.
                                     </Typography>
                                     {detailData?.pairAddress && (
                                         <Link
                                             href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`}
                                             target="_blank"
-                                            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, color: '#10B981', fontSize: 12, fontWeight: 600 }}
+                                            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--tangerine)', fontSize: 12, fontWeight: 600 }}
                                         >
                                             View LP pair <LinkIcon sx={{ fontSize: 14 }} />
                                         </Link>
@@ -1282,9 +1279,9 @@ export default function Token() {
                             {
                                 !launched &&
                                 <>
-                                    <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} color="#DDD">Progress ({Math.min(99.99, Number(detailData?.progress ?? 0)).toFixed(2)}%)</Typography>
+                                    <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} fontFamily="var(--font-data)" color="#DDD">Progress ({Math.min(99.99, Number(detailData?.progress ?? 0)).toFixed(2)}%)</Typography>
                                     <Progress value={Math.min(100, Number(detailData?.progress ?? 0))} />
-                                    <Typography fontSize={11} color="#64748B" mt={0.5} lineHeight={1.4} textAlign="right" maxWidth="400px">
+                                    <Typography fontSize={11} color="var(--text-muted)" mt={0.5} lineHeight={1.4} textAlign="right" maxWidth="400px">
                                         When the market cap reaches the target, liquidity will be automatically added to the DEX and the token will be freely tradeable.
                                     </Typography>
                                     <Box display="flex" alignItems="center" gap="8px">
@@ -1294,7 +1291,7 @@ export default function Token() {
                                             <path d="M6.72428 6.26668C7.45762 6.80001 7.92428 7.73334 8.25762 8.73334C6.92428 9.00001 5.92428 9.00001 5.05762 8.53334C4.25762 8.13334 3.52428 7.26668 3.05762 5.73334C4.92428 5.40001 5.99095 5.73334 6.72428 6.26668Z" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
                                             <path d="M9.79097 3.99999C9.28269 4.79436 9.02702 5.72409 9.05764 6.66666C10.3243 6.59999 11.2576 6.26666 11.9243 5.73332C12.591 5.06666 12.991 4.19999 13.0576 2.66666C11.2576 2.73332 10.391 3.33332 9.79097 3.99999Z" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
-                                        <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} color="#DDD">1d liquidity: {priceFormatter(detailData?.liquidity1d ?? 0)} {tokenNetwork?.nativeCurrency.symbol}</Typography>
+                                        <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} fontFamily="var(--font-data)" color="#DDD">1d liquidity: {priceFormatter(detailData?.liquidity1d ?? 0)} {tokenNetwork?.nativeCurrency.symbol}</Typography>
                                     </Box>
                                     <Box display="flex" alignItems="center" justifyContent="center" gap="8px" mt={1}>
                                         {!!webLink && (
@@ -1335,24 +1332,24 @@ export default function Token() {
                                     preserveValue
                                 />
                             </MarketCapValue>
-                            <Typography fontSize={12} color="rgba(255,255,255,0.6)">Market cap</Typography>
+                            <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Market cap</Typography>
                         </Box>
                         <Box display="flex" gap="8px" alignItems="baseline">
-                            <Typography fontSize={14} color={Number(detailData?.priceChange15m ?? 0) >= 0 ? "#10B981" : "#EF4444"}>
+                            <Typography fontSize={14} fontFamily="var(--font-data)" color={Number(detailData?.priceChange15m ?? 0) >= 0 ? "var(--up)" : "var(--down)"}>
                                 {Number(detailData?.price ?? 0) >= Number(detailData?.price15m ?? 0) ? '+' : '-'}${priceFormatter(Number(detailData?.price15m ?? 0) - Number(detailData?.price15MinAgo ?? 0))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
                             </Typography>
-                            <Typography fontSize={12} color="white">Past 15m</Typography>
+                            <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Past 15m</Typography>
                         </Box>
                         <Box display="flex" flexDirection="column" alignItems="stretch" gap="1px">
                             <StatsBox>
-                                <Typography fontSize={12} color="#9E9E9E">Volume:</Typography>
-                                <Typography fontSize={12} color="white">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
+                                <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="#9E9E9E">Volume:</Typography>
+                                <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--bone)">${priceFormatter(detailData?.volume ?? 0, 2, true, true)}</Typography>
                             </StatsBox>
                             {
                                 !!detailData?.creationTime &&
                                 <StatsBox>
-                                    <Typography fontSize={12} color="#9E9E9E">Created At:</Typography>
-                                    <Typography fontSize={12} color="white">
+                                    <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="#9E9E9E">Created At:</Typography>
+                                    <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--bone)">
                                         {
                                             Date.now() - new Date(detailData.creationTime).getTime() < 3600000
                                                 ? <TimeDiff time={new Date(detailData.creationTime)} postfix="ago" />
@@ -1362,9 +1359,9 @@ export default function Token() {
                                 </StatsBox>
                             }
                             <StatsBox>
-                                <Typography fontSize={12} color="#9E9E9E">{launched ? 'Trading on:' : 'Will be deposited to:'}</Typography>
-                                <Typography fontSize={12} color={launched ? '#10B981' : 'white'} textTransform="capitalize">
-                                    {launched ? '🎓 ' : ''}{pool?.name} {pool?.version} pool
+                                <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="#9E9E9E">{launched ? 'Trading on:' : 'Will be deposited to:'}</Typography>
+                                <Typography fontSize={12} fontFamily="var(--font-data)" color={launched ? 'var(--tangerine)' : 'var(--bone)'} textTransform="capitalize">
+                                    {pool?.name} {pool?.version} pool
                                 </Typography>
                             </StatsBox>
                         </Box>
@@ -1373,14 +1370,15 @@ export default function Token() {
                                 mt: 1,
                                 p: 1.5,
                                 borderRadius: '10px',
-                                background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))',
-                                border: '1px solid rgba(16,185,129,0.2)',
+                                background: 'rgba(232,106,43,0.06)',
+                                border: '1px solid rgba(232,106,43,0.2)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1,
                             }}>
-                                <Typography fontSize={13} fontWeight={600} color="#10B981">
-                                    🎓 Graduated to DEX
+                                <WorkspacePremiumOutlinedIcon sx={{ fontSize: 16, color: 'var(--tangerine)' }} />
+                                <Typography fontSize={13} fontWeight={600} color="var(--tangerine)">
+                                    Graduated to DEX
                                 </Typography>
                             </Box>
                         )}
@@ -1412,9 +1410,9 @@ export default function Token() {
                         } */}
                         {
                             isDirectLaunch
-                                ? <Box sx={{ width: '100%', height: '465px', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                ? <Box sx={{ width: '100%', height: '465px', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(234, 230, 218, 0.05)' }}>
                                     <iframe
-                                        src={`https://www.geckoterminal.com/robinhood/tokens/${id}?embed=1&info=0&swaps=0&chart_type=market_cap&resolution=1d&bg_color=111827`}
+                                        src={`https://www.geckoterminal.com/bsc/tokens/${id}?embed=1&info=0&swaps=0&chart_type=market_cap&resolution=1d&bg_color=111827`}
                                         style={{ width: '100%', height: '100%', border: 'none' }}
                                         allow="clipboard-write"
                                         loading="lazy"
@@ -1429,7 +1427,10 @@ export default function Token() {
                                     <div className={mode === "chat" ? "active" : ""} onClick={() => setMode("chat")}>Chat</div>
                                     <div className={mode === "info" ? "active" : ""} onClick={() => setMode("info")}>Info</div>
                                     <div className={mode === "analytics" ? "active" : ""} onClick={() => setMode("analytics")}>Analytics</div>
-                                    <div className={mode === "live" ? "active" : ""} onClick={() => setMode("live")}>{streamStatus?.isLive ? '🔴 Live' : 'Live'}</div>
+                                    <div className={mode === "live" ? "active" : ""} onClick={() => setMode("live")}>
+                                        {streamStatus?.isLive && <Box component="span" sx={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', bgcolor: 'var(--down)', mr: '4px' }} />}
+                                        Live
+                                    </div>
                                     {
                                         isMobile &&
                                         <div className={mode === "holders" ? "active" : ""} onClick={() => setMode("holders")}>Holders</div>
@@ -1438,39 +1439,39 @@ export default function Token() {
                             </Box>
                             {mode === "trades" && (
                                 <Box mb="1.5em">
-                                    <Box display="flex" flexDirection="column" my="1.5em" borderRadius="16px" overflow="hidden" bgcolor="rgba(13, 13, 20, 0.6)" border="1px solid rgba(255, 255, 255, 0.05)">
+                                    <Box display="flex" flexDirection="column" my="1.5em" borderRadius="16px" overflow="hidden" bgcolor="rgba(30, 28, 16, 0.6)" border="1px solid rgba(234, 230, 218, 0.05)">
                                         <TradeBox sx={{ pt: 3, pb: 2 }}>
-                                            <Typography color="white" fontSize={14} fontWeight="bold" display={{ sm: 'block', xs: 'none' }}>Date</Typography>
-                                            <Typography color="white" fontSize={14} fontWeight="bold">Type</Typography>
-                                            <Typography color="white" fontSize={14} fontWeight="bold">{tokenNetwork?.nativeCurrency.symbol}</Typography>
-                                            <Typography color="white" fontSize={14} fontWeight="bold">{detailData?.tokenSymbol}</Typography>
-                                            <Typography color="white" fontSize={14} fontWeight="bold" display={{ sm: 'block', xs: 'none' }}>Trader</Typography>
-                                            <Typography color="white" fontSize={14} fontWeight="bold">Transaction</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold" display={{ sm: 'block', xs: 'none' }}>Date</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold">Type</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold">{tokenNetwork?.nativeCurrency.symbol}</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold">{detailData?.tokenSymbol}</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold" display={{ sm: 'block', xs: 'none' }}>Trader</Typography>
+                                            <Typography color="var(--bone)" fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" fontSize={14} fontWeight="bold">Transaction</Typography>
                                         </TradeBox>
                                         {
                                             tradeData?.map((trade: any) => (
                                                 <Fragment key={trade.txHash}>
                                                     <Divider />
-                                                    <TradeBox sx={{ py: 2, color: trade.type === "BUY" ? "#10B981" : "#EF4444" }}>
-                                                        <Typography color="inherit" fontSize="small" display={{ sm: 'block', xs: 'none' }}>
+                                                    <TradeBox sx={{ py: 2, color: trade.type === "BUY" ? "var(--up)" : "var(--down)" }}>
+                                                        <Typography color="inherit" fontFamily="var(--font-data)" fontSize="small" display={{ sm: 'block', xs: 'none' }}>
                                                             {
                                                                 Date.now() - new Date(trade.date * 1000).getTime() < 3600000
                                                                     ? <TimeDiff time={new Date(trade.date * 1000)} postfix="ago" />
                                                                     : new Date(trade.date * 1000).toLocaleString('en-US', { month: 'short', year: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
                                                             }
                                                         </Typography>
-                                                        <Typography color="inherit" fontSize="small">{trade.type}</Typography>
-                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.ethAmount, 4, true, true)}</Typography>
+                                                        <Typography color="inherit" fontFamily="var(--font-data)" fontSize="small">{trade.type}</Typography>
+                                                        <Typography color="inherit" fontFamily="var(--font-data)" fontSize="small">{priceFormatter(trade.ethAmount, 4, true, true)}</Typography>
                                                         {/* <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount * trade.tokenPrice, 2, true, true)}</Typography> */}
-                                                        <Typography color="inherit" fontSize="small">{priceFormatter(trade.tokenAmount, 4, true, true)}</Typography>
+                                                        <Typography color="inherit" fontFamily="var(--font-data)" fontSize="small">{priceFormatter(trade.tokenAmount, 4, true, true)}</Typography>
                                                         <Box display={{ sm: 'flex', xs: 'none' }} alignItems="center" gap="6px">
                                                             <UserAvatar user={{ username: trade.swapperUsername, avatar: trade.swapperAvatar, address: trade.swapperAddress }} address={trade.swapperAddress} size={18} mr="0" />
-                                                            <UserName user={{ username: trade.swapperUsername, avatar: trade.swapperAvatar, address: trade.swapperAddress }} address={trade.swapperAddress} color={trade.type === "BUY" ? "#10B981" : "#EF4444"} size={18} />
+                                                            <UserName user={{ username: trade.swapperUsername, avatar: trade.swapperAvatar, address: trade.swapperAddress }} address={trade.swapperAddress} color={trade.type === "BUY" ? "var(--up)" : "var(--down)"} size={18} />
                                                         </Box>
                                                         <Box display={{ sm: 'block', xs: 'none' }}>
                                                             <Link style={{ textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} href={`${tokenChain?.explorerUrl}/tx/${trade.txHash}`} target="_blank">
-                                                                <Typography color={trade.type === "BUY" ? "#10B981" : "#EF4444"} fontSize="small">{trade.txHash.slice(0, 5)}...{trade.txHash.slice(-6)}</Typography>
-                                                                <LinkIcon sx={{ color: trade.type === "BUY" ? "#10B981" : "#EF4444", fontSize: 14 }} />
+                                                                <Typography color={trade.type === "BUY" ? "var(--up)" : "var(--down)"} fontFamily="var(--font-data)" fontSize="small">{trade.txHash.slice(0, 5)}...{trade.txHash.slice(-6)}</Typography>
+                                                                <LinkIcon sx={{ color: trade.type === "BUY" ? "var(--up)" : "var(--down)", fontSize: 14 }} />
                                                             </Link>
                                                         </Box>
                                                     </TradeBox>
@@ -1499,11 +1500,11 @@ export default function Token() {
                                     <ChatMessages ref={chatMessagesRef}>
                                         {chatLoading ? (
                                             <Box display="flex" justifyContent="center" py={4}>
-                                                <CircularProgress size={24} sx={{ color: '#D3FF24' }} />
+                                                <CircularProgress size={24} sx={{ color: 'var(--citron)' }} />
                                             </Box>
                                         ) : threadedChats.length === 0 ? (
                                             <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1}>
-                                                <Typography color="#64748B" fontSize={14}>No messages yet</Typography>
+                                                <Typography color="var(--text-muted)" fontSize={14}>No messages yet</Typography>
                                                 <Typography color="#475569" fontSize={12}>Be the first to comment</Typography>
                                             </Box>
                                         ) : (
@@ -1512,10 +1513,10 @@ export default function Token() {
                                                     <UserAvatar address={chat.replyAddress} size={28} mr="0" />
                                                     <Box flex={1} minWidth={0}>
                                                         <Box display="flex" alignItems="center" gap="6px" mb="4px">
-                                                            <Typography fontSize={12} fontWeight={600} color="white" noWrap>
+                                                            <Typography fontSize={12} fontWeight={600} fontFamily="var(--font-data)" color="var(--bone)" noWrap>
                                                                 {chat.replyAddress?.slice(0, 6)}...{chat.replyAddress?.slice(-4)}
                                                             </Typography>
-                                                            <Typography fontSize={11} color="#64748B">
+                                                            <Typography fontSize={11} fontFamily="var(--font-data)" color="var(--text-muted)">
                                                                 {Date.now() - new Date(chat.date || chat.createdAt).getTime() < 3600000
                                                                     ? <TimeDiff time={new Date(chat.date || chat.createdAt)} postfix="ago" />
                                                                     : new Date(chat.date || chat.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -1533,8 +1534,8 @@ export default function Token() {
                                                             sx={{ cursor: 'pointer', opacity: 0.5, '&:hover': { opacity: 1 }, transition: 'opacity 0.2s' }}
                                                             onClick={() => setChatReplyTo(chat)}
                                                         >
-                                                            <ReplyIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
-                                                            <Typography fontSize={11} color="#94A3B8">Reply</Typography>
+                                                            <ReplyIcon sx={{ fontSize: 14, color: 'var(--text-secondary)' }} />
+                                                            <Typography fontSize={11} color="var(--text-secondary)">Reply</Typography>
                                                         </Box>
                                                     </Box>
                                                 </ChatBubble>
@@ -1544,11 +1545,11 @@ export default function Token() {
                                     {chatReplyTo && (
                                         <ReplyBadge>
                                             <ReplyIcon sx={{ fontSize: 14 }} />
-                                            <Typography fontSize={12} noWrap flex={1}>
+                                            <Typography fontSize={12} fontFamily="var(--font-data)" noWrap flex={1}>
                                                 Replying to {chatReplyTo.replyAddress?.slice(0, 6)}...{chatReplyTo.replyAddress?.slice(-4)}
                                             </Typography>
                                             <IconButton size="small" onClick={() => setChatReplyTo(null)} sx={{ padding: '2px' }}>
-                                                <CloseIcon sx={{ fontSize: 14, color: '#D3FF24' }} />
+                                                <CloseIcon sx={{ fontSize: 14, color: 'var(--citron)' }} />
                                             </IconButton>
                                         </ReplyBadge>
                                     )}
@@ -1577,11 +1578,11 @@ export default function Token() {
                             )}
                             {
                                 mode === "info" &&
-                                <Box bgcolor="rgba(13, 13, 20, 0.6)" border="1px solid rgba(255, 255, 255, 0.05)" borderRadius="16px" display="flex" gap="16px" padding="24px" my="1.5em">
+                                <Box bgcolor="rgba(30, 28, 16, 0.6)" border="1px solid rgba(234, 230, 218, 0.05)" borderRadius="16px" display="flex" gap="16px" padding="24px" my="1.5em">
                                     <TokenLogo logo={detailData?.tokenImage} size="120px" />
                                     <Box>
                                         <Box display="flex" gap="0.2rem">
-                                            <Typography fontSize={24} color="white">{detailData?.tokenName}</Typography>
+                                            <Typography fontSize={24} fontFamily="var(--font-display)" color="var(--bone)">{detailData?.tokenName}</Typography>
                                         </Box>
                                         <Box display="flex" gap="0.2rem" alignItems="center">
                                             <Typography color="#D9D9D9" fontSize={14}>{detailData?.tokenDescription}</Typography>
@@ -1598,7 +1599,7 @@ export default function Token() {
                         </Box> */}
                                         <Box display="flex" gap="0.2rem" mt={1}>
                                             <Avatar sx={{ width: 24, height: 24, mr: '0.5rem' }} src="/images/marketcap.png" />
-                                            <Typography color="#D9D9D9" fontSize={14}>${priceFormatter(marketCap, 2)}</Typography>
+                                            <Typography color="#D9D9D9" fontSize={14} fontFamily="var(--font-data)">${priceFormatter(marketCap, 2)}</Typography>
                                             <Typography color="#9E9E9E" fontSize={14}>—</Typography>
                                             <Typography color="#9E9E9E" fontSize={14}>Market cap</Typography>
                                         </Box>
@@ -1624,14 +1625,15 @@ export default function Token() {
                                             display: 'flex',
                                             gap: 1,
                                             alignItems: 'center',
-                                            background: 'rgba(239,68,68,0.08)',
-                                            border: '1px solid rgba(239,68,68,0.15)',
+                                            background: 'rgba(214,69,69,0.08)',
+                                            border: '1px solid rgba(214,69,69,0.15)',
                                             borderRadius: '8px',
                                             p: '8px 12px',
                                             mb: 1,
                                         }}>
-                                            <Typography fontSize={12} color="#EF4444" fontWeight={500}>
-                                                {'\u26A0\uFE0F'} Top holder owns {topHolderPercent.toFixed(1)}% of supply
+                                            <WarningAmberRoundedIcon sx={{ fontSize: 14, color: 'var(--down)' }} />
+                                            <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--down)" fontWeight={500}>
+                                                Top holder owns {topHolderPercent.toFixed(1)}% of supply
                                             </Typography>
                                         </Box>
                                     )}
@@ -1648,22 +1650,23 @@ export default function Token() {
                                                 }}
                                             />
                                             <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
-                                                <LinkIcon sx={{ color: "white", height: 16 }} />
+                                                <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                             </Link>
                                         </Box>
-                                        <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                        <Typography noWrap fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                     </Box>
                                     {
                                         holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
                                             <Box component="li" key={index}>
                                                 <div>{index + 2}.</div>
                                                 <Box display="flex" alignItems="center">
+                                                    <UserAvatar user={item.user} address={item.holderAddress} size={18} />
                                                     <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
                                                     <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
-                                                        <LinkIcon sx={{ color: "white", height: 16 }} />
+                                                        <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                                     </Link>
                                                 </Box>
-                                                <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                                <Typography fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                             </Box>
                                         ))}
                                 </HolderBox>
@@ -1676,40 +1679,57 @@ export default function Token() {
                         <Box width="370px">
                             <SwapBox className={isLoading ? "disabled" : ""}>
                                     {!isSolanaToken && launched && (
-                                        <Box display="flex" flexDirection="column" alignItems="center" gap={0.5} mb={1.5} pb={1.5} borderBottom="1px solid rgba(255,255,255,0.06)">
-                                            <Typography fontSize={14} fontWeight={700} color="#10B981" fontFamily="'Space Grotesk', sans-serif">
-                                                🎓 Trading via Uniswap V2
-                                            </Typography>
+                                        <Box display="flex" flexDirection="column" alignItems="center" gap={0.5} mb={1.5} pb={1.5} borderBottom="1px solid rgba(234,230,218,0.06)">
+                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                                <WorkspacePremiumOutlinedIcon sx={{ fontSize: 16, color: 'var(--tangerine)' }} />
+                                                <Typography fontSize={14} fontWeight={700} color="var(--tangerine)" fontFamily="var(--font-display)">
+                                                    Trading via PancakeSwap V2
+                                                </Typography>
+                                            </Box>
                                             {detailData?.pairAddress && (
                                                 <Link href={`${tokenChain?.explorerUrl}/address/${detailData.pairAddress}`} target="_blank" style={{ textDecoration: 'none' }}>
-                                                    <Typography fontSize={11} color="#64748B" sx={{ '&:hover': { color: '#10B981' } }}>
+                                                    <Typography fontSize={11} fontFamily="var(--font-data)" color="var(--text-muted)" sx={{ '&:hover': { color: 'var(--tangerine)' } }}>
                                                         View LP Pair <LinkIcon sx={{ fontSize: 11, verticalAlign: 'middle' }} />
                                                     </Typography>
                                                 </Link>
                                             )}
                                         </Box>
                                     )}
-                                    <Toggle style={{ width: "inherit" }}>
-                                        <div className={tradeType === "buy" ? "active" : ""} data-tradetype="buy" onClick={() => setTradeType("buy")}>Buy</div>
-                                        <div className={tradeType === "sell" ? "active" : ""} data-tradetype="sell" onClick={() => setTradeType("sell")}>Sell</div>
-                                    </Toggle>
-                                    <SwapContent
-                                        amountIn={amountIn}
-                                        approveHandler={approveHandler}
-                                        detailData={detailData}
-                                        error={error}
-                                        estimateAmount={estimateAmount}
-                                        ethBalance={ethBalance}
-                                        exactInput={exactInput}
-                                        isLoading={isLoading}
-                                        swapHandler={swapHandler}
-                                        tokenAllowance={tokenAllowance}
-                                        tokenBalance={tokenBalance}
-                                        tradeType={tradeType}
-                                        setAmountIn={setAmountIn}
-                                        setExactInput={setExactInput}
-                                        setShowSlipaggeDialog={setShowSlipaggeDialog}
-                                    />
+                                    {!isSolanaToken && launched ? (
+                                        <Button
+                                            fullWidth
+                                            component="a"
+                                            href={pancakeSwapUrl}
+                                            target="_blank"
+                                            sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }}
+                                        >
+                                            Trade on PancakeSwap
+                                        </Button>
+                                    ) : (
+                                        <>
+                                            <Toggle style={{ width: "inherit" }}>
+                                                <div className={tradeType === "buy" ? "active" : ""} data-tradetype="buy" onClick={() => setTradeType("buy")}>Buy</div>
+                                                <div className={tradeType === "sell" ? "active" : ""} data-tradetype="sell" onClick={() => setTradeType("sell")}>Sell</div>
+                                            </Toggle>
+                                            <SwapContent
+                                                amountIn={amountIn}
+                                                approveHandler={approveHandler}
+                                                detailData={detailData}
+                                                error={error}
+                                                estimateAmount={estimateAmount}
+                                                ethBalance={ethBalance}
+                                                exactInput={exactInput}
+                                                isLoading={isLoading}
+                                                swapHandler={swapHandler}
+                                                tokenAllowance={tokenAllowance}
+                                                tokenBalance={tokenBalance}
+                                                tradeType={tradeType}
+                                                setAmountIn={setAmountIn}
+                                                setExactInput={setExactInput}
+                                                setShowSlipaggeDialog={setShowSlipaggeDialog}
+                                            />
+                                        </>
+                                    )}
                                 </SwapBox>
                             <HolderBox as="ol" mb="1.5em">
                                 <Box component="h3">Top Holders</Box>
@@ -1718,14 +1738,15 @@ export default function Token() {
                                         display: 'flex',
                                         gap: 1,
                                         alignItems: 'center',
-                                        background: 'rgba(239,68,68,0.08)',
-                                        border: '1px solid rgba(239,68,68,0.15)',
+                                        background: 'rgba(214,69,69,0.08)',
+                                        border: '1px solid rgba(214,69,69,0.15)',
                                         borderRadius: '8px',
                                         p: '8px 12px',
                                         mb: 1,
                                     }}>
-                                        <Typography fontSize={12} color="#EF4444" fontWeight={500}>
-                                            {'\u26A0\uFE0F'} Top holder owns {topHolderPercent.toFixed(1)}% of supply
+                                        <WarningAmberRoundedIcon sx={{ fontSize: 14, color: 'var(--down)' }} />
+                                        <Typography fontSize={12} fontFamily="var(--font-data)" color="var(--down)" fontWeight={500}>
+                                            Top holder owns {topHolderPercent.toFixed(1)}% of supply
                                         </Typography>
                                     </Box>
                                 )}
@@ -1741,22 +1762,23 @@ export default function Token() {
                                             }}
                                         />
                                         <Link href={`${tokenChain?.explorerUrl}/address/${tokenChain?.contractAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
-                                            <LinkIcon sx={{ color: "white", height: 16 }} />
+                                            <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                         </Link>
                                     </Box>
-                                    <Typography noWrap>{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                    <Typography noWrap fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                 </Box>
                                 {
                                     holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
                                         <Box component="li" key={index}>
                                             <div>{index + 2}.</div>
                                             <Box display="flex" alignItems="center">
+                                                <UserAvatar user={item.user} address={item.holderAddress} size={18} />
                                                 <UserName user={item.user} address={item.holderAddress} postfix={item.holderAddress === item.creatorAddress ? " (Creator) " : ""} color="#9E9E9E" />
                                                 <Link href={`${tokenChain?.explorerUrl}/address/${item.holderAddress}`} target="_blank" style={{ textDecoration: 'none', height: 16 }}>
-                                                    <LinkIcon sx={{ color: "white", height: 16 }} />
+                                                    <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                                 </Link>
                                             </Box>
-                                            <Typography>{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                            <Typography fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
                                         </Box>
                                     ))}
                             </HolderBox>
@@ -1767,14 +1789,20 @@ export default function Token() {
             {
                 isMobile ? (
                     <TradeMenu>
-                        <button onClick={() => {
-                            setTradeType("buy")
-                            showModal('trade')
-                        }}>Buy</button>
-                        <button onClick={() => {
-                            setTradeType("sell")
-                            showModal('trade')
-                        }}>Sell</button>
+                        {!isSolanaToken && launched ? (
+                            <button onClick={() => window.open(pancakeSwapUrl, '_blank')}>Trade on PancakeSwap</button>
+                        ) : (
+                            <>
+                                <button onClick={() => {
+                                    setTradeType("buy")
+                                    showModal('trade')
+                                }}>Buy</button>
+                                <button onClick={() => {
+                                    setTradeType("sell")
+                                    showModal('trade')
+                                }}>Sell</button>
+                            </>
+                        )}
                     </TradeMenu>
                 ) : null
             }
@@ -1811,7 +1839,7 @@ export default function Token() {
             >
                 <DialogTitle>
                     <Box display="flex" justifyContent="center" alignItems="center" width="100%">
-                        <Typography color="#FFFFFF" fontSize="24px">
+                        <Typography color="var(--bone)" fontFamily="var(--font-display)" fontSize="24px">
                             Slippage
                         </Typography>
                         <IconButton onClick={() => setShowSlipaggeDialog(false)} sx={{ position: 'absolute', right: 8 }}>
@@ -1827,7 +1855,7 @@ export default function Token() {
                                 setSlippage(0.1);
                                 localStorage.setItem('slippage', '0.1');
                             }}
-                            sx={{ borderColor: slippage === 0.1 ? 'white' : 'transparent', borderWidth: 2, borderStyle: 'solid' }}
+                            sx={{ borderColor: slippage === 0.1 ? 'var(--bone)' : 'transparent', borderWidth: 2, borderStyle: 'solid', fontFamily: 'var(--font-data)' }}
                         >
                             0.1%
                         </Button>
@@ -1837,7 +1865,7 @@ export default function Token() {
                                 setSlippage(0.5)
                                 localStorage.setItem('slippage', '0.5');
                             }}
-                            sx={{ borderColor: slippage === 0.5 ? 'white' : 'transparent', borderWidth: 2, borderStyle: 'solid' }}
+                            sx={{ borderColor: slippage === 0.5 ? 'var(--bone)' : 'transparent', borderWidth: 2, borderStyle: 'solid', fontFamily: 'var(--font-data)' }}
                         >
                             0.5%
                         </Button>
@@ -1847,7 +1875,7 @@ export default function Token() {
                                 setSlippage(1)
                                 localStorage.setItem('slippage', '1');
                             }}
-                            sx={{ borderColor: slippage === 1 ? 'white' : 'transparent', borderWidth: 2, borderStyle: 'solid' }}
+                            sx={{ borderColor: slippage === 1 ? 'var(--bone)' : 'transparent', borderWidth: 2, borderStyle: 'solid', fontFamily: 'var(--font-data)' }}
                         >
                             1%
                         </Button>

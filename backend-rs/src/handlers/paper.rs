@@ -13,16 +13,16 @@ use crate::AppState;
 // ---------------------------------------------------------------------------
 // Paper trading / simulator (Tier C). A risk-free practice mode: each address
 // gets a virtual ETH balance and trades run the SAME constant-product bonding
-// curve the contract uses (mirrors getAmountOut in foundry/src/Arrowpad.sol,
+// curve the contract uses (mirrors getAmountOut in foundry/src/Fyuz.sol,
 // 1% platform fee) priced off the token's live virtual reserves. No chain tx,
 // zero economic value. State lives in paper_accounts / paper_positions.
 // ---------------------------------------------------------------------------
 
 const STARTING_BALANCE_ETH: f64 = 10.0;
-/// Platform buy/sell fee in bps — matches PLATFORM_BUY_FEE_BPS / SELL in Arrowpad.sol.
+/// Platform buy/sell fee in bps — matches PLATFORM_BUY_FEE_BPS / SELL in Fyuz.sol.
 const FEE_BPS: f64 = 100.0;
 
-/// Constant-product output with fee, identical to Arrowpad.getAmountOut.
+/// Constant-product output with fee, identical to Fyuz.getAmountOut.
 fn get_amount_out(amount_in: f64, reserve_in: f64, reserve_out: f64) -> f64 {
     if amount_in <= 0.0 || reserve_in <= 0.0 || reserve_out <= 0.0 {
         return 0.0;

@@ -4,14 +4,14 @@ pragma solidity ^0.8.26;
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/Arrowpad.sol";
-import "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import "../src/Fyuz.sol";
+import "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 
-/// @notice Deploys Arrowpad + ArrowpadLiquidityManager to Sepolia with V2, V3 and
+/// @notice Deploys Fyuz + FyuzLiquidityManager to Sepolia with V2, V3 and
 ///         V4 all enabled. The DEX version is chosen per token via createToken's
 ///         `poolType` argument: 1 = Uniswap V2, 2 = Uniswap V3, 3 = Uniswap V4.
-contract DeployArrowpadSepolia is Script {
+contract DeployFyuzSepolia is Script {
 
     /// @dev The proxies each deploy their own ProxyAdmin and record it in the
     ///      ERC-1967 admin slot. Log it: it is the only key that can upgrade, and
@@ -51,7 +51,7 @@ contract DeployArrowpadSepolia is Script {
         vm.startBroadcast(pk);
 
         // All V2/V3/V4 addresses wired so every poolType is usable.
-        ArrowpadLiquidityManager lm = ArrowpadDeploy.deployLiquidityManager(
+        FyuzLiquidityManager lm = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER,
             V3_FACTORY,
             V3_POSITION_MANAGER,
@@ -65,25 +65,25 @@ contract DeployArrowpadSepolia is Script {
             10000, // 100% tokens to LP
             deployer
         );
-        console.log("ArrowpadLiquidityManager:", address(lm));
+        console.log("FyuzLiquidityManager:", address(lm));
 
-        Arrowpad arrowpad = ArrowpadDeploy.deployArrowpad(
+        Fyuz fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(lm),
             deployer, // _feeAddress
             deployer, // _distributorAddress
             deployer
         );
-        console.log("Arrowpad:", address(arrowpad));
+        console.log("Fyuz:", address(fyuz));
 
-        // Authorize Arrowpad to drive the liquidity manager at graduation.
-        lm.setAuthorizedCaller(address(arrowpad), true);
+        // Authorize Fyuz to drive the liquidity manager at graduation.
+        lm.setAuthorizedCaller(address(fyuz), true);
 
         // 1% buy / 1% sell (100 bps), full buy/sell size allowed.
-        arrowpad.setPlatformBuyFeeBps(100);
-        arrowpad.setPlatformSellFeeBps(100);
-        arrowpad.setMaxBuyPercent(10000);
-        arrowpad.setMaxSellPercent(10000);
+        fyuz.setPlatformBuyFeeBps(100);
+        fyuz.setPlatformSellFeeBps(100);
+        fyuz.setMaxBuyPercent(10000);
+        fyuz.setMaxSellPercent(10000);
 
         vm.stopBroadcast();
 
@@ -91,11 +91,11 @@ contract DeployArrowpadSepolia is Script {
         console.log("=================================================");
         console.log("SEPOLIA DEPLOYMENT COMPLETE (V2 + V3 + V4 enabled)");
         console.log("=================================================");
-        console.log("Arrowpad:         ", address(arrowpad));
-        console.log("  ProxyAdmin:     ", _proxyAdmin(address(arrowpad)));
+        console.log("Fyuz:         ", address(fyuz));
+        console.log("  ProxyAdmin:     ", _proxyAdmin(address(fyuz)));
         console.log("LiquidityManager: ", address(lm));
         console.log("  ProxyAdmin:     ", _proxyAdmin(address(lm)));
-        console.log("Target MCAP (USD):", arrowpad.TARGET_MARKET_CAP_USD() / 1e18);
+        console.log("Target MCAP (USD):", fyuz.TARGET_MARKET_CAP_USD() / 1e18);
         console.log("poolType 1=V2  2=V3  3=V4 (choose in createToken)");
         console.log("=================================================");
     }

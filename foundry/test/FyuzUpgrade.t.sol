@@ -2,9 +2,9 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {Fyuz, IFyuz} from "../src/Fyuz.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {
@@ -15,7 +15,7 @@ import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.s
 /// @dev A realistic V2: appends state AFTER the parent's reserved gap, exactly the
 ///      way a future upgrade would. If the gap were missing, `version` would land on
 ///      a slot the V1 layout already uses and the upgrade would silently corrupt it.
-contract ArrowpadV2 is Arrowpad {
+contract FyuzV2 is Fyuz {
     uint256 public version;
 
     function setVersion(uint256 v) external {
@@ -23,10 +23,10 @@ contract ArrowpadV2 is Arrowpad {
     }
 }
 
-contract ArrowpadUpgradeTest is Test {
-    Arrowpad public arrowpad;
-    ArrowpadLiquidityManager public liquidityManager;
-    ProxyAdmin public arrowpadAdmin;
+contract FyuzUpgradeTest is Test {
+    Fyuz public fyuz;
+    FyuzLiquidityManager public liquidityManager;
+    ProxyAdmin public fyuzAdmin;
 
     address constant PERMIT2_ADDR = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
@@ -59,7 +59,7 @@ contract ArrowpadUpgradeTest is Test {
         vm.deal(address(this), 10_000 ether);
         vm.deal(alice, 10_000 ether);
 
-        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
+        liquidityManager = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -73,16 +73,16 @@ contract ArrowpadUpgradeTest is Test {
             10000,
             address(this)
         );
-        arrowpad = ArrowpadDeploy.deployArrowpad(
+        fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR,
             address(this)
         );
-        liquidityManager.setAuthorizedCaller(address(arrowpad), true);
+        liquidityManager.setAuthorizedCaller(address(fyuz), true);
 
-        arrowpadAdmin = ProxyAdmin(_adminOf(address(arrowpad)));
+        fyuzAdmin = ProxyAdmin(_adminOf(address(fyuz)));
     }
 
     /// @dev TransparentUpgradeableProxy deploys its own ProxyAdmin and records it in
@@ -96,7 +96,7 @@ contract ArrowpadUpgradeTest is Test {
 
     function _create(string memory n, string memory s) internal returns (address) {
         return
-            arrowpad.createToken{value: 1 ether}(
+            fyuz.createToken{value: 1 ether}(
                 n,
                 s,
                 0.5 ether,
@@ -112,39 +112,39 @@ contract ArrowpadUpgradeTest is Test {
     function test_Upgrade01_ProxyRanInitializerDefaults() public view {
         // Every default below used to be a declaration-time value, which a proxy
         // would leave at zero if initialize() didn't assign it.
-        assertEq(arrowpad.burnAddress(), 0x000000000000000000000000000000000000dEaD);
-        assertEq(arrowpad.CREATE_TOKEN_FEE_AMOUNT(), 0.001 ether);
-        assertEq(arrowpad.priceStalenessThreshold(), 3600);
-        assertEq(arrowpad.PLATFORM_BUY_FEE_BPS(), 100);
-        assertEq(arrowpad.PLATFORM_SELL_FEE_BPS(), 100);
-        assertEq(arrowpad.platformLPFee(), 0.1 ether);
-        assertEq(arrowpad.MAX_BUY_PERCENT(), 10_000);
-        assertEq(arrowpad.MAX_SELL_PERCENT(), 10_000);
-        assertEq(arrowpad.owner(), address(this));
-        assertEq(address(arrowpad.liquidityManager()), address(liquidityManager));
-        assertEq(arrowpad.feeAddress(), FEE_WALLET);
+        assertEq(fyuz.burnAddress(), 0x000000000000000000000000000000000000dEaD);
+        assertEq(fyuz.CREATE_TOKEN_FEE_AMOUNT(), 0.001 ether);
+        assertEq(fyuz.priceStalenessThreshold(), 3600);
+        assertEq(fyuz.PLATFORM_BUY_FEE_BPS(), 100);
+        assertEq(fyuz.PLATFORM_SELL_FEE_BPS(), 100);
+        assertEq(fyuz.platformLPFee(), 0.1 ether);
+        assertEq(fyuz.MAX_BUY_PERCENT(), 10_000);
+        assertEq(fyuz.MAX_SELL_PERCENT(), 10_000);
+        assertEq(fyuz.owner(), address(this));
+        assertEq(address(fyuz.liquidityManager()), address(liquidityManager));
+        assertEq(fyuz.feeAddress(), FEE_WALLET);
     }
 
     function test_Upgrade02_LiquidityManagerInitializerDefaults() public view {
         assertEq(liquidityManager.owner(), address(this));
         assertEq(address(liquidityManager.routerV2()), V2_ROUTER);
         assertEq(liquidityManager.marginRecipient(), address(this));
-        assertTrue(liquidityManager.authorizedCallers(address(arrowpad)));
+        assertTrue(liquidityManager.authorizedCallers(address(fyuz)));
     }
 
     function test_Upgrade03_CannotInitializeProxyTwice() public {
         vm.expectRevert(); // InvalidInitialization
-        arrowpad.initialize(DATA_FEED, address(liquidityManager), FEE_WALLET, DIST_ADDR);
+        fyuz.initialize(DATA_FEED, address(liquidityManager), FEE_WALLET, DIST_ADDR);
     }
 
     /// @dev An uninitialized implementation is hijackable if it can still be
     ///      initialized; _disableInitializers() in the constructor is what stops it.
     function test_Upgrade04_ImplementationCannotBeInitialized() public {
-        Arrowpad impl = new Arrowpad();
+        Fyuz impl = new Fyuz();
         vm.expectRevert(); // InvalidInitialization
         impl.initialize(DATA_FEED, address(liquidityManager), FEE_WALLET, DIST_ADDR);
 
-        ArrowpadLiquidityManager lmImpl = new ArrowpadLiquidityManager();
+        FyuzLiquidityManager lmImpl = new FyuzLiquidityManager();
         vm.expectRevert();
         lmImpl.initialize(
             V2_ROUTER,
@@ -164,12 +164,12 @@ contract ArrowpadUpgradeTest is Test {
     // ==================== ACCESS CONTROL ====================
 
     function test_Upgrade05_OnlyProxyAdminOwnerCanUpgrade() public {
-        address newImpl = address(new ArrowpadV2());
+        address newImpl = address(new FyuzV2());
 
         vm.prank(alice);
         vm.expectRevert(); // OwnableUnauthorizedAccount
-        arrowpadAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(arrowpad)),
+        fyuzAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(address(fyuz)),
             newImpl,
             ""
         );
@@ -178,14 +178,14 @@ contract ArrowpadUpgradeTest is Test {
     /// @dev The contract owner is not automatically the upgrade admin — losing the
     ///      owner key must not hand over the implementation.
     function test_Upgrade06_ContractOwnerIsNotUpgradeAdmin() public {
-        arrowpad.transferOwnership(alice);
-        assertEq(arrowpad.owner(), alice);
+        fyuz.transferOwnership(alice);
+        assertEq(fyuz.owner(), alice);
 
-        address newImpl = address(new ArrowpadV2());
+        address newImpl = address(new FyuzV2());
         vm.prank(alice);
         vm.expectRevert();
-        arrowpadAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(arrowpad)),
+        fyuzAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(address(fyuz)),
             newImpl,
             ""
         );
@@ -195,30 +195,30 @@ contract ArrowpadUpgradeTest is Test {
 
     function test_Upgrade07_StateSurvivesUpgrade() public {
         address token = _create("PreUpgrade", "PRE");
-        arrowpad.setPlatformBuyFeeBps(250);
+        fyuz.setPlatformBuyFeeBps(250);
 
         uint256 balBefore = IERC20(token).balanceOf(address(this));
-        uint256 countBefore = arrowpad.tokenCount();
-        uint256 curveEthBefore = arrowpad.totalCurveEthReserve();
-        uint256 priceBefore = arrowpad.getVirtualPrice(token);
-        IArrowpad.PoolInfo memory poolBefore = IArrowpad(address(arrowpad))
+        uint256 countBefore = fyuz.tokenCount();
+        uint256 curveEthBefore = fyuz.totalCurveEthReserve();
+        uint256 priceBefore = fyuz.getVirtualPrice(token);
+        IFyuz.PoolInfo memory poolBefore = IFyuz(address(fyuz))
             .tokenPools(token);
 
-        arrowpadAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(arrowpad)),
-            address(new ArrowpadV2()),
+        fyuzAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(address(fyuz)),
+            address(new FyuzV2()),
             ""
         );
 
-        assertEq(arrowpad.tokenCount(), countBefore, "tokenCount");
-        assertEq(arrowpad.totalCurveEthReserve(), curveEthBefore, "curve ETH");
-        assertEq(arrowpad.PLATFORM_BUY_FEE_BPS(), 250, "owner-set fee survives");
-        assertEq(arrowpad.owner(), address(this), "owner");
-        assertEq(arrowpad.burnAddress(), 0x000000000000000000000000000000000000dEaD);
+        assertEq(fyuz.tokenCount(), countBefore, "tokenCount");
+        assertEq(fyuz.totalCurveEthReserve(), curveEthBefore, "curve ETH");
+        assertEq(fyuz.PLATFORM_BUY_FEE_BPS(), 250, "owner-set fee survives");
+        assertEq(fyuz.owner(), address(this), "owner");
+        assertEq(fyuz.burnAddress(), 0x000000000000000000000000000000000000dEaD);
         assertEq(IERC20(token).balanceOf(address(this)), balBefore, "user balance");
-        assertEq(arrowpad.getVirtualPrice(token), priceBefore, "price feed still wired");
+        assertEq(fyuz.getVirtualPrice(token), priceBefore, "price feed still wired");
 
-        IArrowpad.PoolInfo memory poolAfter = IArrowpad(address(arrowpad))
+        IFyuz.PoolInfo memory poolAfter = IFyuz(address(fyuz))
             .tokenPools(token);
         assertEq(poolAfter.ethReserve, poolBefore.ethReserve, "pool ethReserve");
         assertEq(poolAfter.tokenReserve, poolBefore.tokenReserve, "pool tokenReserve");
@@ -233,15 +233,15 @@ contract ArrowpadUpgradeTest is Test {
     function test_Upgrade08_TradingStillWorksAfterUpgrade() public {
         address token = _create("Tradeable", "TRD");
 
-        arrowpadAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(arrowpad)),
-            address(new ArrowpadV2()),
+        fyuzAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(address(fyuz)),
+            address(new FyuzV2()),
             ""
         );
 
         vm.startPrank(alice);
         uint256 before = IERC20(token).balanceOf(alice);
-        arrowpad.swapExactETHForTokens{value: 1 ether}(
+        fyuz.swapExactETHForTokens{value: 1 ether}(
             token,
             1 ether,
             0,
@@ -260,19 +260,19 @@ contract ArrowpadUpgradeTest is Test {
     ///      reinterpret live storage in already-deployed proxies.
     ///
     ///      So the invariant worth locking is positional: inheritor state starts at
-    ///      slot 73, with 50 reserved slots below it. Adding a variable to Arrowpad
+    ///      slot 73, with 50 reserved slots below it. Adding a variable to Fyuz
     ///      without decrementing __gap moves that and breaks this test — which is the
     ///      whole point.
     uint256 constant FIRST_CHILD_SLOT = 73;
     uint256 constant GAP_SLOTS = 50;
 
     function test_Upgrade09_GapReservesFiftySlotsBelowChildState() public {
-        arrowpadAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(arrowpad)),
-            address(new ArrowpadV2()),
+        fyuzAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(address(fyuz)),
+            address(new FyuzV2()),
             ""
         );
-        ArrowpadV2 v2 = ArrowpadV2(payable(address(arrowpad)));
+        FyuzV2 v2 = FyuzV2(payable(address(fyuz)));
 
         uint256 sentinel = 0xdecafbad;
         v2.setVersion(sentinel);
@@ -287,7 +287,7 @@ contract ArrowpadUpgradeTest is Test {
         assertEq(
             versionSlot,
             FIRST_CHILD_SLOT,
-            "inheritor state moved: decrement __gap when adding Arrowpad state, or every deployed proxy's layout shifts"
+            "inheritor state moved: decrement __gap when adding Fyuz state, or every deployed proxy's layout shifts"
         );
 
         for (uint256 i = versionSlot - GAP_SLOTS; i < versionSlot; i++) {
@@ -302,7 +302,7 @@ contract ArrowpadUpgradeTest is Test {
     /// @dev Parent-grows-into-the-gap is covered by the slot assertion above: an
     ///      upgrade that appends parent state and decrements __gap leaves `version` at
     ///      73 and still passes; one that forgets to decrement moves it and fails.
-    ///      Simulating it directly would need a duplicated Arrowpad with a shrunken
+    ///      Simulating it directly would need a duplicated Fyuz with a shrunken
     ///      gap, which would rot out of sync with the real one.
 
     // ==================== LIQUIDITY MANAGER UPGRADE ====================
@@ -312,12 +312,12 @@ contract ArrowpadUpgradeTest is Test {
 
         lmAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(address(liquidityManager)),
-            address(new ArrowpadLiquidityManager()),
+            address(new FyuzLiquidityManager()),
             ""
         );
 
         assertTrue(
-            liquidityManager.authorizedCallers(address(arrowpad)),
+            liquidityManager.authorizedCallers(address(fyuz)),
             "authorization survives"
         );
         assertEq(address(liquidityManager.routerV2()), V2_ROUTER, "router survives");

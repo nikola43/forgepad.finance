@@ -10,6 +10,6 @@ if (!projectId) {
 export const API_ENDPOINT = process.env.NEXT_PUBLIC_API_URL || `http://localhost:5001`
 export const FILE_ENDPOINT = process.env.NEXT_PUBLIC_FILE_URL || `${API_ENDPOINT}/uploads`
 
-export const FORGE_TWITTER_URL = "https://x.com/RobinArrowPad"
-export const FORGE_WEBSITE_URL = "https://arrowpad.io"
+export const FYUZ_TWITTER_URL = "https://x.com/fyuzfun"
+export const FYUZ_WEBSITE_URL = "https://fyuz.fun"
 

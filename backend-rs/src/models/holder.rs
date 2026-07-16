@@ -2,6 +2,7 @@ use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::models::token::CreatorInfo;
 use crate::schema::holders;
 
 /// Queryable struct -- field order matches `holders` table columns exactly.
@@ -38,4 +39,7 @@ pub struct HolderResponse {
     pub marketcap: String,
     pub network: String,
     pub creator_address: String,
+    /// The holder's own profile (username + avatar), so holder lists can show
+    /// identity instead of falling back to a truncated address.
+    pub user: CreatorInfo,
 }

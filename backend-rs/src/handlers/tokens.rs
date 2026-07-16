@@ -551,6 +551,11 @@ pub async fn get_token_details(
             marketcap: token.marketcap.to_string(),
             network: token.network.clone(),
             creator_address: creator.address.clone(),
+            user: CreatorInfo {
+                address: user.address.clone(),
+                username: user.username.clone(),
+                avatar: user.avatar.clone(),
+            },
         })
         .collect();
 
@@ -764,6 +769,95 @@ pub async fn move_token(
     Ok(Json(serde_json::json!({ "message": "Token category updated" })))
 }
 
+/// Store image bytes and return their public URL + key. Uses S3 when configured,
+/// else the local upload dir. Shared by the manual upload and AI generation paths.
+pub(crate) async fn store_image_bytes(
+    state: &AppState,
+    data: &[u8],
+    ext: &str,
+    content_type: &str,
+) -> AppResult<(String, String)> {
+    let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+    let public_url = if let Some(ref s3) = state.s3_client {
+        s3.put_object()
+            .bucket(&state.s3_bucket)
+            .key(&filename)
+            .body(data.to_vec().into())
+            .content_type(content_type.to_string())
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("S3 upload failed: {e}")))?;
+        format!("{}/{}", state.s3_public_url, filename)
+    } else {
+        let filepath = format!("{}/{}", state.upload_dir, filename);
+        tokio::fs::write(&filepath, data)
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to save file: {e}")))?;
+        format!("{}/{}", state.upload_base_url, filename)
+    };
+    Ok((public_url, filename))
+}
+
+// ---------------------------------------------------------------------------
+// POST /tokens/generate-image
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateImageBody {
+    pub character1: String,
+    pub character2: String,
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+/// POST /tokens/generate-image
+///
+/// Fyuz's create flow: instead of uploading a logo, the creator names two
+/// characters. The backend generates a single fused character image (OpenAI
+/// gpt-image-1), stores it on our own S3, and returns the URL — so the browser
+/// never sees the OpenAI key and the image is served from our bucket, not a
+/// short-lived provider URL.
+pub async fn generate_image(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<GenerateImageBody>,
+) -> AppResult<Json<serde_json::Value>> {
+    let api_key = headers
+        .get("api-key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if api_key != state.api_key {
+        return Err(AppError::Unauthorized("Invalid API key".to_string()));
+    }
+
+    let c1 = body.character1.trim();
+    let c2 = body.character2.trim();
+    if c1.is_empty() || c2.is_empty() {
+        return Err(AppError::BadRequest(
+            "Both character1 and character2 are required".to_string(),
+        ));
+    }
+    // Bound the inputs — these flow into a paid generation prompt.
+    if c1.chars().count() > 200 || c2.chars().count() > 200 {
+        return Err(AppError::BadRequest(
+            "Character descriptions must be 200 characters or fewer".to_string(),
+        ));
+    }
+
+    let img = crate::services::image_gen::generate_fusion(c1, c2, body.name.as_deref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Image generation failed: {e}")))?;
+
+    let (url, key) = store_image_bytes(&state, &img.bytes, img.ext, img.content_type).await?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "url": url,
+        "key": key,
+    })))
+}
+
 // ---------------------------------------------------------------------------
 // POST /tokens/upload
 // ---------------------------------------------------------------------------
@@ -815,25 +909,7 @@ pub async fn upload_logo(
             )
         })?;
 
-        let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
-
-        let public_url = if let Some(ref s3) = state.s3_client {
-            s3.put_object()
-                .bucket(&state.s3_bucket)
-                .key(&filename)
-                .body(data.clone().into())
-                .content_type(content_type)
-                .send()
-                .await
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("S3 upload failed: {e}")))?;
-            format!("{}/{}", state.s3_public_url, filename)
-        } else {
-            let filepath = format!("{}/{}", state.upload_dir, filename);
-            tokio::fs::write(&filepath, &data)
-                .await
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to save file: {e}")))?;
-            format!("{}/{}", state.upload_base_url, filename)
-        };
+        let (public_url, filename) = store_image_bytes(&state, &data, ext, content_type).await?;
 
         return Ok(Json(serde_json::json!({
             "success": true,

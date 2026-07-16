@@ -9,7 +9,14 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # initdb runs these ONCE, on an empty data dir, in filename order. A pgdata
+      # volume created by an older schema is NEVER re-initialised, so it silently
+      # drifts from the repo (missing tables/columns surface as 500s like
+      # 'relation "watchlist" does not exist'). Wipe the volume to re-seed:
+      #   docker compose down -v   (or scripts/localnet.sh --reset-db)
+      # Every migration must be listed here, or the DB only ever gets the base schema.
       - ./backend-rs/migrations/00000000000000_create_schema/up.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend-rs/migrations/2026-07-14-000000_add_direct_pool_type/up.sql:/docker-entrypoint-initdb.d/02-add-direct-pool-type.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
@@ -33,32 +40,51 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/forgepad
       REDIS_URL: redis://redis:6379
-      # Browser-facing RPC (Alchemy): returned via /config, used by the frontend.
-      ROBINHOOD_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
-      ROBINHOOD_PUBLIC_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
-      # Server-side RPC (public node): indexing getLogs + eth_call. Supports large
-      # ranges the browser-facing provider does not; kept separate on purpose.
-      ETH_RPC_URL: ${ROBINHOOD_ETH_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
-      # WS newHeads subscription (Alchemy).
-      ROBINHOOD_WS_URL: ${ROBINHOOD_WS_URL:-wss://rpc.mainnet.chain.robinhood.com}
-      CHAIN_ID: "4663"
+      # Browser-facing RPC: returned via /config and used by the BROWSER, so it must
+      # be reachable from the user's machine — not from inside this container. On a
+      # localnet that means 127.0.0.1, while the server vars below point at
+      # host.docker.internal. Keep them independently overridable for that reason.
+      BSC_RPC_URL: ${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}
+      BSC_PUBLIC_RPC_URL: ${BSC_PUBLIC_RPC_URL:-${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}}
+      # Server-side RPC: indexing getLogs + eth_call, resolved from inside the
+      # container. Supports large ranges the browser-facing provider does not.
+      ETH_RPC_URL: ${BSC_SERVER_RPC_URL:-https://bsc-dataseed.bnbchain.org}
+      # WS newHeads subscription (browser-facing, same reachability caveat).
+      BSC_WS_URL: ${BSC_WS_URL:-wss://bsc-ws-node.nariox.org}
+      BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://bscscan.com}
+      # BNB Smart Chain. chains.rs reads CHAIN_ID first, so this drives what /config
+      # advertises — it must match the chain the RPC actually serves, or every wallet
+      # tx targets the wrong network. 56 for real BSC; a localnet fork overrides this
+      # with its own id (see scripts/localnet.sh).
+      CHAIN_ID: ${CHAIN_ID:-56}
+      # The deployed Fyuz proxy on BSC.
+      FYUZ_CONTRACT_ADDRESS: ${FYUZ_CONTRACT_ADDRESS:-0xdd4C1D9837AdFf44C2e29d7e3EF93e8A51D55F86}
+      # Block to start indexing from on a FRESH database. BSC is ~110M blocks deep
+      # and nothing before the Fyuz deployment can contain our events, so leaving
+      # this at 0 makes the indexer backfill the whole chain and never reach head.
+      # Set it to the deployment block (or the anvil fork block on a localnet).
+      INDEXER_START_BLOCK: ${INDEXER_START_BLOCK:-0}
       PORT: "5001"
-      CORS_ORIGINS: "https://arrowpad.io,https://www.arrowpad.io,http://localhost:3000,http://localhost:8080"
+      CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,http://localhost:3000,http://localhost:8080"
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
-      UPLOAD_BASE_URL: https://api.arrowpad.io/uploads
+      UPLOAD_BASE_URL: https://api.fyuz.fun/uploads
       S3_ENDPOINT: http://minio:9000
       S3_BUCKET: forgepad
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_REGION: us-east-1
-      S3_PUBLIC_URL: https://s3.arrowpad.io/forgepad
+      # Where the BROWSER fetches uploaded images from, so it must be resolvable
+      # from the user's machine — S3_ENDPOINT above is container-internal only.
+      # On a localnet this points at the local MinIO (http://localhost:9000/<bucket>);
+      # in production, at the real CDN/S3 domain, which must actually exist in DNS.
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-https://s3.fyuz.fun/forgepad}
       RUST_LOG: info,forgepad_backend=debug
       # LiveKit (native streaming). Keys must match the livekit service's
       # LIVEKIT_KEYS. LIVEKIT_URL is the public wss the browser connects to.
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-devsecret_change_me_min_32_chars_long}
-      LIVEKIT_URL: ${LIVEKIT_URL:-wss://livekit.arrowpad.io}
+      LIVEKIT_URL: ${LIVEKIT_URL:-wss://livekit.fyuz.fun}
     ports:
       - "5002:5001"
     volumes:
@@ -71,7 +97,7 @@ services:
 
   # Native WebRTC streaming SFU (Tier C). Signaling on 7880; media on 7881/tcp +
   # 50000-50100/udp. Behind the cloudflared tunnel, expose 7880 as wss on a
-  # subdomain (e.g. livekit.arrowpad.io) and enable TURN in livekit/livekit.yaml.
+  # subdomain (e.g. livekit.fyuz.fun) and enable TURN in livekit/livekit.yaml.
   livekit:
     image: livekit/livekit-server:latest
     command: --config /etc/livekit/livekit.yaml
@@ -124,8 +150,9 @@ services:
       args:
         NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
         NEXT_PUBLIC_LOCAL_MODE: "false"
-        NEXT_PUBLIC_API_URL: https://api.arrowpad.io
-        NEXT_PUBLIC_ROBINHOOD_RPC_URL: ${ROBINHOOD_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}
+        NEXT_PUBLIC_API_URL: https://api.fyuz.fun
+        NEXT_PUBLIC_BSC_RPC_URL: ${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}
+        NEXT_PUBLIC_BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://bscscan.com}
     ports:
       - "3001:80"
     depends_on:

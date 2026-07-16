@@ -34,10 +34,15 @@ export function UserAvatar({ user, address, size = 24, mr = "0.5rem", me = false
 }
 
 export function UserName({ user, address, fontSize = 14, fontFamily, color = "#D9D9D9", prefix = "", postfix = "", me = false }: any) {
-    let username = !!user?.username?.trim() ? user.username : `@${(user?.address ?? address)?.slice(-6) ?? 'unknown'}`
-    if (user?.twitter_username) {
-        username = `@${user.twitter_username}`
-    }
+    // Precedence: the name the user chose > their X handle > address tail.
+    // The X handle must never override a set username — users who set both
+    // expect their chosen name to show, with the handle as a profile link only.
+    const twitterHandle = user?.twitterUsername ?? user?.twitter_username
+    let username = !!user?.username?.trim()
+        ? user.username
+        : twitterHandle
+            ? `@${twitterHandle}`
+            : `@${(user?.address ?? address)?.slice(-6) ?? 'unknown'}`
     return (
         <Box display="flex" alignItems="center" gap="4px">
             <NextLink href={profileHref(user, address, me)} style={{ textDecoration: 'none' }}>

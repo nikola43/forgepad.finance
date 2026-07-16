@@ -15,7 +15,7 @@ const pulse = keyframes`
 
 // Base skeleton with shimmer
 const SkeletonBase = styled(Box)`
-  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background: linear-gradient(90deg, rgba(234,230,218,0.03) 25%, rgba(234,230,218,0.08) 50%, rgba(234,230,218,0.03) 75%);
   background-size: 800px 100%;
   animation: ${shimmer} 1.5s infinite linear;
   border-radius: 8px;
@@ -27,8 +27,8 @@ export function TokenCardSkeleton({ mode = "list" }: { mode?: "trends" | "list" 
     return (
       <Box sx={{
         borderRadius: '16px',
-        border: '1px solid rgba(255,255,255,0.05)',
-        background: 'rgba(13,13,20,0.6)',
+        border: '1px solid rgba(234,230,218,0.05)',
+        background: 'var(--surface-dark)',
         p: '16px',
         display: 'flex',
         flexDirection: 'column',
@@ -53,8 +53,8 @@ export function TokenCardSkeleton({ mode = "list" }: { mode?: "trends" | "list" 
   return (
     <Box sx={{
       borderRadius: '16px',
-      border: '1px solid rgba(255,255,255,0.05)',
-      background: 'rgba(13,13,20,0.6)',
+      border: '1px solid rgba(234,230,218,0.05)',
+      background: 'var(--surface-dark)',
       p: '8px 16px 8px 8px',
       display: 'flex',
       gap: '8px',
@@ -91,8 +91,8 @@ export function KingCardSkeleton() {
   return (
     <Box sx={{
       borderRadius: '20px',
-      background: 'linear-gradient(135deg, rgba(209,255,26,0.04) 0%, rgba(139,92,246,0.03) 50%, rgba(209,255,26,0.02) 100%)',
-      border: '1px solid rgba(209,255,26,0.1)',
+      background: 'rgba(191,209,67,0.03)',
+      border: '1px solid rgba(191,209,67,0.1)',
       p: '24px',
       display: 'flex',
       alignItems: 'center',
@@ -109,7 +109,7 @@ export function KingCardSkeleton() {
             <SkeletonBase sx={{ width: '70px', height: '10px', mb: 0.5 }} />
             <SkeletonBase sx={{ width: '90px', height: '20px' }} />
           </Box>
-          <Box sx={{ width: '1px', height: 32, background: 'rgba(255,255,255,0.08)' }} />
+          <Box sx={{ width: '1px', height: 32, background: 'var(--border)' }} />
           <Box>
             <SkeletonBase sx={{ width: '50px', height: '10px', mb: 0.5 }} />
             <SkeletonBase sx={{ width: '70px', height: '14px' }} />
@@ -148,8 +148,8 @@ export function ListSkeleton({ count = 3 }: { count?: number }) {
         <Box key={i} display="flex" gap={2} alignItems="center" sx={{
           p: 2,
           borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.05)',
-          background: 'rgba(13,13,20,0.4)',
+          border: '1px solid rgba(234,230,218,0.05)',
+          background: 'var(--surface-dark)',
         }}>
           <SkeletonBase sx={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }} />
           <Box flex={1}>

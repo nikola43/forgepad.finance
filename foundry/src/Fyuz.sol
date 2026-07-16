@@ -20,7 +20,7 @@ import {
     SafeERC20,
     IERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IArrowpadLiquidityManager} from "./IArrowpadLiquidityManager.sol";
+import {IFyuzLiquidityManager} from "./IFyuzLiquidityManager.sol";
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -42,7 +42,7 @@ interface ILaunchable {
     function launch() external;
 }
 
-interface IArrowpad {
+interface IFyuz {
     struct PoolInfo {
         uint256 ethReserve;
         uint256 tokenReserve;
@@ -57,7 +57,7 @@ interface IArrowpad {
     function tokenPools(address) external view returns (PoolInfo memory);
 }
 
-contract Arrowpad is
+contract Fyuz is
     Initializable,
     ReentrancyGuard,
     OwnableUpgradeable,
@@ -67,10 +67,28 @@ contract Arrowpad is
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    uint256 public constant TARGET_MARKET_CAP_USD = 20_000 * 1e18; // Graduation at ~$20K virtual MCAP
-    // Opening mcap is ETH-price dependent: ~$4.5K at ETH $1.9K. Graduation is fixed in
-    // USD by TARGET_MARKET_CAP_USD above ($20K) — not the ~$70K an older comment claimed.revi
-    uint256 public constant VIRTUAL_ETH_INITIAL = 2.5 ether;
+    uint256 public constant TARGET_MARKET_CAP_USD = 30_000 * 1e18; // Graduation at $30K virtual MCAP
+
+    // CALIBRATED FOR BNB SMART CHAIN. The gas token is BNB (~$575), not ETH, and
+    // these virtual reserves are denominated in the gas token — so they cannot be
+    // carried over from an ETH chain unchanged.
+    //
+    // Opening mcap = ethPrice * TOTAL_SUPPLY * VIRTUAL_ETH_INITIAL / VIRTUAL_TOKEN_INITIAL,
+    // i.e. it scales with the gas token's USD price. The original ETH calibration
+    // (2.5 ether) opened at ~$4.4K with ETH at $1.9K. On BNB the same 2.5 opens at
+    // only ~$1.3K, and because the curve can multiply the opening mcap by at most
+    // ~14.7x (VIRTUAL_TOKEN_INITIAL / (VIRTUAL_TOKEN_INITIAL - REAL_TOKEN_INITIAL))^2,
+    // its ceiling lands near $19.7K — BELOW the graduation target. Every token
+    // would have been unable to graduate, permanently.
+    //
+    // 8.25 BNB reproduces the ETH design's ~$4.4K opening mcap at BNB ~$575, which
+    // puts the $30K target at ~83% of the curve and keeps graduation reachable
+    // until BNB falls under ~$266.
+    //
+    // NOTE: this is a USD target priced off a volatile gas token. If BNB drops far
+    // enough, the ceiling falls back under the target and graduation bricks again.
+    // Re-check this calibration before any large BNB drawdown.
+    uint256 public constant VIRTUAL_ETH_INITIAL = 8.25 ether;
     uint256 public constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18; // Virtual tokens for pricing curve
     uint256 public constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18; // Real tokens available on curve (sellable)
 
@@ -86,7 +104,7 @@ contract Arrowpad is
     }
 
     // ==================== STATE VARIABLES ====================
-    IArrowpadLiquidityManager public liquidityManager;
+    IFyuzLiquidityManager public liquidityManager;
     // Chainlink ETH/USD feed — read automatically (view call) on every trade/mcap
     // query. No owner, backend, or transaction is ever needed to read it.
     // Set once in initialize() and never written again: no setter exists, so it is
@@ -255,7 +273,7 @@ contract Arrowpad is
 
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
         priceFeedDecimals = priceFeed.decimals();
-        liquidityManager = IArrowpadLiquidityManager(_liquidityManagerAddress);
+        liquidityManager = IFyuzLiquidityManager(_liquidityManagerAddress);
         feeAddress = _feeAddress;
         distributorAddress = _distributorAddress;
 
@@ -337,7 +355,10 @@ contract Arrowpad is
         uint256 deadline
     ) external payable whenNotPaused nonReentrant returns (address) {
         require(deadline >= block.timestamp, "Swap expired");
-        require(poolType >= 1 && poolType <= 3, "Invalid pool type");
+        // V4 (poolType 3) is deliberately gated off: the V4 seeding/graduation
+        // internals remain in FyuzLiquidityManager but are unreachable. Only
+        // 1 = Uniswap/Pancake V2 and 2 = Uniswap/Pancake V3 may be selected.
+        require(poolType == 1 || poolType == 2, "Only V2 or V3 pool type");
 
         address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
 
@@ -394,84 +415,12 @@ contract Arrowpad is
         return newToken;
     }
 
-    // ==================== DIRECT LAUNCH (Klik-style, no bonding curve) ====================
-    /// @notice Create a token and list directly on V4 with LP — no bonding curve.
-    ///         Total supply is fixed at 1B. msg.value = fee + LP ETH.
-    ///         The ENTIRE supply is seeded as single-sided liquidity with NO ETH:
-    ///         the position sits above the opening price, so buyers walk the price up
-    ///         through the supply and pay ETH into the pool as they go. The creator
-    ///         keeps no allocation, so there is nothing for them to dump.
-    ///         msg.value covers the creation fee only. Opening price is set so the
-    ///         whole supply is worth TARGET_MARKET_CAP_USD at the current ETH price.
-    function createTokenDirect(
-        string memory name,
-        string memory symbol,
-        uint32 sig,
-        uint256 deadline
-    ) external payable whenNotPaused nonReentrant returns (address) {
-        require(deadline >= block.timestamp, "Swap expired");
-        // Fee only — a direct launch needs no LP ETH at all.
-        require(msg.value >= CREATE_TOKEN_FEE_AMOUNT, "Insufficient fee");
-
-        address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
-
-        // Launch the token immediately — enables free transfers, renounces ownership
-        ILaunchable(newToken).launch();
-
-        // Mark as launched in pool — no bonding curve, no graduation
-        tokenPools[newToken] = PoolInfo({
-            ethReserve: 0,
-            tokenReserve: 0,
-            virtualEthReserve: 0,
-            virtualTokenReserve: 0,
-            token: newToken,
-            owner: msg.sender,
-            poolType: 3, // V4 (klik-style)
-            launched: true
-        });
-
-        tokenCount++;
-
-        emit TokenCreated(newToken, 0, _rawEthPrice(), sig, block.timestamp);
-        emit TokenLaunched(newToken, block.timestamp);
-
-        // Pay fee
-        if (CREATE_TOKEN_FEE_AMOUNT > 0) {
-            _transferETH(feeAddress, CREATE_TOKEN_FEE_AMOUNT);
-        }
-
-        // Refund anything above the fee: there is no LP ETH to spend it on.
-        if (msg.value > CREATE_TOKEN_FEE_AMOUNT) {
-            _transferETH(msg.sender, msg.value - CREATE_TOKEN_FEE_AMOUNT);
-        }
-
-        // Notional value of the whole supply at launch. Never transferred — it only
-        // fixes the opening price, so the pool opens at TARGET_MARKET_CAP_USD.
-        // Unlike createToken this genuinely needs the oracle, so go through the
-        // checked getter: a stale feed must revert with a reason, not panic on a
-        // divide-by-zero.
-        uint256 launchEthValue = (TARGET_MARKET_CAP_USD * 1e18) /
-            getETHPriceByUSD();
-
-        IERC20(newToken).approve(address(liquidityManager), TOTAL_SUPPLY);
-        liquidityManager.addLiquidityV4SingleSided(
-            newToken,
-            TOTAL_SUPPLY,
-            launchEthValue,
-            burnAddress // dust only — the LP position is locked in the manager
-        );
-
-        emit LiquidityAdded(newToken, 0, TOTAL_SUPPLY, TOTAL_SUPPLY);
-
-        // Belt and braces: the whole balance went in as liquidity, so nothing should
-        // remain. Burn any rounding remainder rather than stranding or gifting it.
-        uint256 remainingTokens = IERC20(newToken).balanceOf(address(this));
-        if (remainingTokens > 0) {
-            IERC20(newToken).safeTransfer(burnAddress, remainingTokens);
-        }
-
-        return newToken;
-    }
+    // ==================== DIRECT LAUNCH (removed) ====================
+    // createTokenDirect (Klik-style, bonding-curve-less launch straight onto V4)
+    // was removed from the external ABI along with the V4 gate in createToken.
+    // Every launch now goes through the bonding curve and graduates to V2 or V3.
+    // The V4 seeding path it used (FyuzLiquidityManager.addLiquidityV4SingleSided)
+    // is intentionally left in place but is now unreachable from Fyuz.
 
     // ==================== FEE CLAIMING ====================
     /// @notice Claim the token's accrued V3/V4 trading fees: 50% to the token's
@@ -1233,7 +1182,7 @@ contract Arrowpad is
             block.timestamp >= liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
             "Timelock not expired"
         );
-        liquidityManager = IArrowpadLiquidityManager(pendingLiquidityManager);
+        liquidityManager = IFyuzLiquidityManager(pendingLiquidityManager);
         emit LiquidityManagerChanged(pendingLiquidityManager);
         pendingLiquidityManager = address(0);
         liquidityManagerChangeTime = 0;
@@ -1255,7 +1204,9 @@ contract Arrowpad is
     ) external onlyOwner {
         require(tokenPools[token].token != address(0), "Pool does not exist");
         require(!tokenPools[token].launched, "Already launched");
-        require(newPoolType >= 1 && newPoolType <= 3, "Invalid pool type");
+        // Must match createToken's gate, or V4 would be reachable through this
+        // owner-only back door despite being disabled at creation time.
+        require(newPoolType == 1 || newPoolType == 2, "Only V2 or V3 pool type");
         tokenPools[token].poolType = newPoolType;
     }
 

@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    tracing::info!("Starting Arrowpad backend...");
+    tracing::info!("Starting Fyuz backend...");
 
     // Database pool (supports both DATABASE_URL and SUPABASE_URL)
     let database_url = std::env::var("DATABASE_URL")
@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     // CORS configuration. When CORS_ORIGINS is unset we fall back to the known
     // production + localhost origins so a missing env var on a deployed host
     // can't silently break the browser (No 'Access-Control-Allow-Origin').
-    const DEFAULT_CORS_ORIGINS: &str = "https://arrowpad.io,https://www.arrowpad.io,http://localhost:3000,http://localhost:8080";
+    const DEFAULT_CORS_ORIGINS: &str = "https://fyuz.fun,https://www.fyuz.fun,http://localhost:3000,http://localhost:8080";
     let cors_origins =
         std::env::var("CORS_ORIGINS").unwrap_or_else(|_| DEFAULT_CORS_ORIGINS.to_string());
     let origins: Vec<_> = cors_origins

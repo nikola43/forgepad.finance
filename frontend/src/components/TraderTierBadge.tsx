@@ -28,18 +28,18 @@ export default function TraderTierBadge({ address }: { address?: string }) {
                     </Typography>
                 </Box>
                 <Box textAlign="right">
-                    <Typography fontSize={16} fontWeight={800} color="#fff">${priceFormatter(tier.volumeUsd, 2)}</Typography>
-                    <Typography fontSize={10} color="#94A3B8" textTransform="uppercase" letterSpacing="0.05em">Lifetime volume</Typography>
+                    <Typography fontSize={16} fontWeight={800} color="var(--text-primary)" fontFamily="var(--font-data)">${priceFormatter(tier.volumeUsd, 2)}</Typography>
+                    <Typography fontSize={10} color="var(--muted)" textTransform="uppercase" letterSpacing="0.05em">Lifetime volume</Typography>
                 </Box>
             </Box>
 
             <LinearProgress
                 variant="determinate"
                 value={Math.min(100, Math.max(0, tier.progressPct))}
-                sx={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', '& .MuiLinearProgress-bar': { background: colors.bar } }}
+                sx={{ height: 6, borderRadius: 3, background: 'rgba(234,230,218,0.06)', '& .MuiLinearProgress-bar': { background: colors.bar } }}
             />
 
-            <Typography fontSize={11} color="#64748B">
+            <Typography fontSize={11} color="var(--text-muted)" fontFamily="var(--font-data)">
                 {tier.nextTier && tier.nextThresholdUsd != null
                     ? `${priceFormatter(tier.progressPct, 0)}% to ${tier.nextTier} · $${priceFormatter(tier.nextThresholdUsd, 0)}`
                     : 'Top tier reached — Diamond'}

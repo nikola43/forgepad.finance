@@ -21,8 +21,8 @@ pub struct ChainConfig {
 }
 
 fn load_abi() -> serde_json::Value {
-    let abi_str = include_str!("ArrowpadV1.json");
-    serde_json::from_str(abi_str).expect("Failed to parse ArrowpadV1.json ABI")
+    let abi_str = include_str!("FyuzV1.json");
+    serde_json::from_str(abi_str).expect("Failed to parse FyuzV1.json ABI")
 }
 
 pub fn default_chains() -> Vec<ChainConfig> {
@@ -30,37 +30,53 @@ pub fn default_chains() -> Vec<ChainConfig> {
 
     vec![
         ChainConfig {
-            name: "Robinhood".to_string(),
-            network: "robinhood".to_string(),
+            name: "BNB Smart Chain".to_string(),
+            network: "bsc".to_string(),
             chain_id: std::env::var("CHAIN_ID")
-                .or_else(|_| std::env::var("ROBINHOOD_CHAIN_ID"))
+                .or_else(|_| std::env::var("BSC_CHAIN_ID"))
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(4663),
-            currency: "ETH".to_string(),
-            rpc_url: std::env::var("ROBINHOOD_PUBLIC_RPC_URL")
-                .or_else(|_| std::env::var("ROBINHOOD_RPC_URL"))
+                .unwrap_or(56),
+            currency: "BNB".to_string(),
+            rpc_url: std::env::var("BSC_PUBLIC_RPC_URL")
+                .or_else(|_| std::env::var("BSC_RPC_URL"))
                 .or_else(|_| std::env::var("ETH_PUBLIC_RPC_URL"))
                 .or_else(|_| std::env::var("ETH_RPC_URL"))
-                .unwrap_or_else(|_| "https://rpc.mainnet.chain.robinhood.com".to_string()),
+                .unwrap_or_else(|_| "https://bsc-dataseed.bnbchain.org".to_string()),
             ws_url: Some(
-                std::env::var("ROBINHOOD_WS_URL")
+                std::env::var("BSC_WS_URL")
                     .or_else(|_| std::env::var("ETH_WS_URL"))
-                    .unwrap_or_else(|_| "wss://rpc.mainnet.chain.robinhood.com".to_string()),
+                    .unwrap_or_else(|_| "wss://bsc-ws-node.nariox.org".to_string()),
             ),
-            explorer_url: std::env::var("ROBINHOOD_EXPLORER_URL")
-                .unwrap_or_else(|_| "https://robinhoodchain.blockscout.com".to_string()),
-            contract_address: "0x70ce22A606B3A5770e087cB461dB38076eBA9d2F".to_string(),
+            explorer_url: std::env::var("BSC_EXPLORER_URL")
+                .unwrap_or_else(|_| "https://bscscan.com".to_string()),
+            // Set FYUZ_CONTRACT_ADDRESS to the deployed Fyuz proxy. The default
+            // below is the address the deploy script produces on a fresh anvil
+            // BSC fork — it is NOT a mainnet deployment.
+            contract_address: std::env::var("FYUZ_CONTRACT_ADDRESS")
+                .unwrap_or_else(|_| {
+                    "0xdd4C1D9837AdFf44C2e29d7e3EF93e8A51D55F86".to_string()
+                }),
             abi,
-            virtual_eth_amount: 2.5,
-            virtual_token_amount: 1_073_000_000.0,
-            total_supply: 1_000_000_000.0,
-            target_market_cap: 20_000.0,
+            // These MIRROR the on-chain constants in foundry/src/Fyuz.sol and must
+            // be kept in step with them — the frontend prices the curve off these.
+            //
+            // virtual_eth_amount is denominated in the chain's NATIVE token, which
+            // on BSC is BNB (~$575), not ETH. The ETH-era 2.5 opened at only ~$1.3K
+            // on BNB and capped the curve under the graduation target, so no token
+            // could ever graduate. 8.25 BNB restores the ETH design's ~$4.4K opening.
+            virtual_eth_amount: 8.25, // == VIRTUAL_ETH_INITIAL
+            virtual_token_amount: 1_073_000_000.0, // == VIRTUAL_TOKEN_INITIAL
+            total_supply: 1_000_000_000.0, // == TOTAL_SUPPLY
+            target_market_cap: 30_000.0, // == TARGET_MARKET_CAP_USD
+            // Index is load-bearing: the frontend resolves a token's pool via
+            // `chain.pools[token.poolType - 1]`, and the on-chain enum is
+            // 1 = V2, 2 = V3, 3 = V4. So V2 MUST stay at index 0 and V3 at index 1.
+            // V4 ("pancakeswap:v4") and direct launch ("direct:v4") are gated off by
+            // omission here — the contract code stays dormant, not removed.
             pools: vec![
-                "uniswap:v2".to_string(),
-                "uniswap:v3".to_string(),
-                "uniswap:v4".to_string(),
-                "direct:v4".to_string(),
+                "pancakeswap:v2".to_string(),
+                "pancakeswap:v3".to_string(),
             ],
         },
     ]

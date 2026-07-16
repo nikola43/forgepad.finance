@@ -205,7 +205,7 @@ mod anti_replay_tests {
         // stale timestamp
         assert!(recover_fresh("Update profile\n1730000000000", "0x00", None, now).is_err());
         // wrong action prefix (fails before recovery)
-        let fresh = format!("Register on Arrowpad\n{}", now);
+        let fresh = format!("Register on Fyuz\n{}", now);
         assert!(recover_fresh(&fresh, "0x00", Some("Update profile"), now).is_err());
     }
 }

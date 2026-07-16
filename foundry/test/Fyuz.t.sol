@@ -4,8 +4,8 @@ pragma solidity ^0.8.26;
 import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {Arrowpad, IArrowpad} from "../src/Arrowpad.sol";
-import {ArrowpadLiquidityManager} from "../src/ArrowpadLiquidityManager.sol";
+import {Fyuz, IFyuz} from "../src/Fyuz.sol";
+import {FyuzLiquidityManager} from "../src/FyuzLiquidityManager.sol";
 import {Token} from "../src/Token.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
@@ -39,15 +39,15 @@ import {PoolId, PoolIdLibrary} from "../src/v4-core/types/PoolId.sol";
 import {Currency} from "../src/v4-core/types/Currency.sol";
 import {IHooks} from "../src/v4-core/interfaces/IHooks.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ArrowpadDeploy} from "../src/ArrowpadDeploy.sol";
+import {FyuzDeploy} from "../src/FyuzDeploy.sol";
 
-contract ArrowpadTest is Test {
+contract FyuzTest is Test {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
-    Arrowpad public arrowpad;
-    ArrowpadLiquidityManager public liquidityManager;
-    IArrowpad public iArrowpad;
+    Fyuz public fyuz;
+    FyuzLiquidityManager public liquidityManager;
+    IFyuz public iFyuz;
 
     address public addr1;
     address public addr2;
@@ -69,15 +69,19 @@ contract ArrowpadTest is Test {
     address constant FEE_WALLET = 0x33f4Cf3C025Ba87F02fB4f00E2E1EA7c8646A103;
     address constant DIST_ADDR = 0xF2917a81fF74406fbCf01c507057e101Db8f2F12;
 
-    // Uniswap V3 factory + fee tier used by ArrowpadLiquidityManager (POOL_FEE = 100)
+    // Uniswap V3 factory + fee tier used by FyuzLiquidityManager (POOL_FEE = 100)
     address V3_FACTORY;
     uint24 constant V3_FEE = 100;
 
-    // Bonding curve constants (mirrored for test assertions)
-    uint256 constant TOTAL_SUPPLY = 1_000_000_000 * 1e18;
-    uint256 constant VIRTUAL_ETH_INITIAL = 2.5 ether;
-    uint256 constant VIRTUAL_TOKEN_INITIAL = 1_073_000_000 * 1e18;
-    uint256 constant REAL_TOKEN_INITIAL = 793_100_000 * 1e18;
+    // Bonding curve constants — read from the contract in setUp rather than
+    // mirrored as literals. A hardcoded copy of VIRTUAL_ETH_INITIAL (2.5 ether,
+    // an ETH-era value) silently rotted when the curve was recalibrated for BNB
+    // to 8.25, so this test failed on the constant itself rather than on any real
+    // behaviour. Reading them keeps every assertion honest across recalibration.
+    uint256 TOTAL_SUPPLY;
+    uint256 VIRTUAL_ETH_INITIAL;
+    uint256 VIRTUAL_TOKEN_INITIAL;
+    uint256 REAL_TOKEN_INITIAL;
     uint256 constant PRIVATE_DIVISOR = 10_000;
     uint256 TARGET_MCAP_USD; // read from the contract in setUp so tests track the live target
 
@@ -106,7 +110,7 @@ contract ArrowpadTest is Test {
         vm.deal(addr2, 100_000 ether);
         vm.deal(addr3, 100_000 ether);
 
-        liquidityManager = ArrowpadDeploy.deployLiquidityManager(
+        liquidityManager = FyuzDeploy.deployLiquidityManager(
             UNISWAP_V2_ROUTER,
             V3_FACTORY,
             V3_POS_MGR,
@@ -121,28 +125,32 @@ contract ArrowpadTest is Test {
             address(this)
         );
 
-        arrowpad = ArrowpadDeploy.deployArrowpad(
+        fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(liquidityManager),
             FEE_WALLET,
             DIST_ADDR,
             address(this)
         );
-        iArrowpad = IArrowpad(address(arrowpad));
-        TARGET_MCAP_USD = arrowpad.TARGET_MARKET_CAP_USD();
+        iFyuz = IFyuz(address(fyuz));
+        TARGET_MCAP_USD = fyuz.TARGET_MARKET_CAP_USD();
+        TOTAL_SUPPLY = fyuz.TOTAL_SUPPLY();
+        VIRTUAL_ETH_INITIAL = fyuz.VIRTUAL_ETH_INITIAL();
+        VIRTUAL_TOKEN_INITIAL = fyuz.VIRTUAL_TOKEN_INITIAL();
+        REAL_TOKEN_INITIAL = fyuz.REAL_TOKEN_INITIAL();
 
-        liquidityManager.setAuthorizedCaller(address(arrowpad), true);
+        liquidityManager.setAuthorizedCaller(address(fyuz), true);
 
         // Set fees to 3% buy / 3% sell, uncapped buy/sell percent
-        arrowpad.setPlatformBuyFeeBps(300);
-        arrowpad.setPlatformSellFeeBps(300);
-        arrowpad.setMaxBuyPercent(10000);
-        arrowpad.setMaxSellPercent(10000);
+        fyuz.setPlatformBuyFeeBps(300);
+        fyuz.setPlatformSellFeeBps(300);
+        fyuz.setMaxBuyPercent(10000);
+        fyuz.setMaxSellPercent(10000);
 
         // On L2 chains (Arbitrum, Robinhood Chain) the Chainlink feed timestamp
         // originates from L1 and can lag behind the L2 block time. Use 24h window.
         if (block.chainid == 4663) {
-            arrowpad.setPriceStalenessThreshold(86400);
+            fyuz.setPriceStalenessThreshold(86400);
         }
     }
 
@@ -150,14 +158,14 @@ contract ArrowpadTest is Test {
     //  HELPERS
     // ================================================================
 
-    /// @dev Create a token via Arrowpad, extract address from TokenCreated event
+    /// @dev Create a token via Fyuz, extract address from TokenCreated event
     function _create(
         string memory name,
         string memory sym,
         uint8 pt
     ) internal returns (address) {
         vm.recordLogs();
-        arrowpad.createToken{value: 0.001 ether}(name, sym, 0, 0, 0, pt, block.timestamp);
+        fyuz.createToken{value: 0.001 ether}(name, sym, 0, 0, 0, pt, block.timestamp);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 tcSig = keccak256(
             "TokenCreated(address,uint256,uint256,uint32,uint256)"
@@ -182,7 +190,7 @@ contract ArrowpadTest is Test {
         uint256 buyAmount
     ) internal returns (address) {
         vm.recordLogs();
-        arrowpad.createToken{value: buyAmount + 0.001 ether}(
+        fyuz.createToken{value: buyAmount + 0.001 ether}(
             name,
             sym,
             buyAmount,
@@ -210,15 +218,15 @@ contract ArrowpadTest is Test {
     /// @dev Shorthand to read pool struct
     function _pool(
         address t
-    ) internal view returns (IArrowpad.PoolInfo memory) {
-        return iArrowpad.tokenPools(t);
+    ) internal view returns (IFyuz.PoolInfo memory) {
+        return iFyuz.tokenPools(t);
     }
 
     /// @dev Log price and mcap for a token
     function _logPriceAndMcap(string memory label, address t) internal view {
-        uint256 vPrice = arrowpad.getVirtualPrice(t);
-        uint256 mcap = arrowpad.getTokenVirtualMarketCap(t);
-        IArrowpad.PoolInfo memory p = _pool(t);
+        uint256 vPrice = fyuz.getVirtualPrice(t);
+        uint256 mcap = fyuz.getTokenVirtualMarketCap(t);
+        IFyuz.PoolInfo memory p = _pool(t);
         console.log("----", label, "----");
         console.log("  Virtual Price (wei/token):", vPrice);
         console.log("  Market Cap USD (18 dec):", mcap / 1e18);
@@ -237,7 +245,7 @@ contract ArrowpadTest is Test {
         address t = _create("AlphaToken", "ALPHA", 1);
         assertTrue(t != address(0), "Token address nonzero");
 
-        IArrowpad.PoolInfo memory p = _pool(t);
+        IFyuz.PoolInfo memory p = _pool(t);
 
         // Virtual reserves match constants
         assertEq(p.virtualEthReserve, VIRTUAL_ETH_INITIAL, "vETH initial");
@@ -251,14 +259,14 @@ contract ArrowpadTest is Test {
         assertEq(p.poolType, 1, "pool type V2");
         assertFalse(p.launched, "not launched");
 
-        // Total supply minted to arrowpad
+        // Total supply minted to fyuz
         uint256 supply = IERC20(t).totalSupply();
         assertEq(supply, TOTAL_SUPPLY, "total supply");
 
         _logPriceAndMcap("After creation (no buy)", t);
 
         // Token count incremented
-        assertEq(arrowpad.tokenCount(), 1, "tokenCount");
+        assertEq(fyuz.tokenCount(), 1, "tokenCount");
     }
 
     function test_01b_CreateTokenWithInitialBuy() public {
@@ -266,7 +274,7 @@ contract ArrowpadTest is Test {
         uint256 buyAmt = 0.05 ether;
         address t = _createWithBuy("BetaToken", "BETA", 1, buyAmt);
 
-        IArrowpad.PoolInfo memory p = _pool(t);
+        IFyuz.PoolInfo memory p = _pool(t);
         assertTrue(p.ethReserve > 0, "real ETH > 0 after initial buy");
         assertTrue(
             p.tokenReserve < REAL_TOKEN_INITIAL,
@@ -285,13 +293,13 @@ contract ArrowpadTest is Test {
         address t = _create("GammaToken", "GAMMA", 1);
 
         // K value at creation
-        IArrowpad.PoolInfo memory p = _pool(t);
+        IFyuz.PoolInfo memory p = _pool(t);
         uint256 k = p.virtualEthReserve * p.virtualTokenReserve;
         console.log("Initial K:", k / 1e36);
         assertTrue(k > 0, "K > 0");
 
         // Virtual price should match ratio
-        uint256 vPrice = arrowpad.getVirtualPrice(t);
+        uint256 vPrice = fyuz.getVirtualPrice(t);
         uint256 expectedPrice = (p.virtualEthReserve * 1e18) /
             p.virtualTokenReserve;
         assertEq(vPrice, expectedPrice, "price matches reserve ratio");
@@ -305,11 +313,11 @@ contract ArrowpadTest is Test {
     function test_02a_GetAmountOutBasic() public {
         console.log("=== TEST 2a: getAmountOut / getAmountIn math ===");
         address t = _create("MathToken", "MATH", 1);
-        IArrowpad.PoolInfo memory p = _pool(t);
+        IFyuz.PoolInfo memory p = _pool(t);
 
         // Use getSwapOutput to test the math
         uint256 inputETH = 0.1 ether;
-        (uint256 tokensOut, uint256 impact) = arrowpad.getSwapOutput(
+        (uint256 tokensOut, uint256 impact) = fyuz.getSwapOutput(
             t,
             inputETH,
             true
@@ -321,7 +329,7 @@ contract ArrowpadTest is Test {
         assertTrue(impact < 4500, "impact within limit");
 
         // Test sell side
-        (uint256 ethOut, uint256 sellImpact) = arrowpad.getSwapOutput(
+        (uint256 ethOut, uint256 sellImpact) = fyuz.getSwapOutput(
             t,
             tokensOut,
             false
@@ -336,35 +344,35 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 2b: K preservation across buys ===");
         address t = _create("KToken", "KVAL", 1);
 
-        IArrowpad.PoolInfo memory p0 = _pool(t);
+        IFyuz.PoolInfo memory p0 = _pool(t);
         uint256 k0 = p0.virtualEthReserve * p0.virtualTokenReserve;
         console.log("K initial:", k0 / 1e36);
 
         // Buy 1
-        uint256 fee1 = arrowpad.getFirstBuyFee(t);
+        uint256 fee1 = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee1}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee1}(
             t,
             0.01 ether,
             0,
             block.timestamp
         );
-        IArrowpad.PoolInfo memory p1 = _pool(t);
+        IFyuz.PoolInfo memory p1 = _pool(t);
         uint256 k1 = p1.virtualEthReserve * p1.virtualTokenReserve;
         console.log("K after buy 1:", k1 / 1e36);
         // K should increase (fees add to reserves)
         assertGe(k1, k0, "K non-decreasing after buy");
 
         // Buy 2
-        uint256 fee2 = arrowpad.getFirstBuyFee(t);
+        uint256 fee2 = fyuz.getFirstBuyFee(t);
         vm.prank(addr2);
-        arrowpad.swapExactETHForTokens{value: 0.05 ether + fee2}(
+        fyuz.swapExactETHForTokens{value: 0.05 ether + fee2}(
             t,
             0.05 ether,
             0,
             block.timestamp
         );
-        IArrowpad.PoolInfo memory p2 = _pool(t);
+        IFyuz.PoolInfo memory p2 = _pool(t);
         uint256 k2 = p2.virtualEthReserve * p2.virtualTokenReserve;
         console.log("K after buy 2:", k2 / 1e36);
         assertGe(k2, k1, "K non-decreasing after buy 2");
@@ -372,11 +380,11 @@ contract ArrowpadTest is Test {
         // Sell
         uint256 sellAmt = IERC20(t).balanceOf(addr1) / 2;
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), sellAmt);
-        arrowpad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), sellAmt);
+        fyuz.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
-        IArrowpad.PoolInfo memory p3 = _pool(t);
+        IFyuz.PoolInfo memory p3 = _pool(t);
         uint256 k3 = p3.virtualEthReserve * p3.virtualTokenReserve;
         console.log("K after sell:", k3 / 1e36);
         assertGe(k3, k2, "K non-decreasing after sell");
@@ -390,16 +398,16 @@ contract ArrowpadTest is Test {
         address t = _create("MaxBuy", "MXB", 1);
 
         for (uint256 i = 0; i < 2000; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
 
             uint256 resBefore = p.tokenReserve;
             uint256 balBefore = IERC20(t).balanceOf(addr1);
 
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.3 ether}(t, 0.3 ether, 0, block.timestamp);
+            fyuz.swapExactETHForTokens{value: 0.3 ether}(t, 0.3 ether, 0, block.timestamp);
 
-            IArrowpad.PoolInfo memory pAfter = _pool(t);
+            IFyuz.PoolInfo memory pAfter = _pool(t);
             if (!pAfter.launched) {
                 uint256 tokensReceived = IERC20(t).balanceOf(addr1) - balBefore;
                 // Invariant: the buy never consumes more tokens than were available.
@@ -485,12 +493,12 @@ contract ArrowpadTest is Test {
         _logPriceAndMcap("Before buy", t);
 
         uint256 buyAmt = 0.1 ether;
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         uint256 feeWalletBefore = FEE_WALLET.balance;
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 bal = IERC20(t).balanceOf(addr1);
         assertTrue(bal > 0, "received tokens");
@@ -516,20 +524,20 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 3b: Multiple sequential buys ===");
         address t = _create("MultiBuy", "MBUY", 1);
 
-        uint256 prevPrice = arrowpad.getVirtualPrice(t);
+        uint256 prevPrice = fyuz.getVirtualPrice(t);
         console.log("Initial price:", prevPrice);
 
         for (uint256 i = 0; i < 5; i++) {
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.05 ether + fee}(
                 t,
                 0.05 ether,
                 0,
                 block.timestamp
             );
 
-            uint256 newPrice = arrowpad.getVirtualPrice(t);
+            uint256 newPrice = fyuz.getVirtualPrice(t);
             console.log("Price after buy", i + 1, ":", newPrice);
             assertTrue(newPrice > prevPrice, "price increases on buy");
             prevPrice = newPrice;
@@ -547,10 +555,10 @@ contract ArrowpadTest is Test {
 
         // Buy 1 ETH in one go
         uint256 buyAmt = 1 ether;
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
 
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 bal = IERC20(t).balanceOf(addr1);
         console.log("Tokens from 1 ETH buy:", bal / 1e18);
@@ -567,9 +575,9 @@ contract ArrowpadTest is Test {
         address t = _create("SellToken", "SELL", 1);
 
         // Buy first
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
             0,
@@ -585,8 +593,8 @@ contract ArrowpadTest is Test {
         uint256 ethBefore = addr1.balance;
 
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), sellAmt);
-        arrowpad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), sellAmt);
+        fyuz.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -608,9 +616,9 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 4b: Sell entire token balance ===");
         address t = _create("FullSell", "FSELL", 1);
 
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.05 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.05 ether + fee}(
             t,
             0.05 ether,
             0,
@@ -621,8 +629,8 @@ contract ArrowpadTest is Test {
         uint256 ethBefore = addr1.balance;
 
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), tokenBal);
-        arrowpad.swapExactTokensForETH(t, tokenBal, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), tokenBal);
+        fyuz.swapExactTokensForETH(t, tokenBal, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
@@ -638,16 +646,16 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 4c: Sell fee deduction verification ===");
         address t = _create("FeeCheck", "FCHK", 1);
 
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
             0,
             block.timestamp
         );
 
-        IArrowpad.PoolInfo memory pBefore = _pool(t);
+        IFyuz.PoolInfo memory pBefore = _pool(t);
         uint256 tokenBal = IERC20(t).balanceOf(addr1);
         uint256 sellAmt = tokenBal / 10;
 
@@ -656,12 +664,12 @@ contract ArrowpadTest is Test {
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), sellAmt);
-        arrowpad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), sellAmt);
+        fyuz.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
-        IArrowpad.PoolInfo memory pAfter = _pool(t);
+        IFyuz.PoolInfo memory pAfter = _pool(t);
         uint256 grossETH = pBefore.ethReserve - pAfter.ethReserve;
         uint256 feeWalletGain = FEE_WALLET.balance - feeWalletBefore;
         uint256 distGain = DIST_ADDR.balance - distBefore;
@@ -687,36 +695,36 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 5: Price tracking across operations ===");
         address t = _create("PriceTrack", "PTRK", 1);
 
-        uint256 price0 = arrowpad.getVirtualPrice(t);
-        uint256 mcap0 = arrowpad.getTokenVirtualMarketCap(t);
+        uint256 price0 = fyuz.getVirtualPrice(t);
+        uint256 mcap0 = fyuz.getTokenVirtualMarketCap(t);
         console.log("INITIAL  price:", price0, " mcap:", mcap0 / 1e18);
 
         // Buy 0.01 ETH
-        uint256 fee1 = arrowpad.getFirstBuyFee(t);
+        uint256 fee1 = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee1}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee1}(
             t,
             0.01 ether,
             0,
             block.timestamp
         );
-        uint256 price1 = arrowpad.getVirtualPrice(t);
-        uint256 mcap1 = arrowpad.getTokenVirtualMarketCap(t);
+        uint256 price1 = fyuz.getVirtualPrice(t);
+        uint256 mcap1 = fyuz.getTokenVirtualMarketCap(t);
         console.log("AFTER 0.01 ETH  price:", price1, " mcap:", mcap1 / 1e18);
         assertTrue(price1 > price0, "price up after buy");
         assertTrue(mcap1 > mcap0, "mcap up after buy");
 
         // Buy 0.1 ETH
-        uint256 fee2 = arrowpad.getFirstBuyFee(t);
+        uint256 fee2 = fyuz.getFirstBuyFee(t);
         vm.prank(addr2);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee2}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee2}(
             t,
             0.1 ether,
             0,
             block.timestamp
         );
-        uint256 price2 = arrowpad.getVirtualPrice(t);
-        uint256 mcap2 = arrowpad.getTokenVirtualMarketCap(t);
+        uint256 price2 = fyuz.getVirtualPrice(t);
+        uint256 mcap2 = fyuz.getTokenVirtualMarketCap(t);
         console.log("AFTER 0.1 ETH   price:", price2, " mcap:", mcap2 / 1e18);
         assertTrue(price2 > price1, "price up after 2nd buy");
 
@@ -724,26 +732,26 @@ contract ArrowpadTest is Test {
         uint256 sellAmt = IERC20(t).balanceOf(addr1);
         if (sellAmt > 0) {
             vm.startPrank(addr1);
-            IERC20(t).approve(address(arrowpad), sellAmt);
-            arrowpad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
+            IERC20(t).approve(address(fyuz), sellAmt);
+            fyuz.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
             vm.stopPrank();
         }
-        uint256 price3 = arrowpad.getVirtualPrice(t);
-        uint256 mcap3 = arrowpad.getTokenVirtualMarketCap(t);
+        uint256 price3 = fyuz.getVirtualPrice(t);
+        uint256 mcap3 = fyuz.getTokenVirtualMarketCap(t);
         console.log("AFTER sell      price:", price3, " mcap:", mcap3 / 1e18);
         assertTrue(price3 < price2, "price down after sell");
 
         // Buy 0.5 ETH
-        uint256 fee3 = arrowpad.getFirstBuyFee(t);
+        uint256 fee3 = fyuz.getFirstBuyFee(t);
         vm.prank(addr3);
-        arrowpad.swapExactETHForTokens{value: 0.5 ether + fee3}(
+        fyuz.swapExactETHForTokens{value: 0.5 ether + fee3}(
             t,
             0.5 ether,
             0,
             block.timestamp
         );
-        uint256 price4 = arrowpad.getVirtualPrice(t);
-        uint256 mcap4 = arrowpad.getTokenVirtualMarketCap(t);
+        uint256 price4 = fyuz.getVirtualPrice(t);
+        uint256 mcap4 = fyuz.getTokenVirtualMarketCap(t);
         console.log("AFTER 0.5 ETH   price:", price4, " mcap:", mcap4 / 1e18);
         assertTrue(price4 > price3, "price up after large buy");
     }
@@ -766,18 +774,18 @@ contract ArrowpadTest is Test {
         uint256 buyCount = 0;
 
         for (uint i = 0; i < 500; i++) {
-            IArrowpad.PoolInfo memory pCheck = _pool(t);
+            IFyuz.PoolInfo memory pCheck = _pool(t);
             if (pCheck.launched) {
                 launched = true;
                 buyCount = i;
                 break;
             }
 
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             uint256 buyAmt = 0.5 ether;
 
             // Log price before graduation-triggering buy
-            uint256 mcapBefore = arrowpad.getTokenVirtualMarketCap(t);
+            uint256 mcapBefore = fyuz.getTokenVirtualMarketCap(t);
             if (mcapBefore > 60_000 * 1e18) {
                 console.log(
                     "  [Near graduation] mcap:",
@@ -789,10 +797,10 @@ contract ArrowpadTest is Test {
             }
 
             vm.prank(addr2);
-            arrowpad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
+            fyuz.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
             totalETHSpent += buyAmt;
 
-            IArrowpad.PoolInfo memory pAfter = _pool(t);
+            IFyuz.PoolInfo memory pAfter = _pool(t);
             if (pAfter.launched) {
                 launched = true;
                 buyCount = i + 1;
@@ -805,7 +813,7 @@ contract ArrowpadTest is Test {
         assertTrue(launched, "Token should graduate");
 
         // Verify pool cleared
-        IArrowpad.PoolInfo memory pFinal = _pool(t);
+        IFyuz.PoolInfo memory pFinal = _pool(t);
         assertTrue(pFinal.launched, "launched = true");
         assertEq(pFinal.ethReserve, 0, "ethReserve cleared");
         assertEq(pFinal.tokenReserve, 0, "tokenReserve cleared");
@@ -852,11 +860,11 @@ contract ArrowpadTest is Test {
 
         // Graduate the token
         for (uint i = 0; i < 500; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
                 0,
@@ -864,7 +872,7 @@ contract ArrowpadTest is Test {
             );
         }
 
-        IArrowpad.PoolInfo memory pLaunched = _pool(t);
+        IFyuz.PoolInfo memory pLaunched = _pool(t);
         assertTrue(pLaunched.launched, "must be launched");
 
         address weth = router.WETH();
@@ -928,9 +936,9 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 8a: Transfer blocked before launch ===");
         address t = _create("RestrictToken", "RST", 1);
 
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
             0,
@@ -960,13 +968,13 @@ contract ArrowpadTest is Test {
         console.log("Transfers correctly blocked before launch");
     }
 
-    function test_08b_TransferToArrowpadAllowed() public {
-        console.log("=== TEST 8b: Transfer to/from Arrowpad allowed before launch ===");
+    function test_08b_TransferToFyuzAllowed() public {
+        console.log("=== TEST 8b: Transfer to/from Fyuz allowed before launch ===");
         address t = _create("AllowedToken", "ALW", 1);
 
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
             0,
@@ -975,14 +983,14 @@ contract ArrowpadTest is Test {
 
         uint256 bal = IERC20(t).balanceOf(addr1);
 
-        // Sell back to arrowpad (this is a transferFrom to owner = arrowpad)
+        // Sell back to fyuz (this is a transferFrom to owner = fyuz)
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), bal / 4);
-        arrowpad.swapExactTokensForETH(t, bal / 4, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), bal / 4);
+        fyuz.swapExactTokensForETH(t, bal / 4, 0, block.timestamp);
         vm.stopPrank();
 
         console.log(
-            "Transfer to Arrowpad (sell) succeeded before launch: OK"
+            "Transfer to Fyuz (sell) succeeded before launch: OK"
         );
     }
 
@@ -992,11 +1000,11 @@ contract ArrowpadTest is Test {
 
         // Graduate
         for (uint i = 0; i < 500; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
                 0,
@@ -1027,12 +1035,12 @@ contract ArrowpadTest is Test {
         address t = _create("BuyFeeToken", "BFT", 1);
 
         uint256 buyAmt = 1 ether;
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         uint256 feeWalletBefore = FEE_WALLET.balance;
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: buyAmt + fee}(t, buyAmt, 0, block.timestamp);
 
         uint256 feeWalletGain = FEE_WALLET.balance - feeWalletBefore;
         uint256 distGain = DIST_ADDR.balance - distBefore;
@@ -1066,9 +1074,9 @@ contract ArrowpadTest is Test {
         address t = _create("SellFeeToken", "SFT", 1);
 
         // Buy first
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
             0,
@@ -1078,18 +1086,18 @@ contract ArrowpadTest is Test {
         uint256 tokenBal = IERC20(t).balanceOf(addr1);
         uint256 sellAmt = tokenBal / 5;
 
-        IArrowpad.PoolInfo memory pBefore = _pool(t);
+        IFyuz.PoolInfo memory pBefore = _pool(t);
         uint256 ethBefore = addr1.balance;
         uint256 feeWalletBefore = FEE_WALLET.balance;
         uint256 distBefore = DIST_ADDR.balance;
 
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), sellAmt);
-        arrowpad.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), sellAmt);
+        fyuz.swapExactTokensForETH(t, sellAmt, 0, block.timestamp);
         vm.stopPrank();
 
         uint256 ethReceived = addr1.balance - ethBefore;
-        IArrowpad.PoolInfo memory pAfter = _pool(t);
+        IFyuz.PoolInfo memory pAfter = _pool(t);
         uint256 grossETH = pBefore.ethReserve - pAfter.ethReserve;
         uint256 feeWalletGain = FEE_WALLET.balance - feeWalletBefore;
         uint256 distGain = DIST_ADDR.balance - distBefore;
@@ -1120,7 +1128,7 @@ contract ArrowpadTest is Test {
 
         vm.prank(addr1);
         vm.expectRevert();
-        arrowpad.swapExactETHForTokens{value: 0}(t, 0, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: 0}(t, 0, 0, block.timestamp);
     }
 
     function test_10b_ZeroSellReverts() public {
@@ -1128,26 +1136,30 @@ contract ArrowpadTest is Test {
         address t = _create("EdgeZeroSell", "EZS", 1);
 
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), type(uint256).max);
+        IERC20(t).approve(address(fyuz), type(uint256).max);
         vm.expectRevert();
-        arrowpad.swapExactTokensForETH(t, 0, 0, block.timestamp);
+        fyuz.swapExactTokensForETH(t, 0, 0, block.timestamp);
         vm.stopPrank();
     }
 
     function test_10h_InvalidPoolTypeReverts() public {
         console.log("=== TEST 10h: Invalid pool type reverts at creation ===");
-        vm.expectRevert("Invalid pool type");
-        arrowpad.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 0, block.timestamp);
+        vm.expectRevert("Only V2 or V3 pool type");
+        fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 0, block.timestamp);
 
-        vm.expectRevert("Invalid pool type");
-        arrowpad.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 4, block.timestamp);
+        vm.expectRevert("Only V2 or V3 pool type");
+        fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 4, block.timestamp);
 
-        // Valid types 1-3 succeed
+        // V4 (3) used to be valid and is now deliberately gated off. The V4 code
+        // in the liquidity manager stays dormant; it must be unreachable from here.
+        vm.expectRevert("Only V2 or V3 pool type");
+        fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 3, block.timestamp);
+
+        // Valid types 1-2 succeed
         address t1 = _create("OkV2", "OK2", 1);
         address t2 = _create("OkV3", "OK3", 2);
-        address t3 = _create("OkV4", "OK4", 3);
-        assertTrue(t1 != address(0) && t2 != address(0) && t3 != address(0), "valid types ok");
-        console.log("Pool type validation works");
+        assertTrue(t1 != address(0) && t2 != address(0), "valid types ok");
+        console.log("Pool type validation works (V2/V3 only)");
     }
 
     function test_10c_NonExistentPoolReverts() public {
@@ -1155,7 +1167,7 @@ contract ArrowpadTest is Test {
 
         vm.prank(addr1);
         vm.expectRevert("Pool does not exist");
-        arrowpad.swapExactETHForTokens{value: 0.01 ether}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether}(
             address(0xdead),
             0.01 ether,
             0,
@@ -1164,7 +1176,7 @@ contract ArrowpadTest is Test {
 
         vm.prank(addr1);
         vm.expectRevert("Pool does not exist");
-        arrowpad.swapExactTokensForETH(address(0xdead), 1e18, 0, block.timestamp);
+        fyuz.swapExactTokensForETH(address(0xdead), 1e18, 0, block.timestamp);
     }
 
     function test_10d_BuyAfterLaunchReverts() public {
@@ -1173,11 +1185,11 @@ contract ArrowpadTest is Test {
 
         // Graduate
         for (uint i = 0; i < 500; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
                 0,
@@ -1189,7 +1201,7 @@ contract ArrowpadTest is Test {
         // After launch virtualEthReserve=0, so maxBuy=0, any buy reverts
         vm.prank(addr2);
         vm.expectRevert("Exceeds maximum price impact");
-        arrowpad.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0, block.timestamp);
 
         console.log("Buy after launch correctly reverts");
     }
@@ -1200,11 +1212,11 @@ contract ArrowpadTest is Test {
 
         // Buy then graduate
         for (uint i = 0; i < 500; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
                 0,
@@ -1217,9 +1229,9 @@ contract ArrowpadTest is Test {
         uint256 bal = IERC20(t).balanceOf(addr1);
         if (bal > 0) {
             vm.startPrank(addr1);
-            IERC20(t).approve(address(arrowpad), bal);
+            IERC20(t).approve(address(fyuz), bal);
             vm.expectRevert("Sell amount too large");
-            arrowpad.swapExactTokensForETH(t, bal, 0, block.timestamp);
+            fyuz.swapExactTokensForETH(t, bal, 0, block.timestamp);
             vm.stopPrank();
         }
         console.log("Sell after launch correctly reverts");
@@ -1230,10 +1242,10 @@ contract ArrowpadTest is Test {
         address t = _create("Slippage", "SLIP", 1);
 
         // Try to buy with very high minAmountOut
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
         vm.expectRevert("Slippage limit exceeded");
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
             type(uint256).max,
@@ -1247,15 +1259,15 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 10g: Price impact limit (99.99%) ===");
         address t = _create("ImpactToken", "IMP", 1);
 
-        assertEq(arrowpad.MAX_PRICE_IMPACT(), 9_999, "breaker set to 99.99%");
+        assertEq(fyuz.MAX_PRICE_IMPACT(), 9_999, "breaker set to 99.99%");
 
         // virtualEthReserve = 2.5 ETH, virtualTokenReserve = 1.073e9.
         // A buy of 2.4 ETH nets ~2.328 ETH after fees => amountOut ~517M tokens
         // = ~48% of virtualTokenReserve. That tripped the old 45% breaker; at
         // 99.99% it is allowed through.
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 2.4 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 2.4 ether + fee}(
             t,
             2.4 ether,
             0,
@@ -1280,49 +1292,49 @@ contract ArrowpadTest is Test {
         vm.startPrank(addr1);
 
         vm.expectRevert();
-        arrowpad.setPlatformBuyFeeBps(500);
+        fyuz.setPlatformBuyFeeBps(500);
 
         vm.expectRevert();
-        arrowpad.setPlatformSellFeeBps(500);
+        fyuz.setPlatformSellFeeBps(500);
 
         vm.expectRevert();
-        arrowpad.setFeeAddress(addr1);
+        fyuz.setFeeAddress(addr1);
 
         vm.expectRevert();
-        arrowpad.setDistributorAddress(addr1);
+        fyuz.setDistributorAddress(addr1);
 
         vm.expectRevert();
-        arrowpad.setMaxBuyPercent(5000);
+        fyuz.setMaxBuyPercent(5000);
 
         vm.expectRevert();
-        arrowpad.setMaxSellPercent(5000);
+        fyuz.setMaxSellPercent(5000);
 
         vm.expectRevert();
-        arrowpad.setCreateTokenFeeAmount(0.01 ether);
+        fyuz.setCreateTokenFeeAmount(0.01 ether);
 
         vm.expectRevert();
-        arrowpad.setTokenOwnerFeeBps(100);
+        fyuz.setTokenOwnerFeeBps(100);
 
         vm.expectRevert();
-        arrowpad.setTokenOwnerLPFee(0.1 ether);
+        fyuz.setTokenOwnerLPFee(0.1 ether);
 
         vm.expectRevert();
-        arrowpad.setPlatformLPFee(0.1 ether);
+        fyuz.setPlatformLPFee(0.1 ether);
 
         vm.expectRevert();
-        arrowpad.setFirstBuyFee(100);
+        fyuz.setFirstBuyFee(100);
 
         vm.expectRevert();
-        arrowpad.requestLiquidityManagerChange(addr1);
+        fyuz.requestLiquidityManagerChange(addr1);
 
         vm.expectRevert();
-        arrowpad.pause();
+        fyuz.pause();
 
         vm.expectRevert();
-        arrowpad.unpause();
+        fyuz.unpause();
 
         vm.expectRevert();
-        arrowpad.requestEmergencyWithdrawETH(1 ether);
+        fyuz.requestEmergencyWithdrawETH(1 ether);
 
         vm.stopPrank();
 
@@ -1333,22 +1345,22 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 11b: Fee limit validation ===");
 
         vm.expectRevert("Buy fee cannot exceed 10%");
-        arrowpad.setPlatformBuyFeeBps(1001);
+        fyuz.setPlatformBuyFeeBps(1001);
 
         vm.expectRevert("Sell fee cannot exceed 10%");
-        arrowpad.setPlatformSellFeeBps(1001);
+        fyuz.setPlatformSellFeeBps(1001);
 
         vm.expectRevert("Fee cannot exceed 10%");
-        arrowpad.setTokenOwnerFeeBps(1001);
+        fyuz.setTokenOwnerFeeBps(1001);
 
         // Valid fee changes should succeed
-        arrowpad.setPlatformBuyFeeBps(1000);
-        assertEq(arrowpad.PLATFORM_BUY_FEE_BPS(), 1000, "buy fee set");
-        arrowpad.setPlatformBuyFeeBps(300); // restore
+        fyuz.setPlatformBuyFeeBps(1000);
+        assertEq(fyuz.PLATFORM_BUY_FEE_BPS(), 1000, "buy fee set");
+        fyuz.setPlatformBuyFeeBps(300); // restore
 
-        arrowpad.setPlatformSellFeeBps(1000);
-        assertEq(arrowpad.PLATFORM_SELL_FEE_BPS(), 1000, "sell fee set");
-        arrowpad.setPlatformSellFeeBps(300); // restore
+        fyuz.setPlatformSellFeeBps(1000);
+        assertEq(fyuz.PLATFORM_SELL_FEE_BPS(), 1000, "sell fee set");
+        fyuz.setPlatformSellFeeBps(300); // restore
 
         console.log("Fee limits enforced correctly");
     }
@@ -1357,26 +1369,26 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 11c: Address validation ===");
 
         vm.expectRevert("Fee address cannot be zero");
-        arrowpad.setFeeAddress(address(0));
+        fyuz.setFeeAddress(address(0));
 
         vm.expectRevert("Distributor cannot be zero");
-        arrowpad.setDistributorAddress(address(0));
+        fyuz.setDistributorAddress(address(0));
 
         vm.expectRevert("Liquidity manager cannot be zero");
-        arrowpad.requestLiquidityManagerChange(address(0));
+        fyuz.requestLiquidityManagerChange(address(0));
 
         // Valid address changes
-        arrowpad.setFeeAddress(addr3);
-        assertEq(arrowpad.feeAddress(), addr3, "fee address updated");
-        arrowpad.setFeeAddress(FEE_WALLET); // restore
+        fyuz.setFeeAddress(addr3);
+        assertEq(fyuz.feeAddress(), addr3, "fee address updated");
+        fyuz.setFeeAddress(FEE_WALLET); // restore
 
-        arrowpad.setDistributorAddress(addr3);
+        fyuz.setDistributorAddress(addr3);
         assertEq(
-            arrowpad.distributorAddress(),
+            fyuz.distributorAddress(),
             addr3,
             "distributor updated"
         );
-        arrowpad.setDistributorAddress(DIST_ADDR); // restore
+        fyuz.setDistributorAddress(DIST_ADDR); // restore
 
         console.log("Address validation works correctly");
     }
@@ -1385,14 +1397,14 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 11d: Max percent validation ===");
 
         vm.expectRevert("Max buy cannot exceed 100%");
-        arrowpad.setMaxBuyPercent(10001);
+        fyuz.setMaxBuyPercent(10001);
 
         vm.expectRevert("Max sell cannot exceed 100%");
-        arrowpad.setMaxSellPercent(10001);
+        fyuz.setMaxSellPercent(10001);
 
-        arrowpad.setMaxBuyPercent(5000);
-        assertEq(arrowpad.MAX_BUY_PERCENT(), 5000, "max buy updated");
-        arrowpad.setMaxBuyPercent(10000); // restore
+        fyuz.setMaxBuyPercent(5000);
+        assertEq(fyuz.MAX_BUY_PERCENT(), 5000, "max buy updated");
+        fyuz.setMaxBuyPercent(10000); // restore
 
         console.log("Max percent validation works");
     }
@@ -1401,17 +1413,17 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 11e: Pause/unpause ===");
         address t = _create("PauseToken", "PAUS", 1);
 
-        arrowpad.pause();
+        fyuz.pause();
 
         // Create token should revert when paused
         vm.expectRevert();
-        arrowpad.createToken{value: 0.001 ether}("X", "X", 0, 0, 0, 1, block.timestamp);
+        fyuz.createToken{value: 0.001 ether}("X", "X", 0, 0, 0, 1, block.timestamp);
 
         // Buy should revert when paused
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
         vm.expectRevert();
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
             0,
@@ -1421,14 +1433,14 @@ contract ArrowpadTest is Test {
         // Sell should revert when paused
         vm.prank(addr1);
         vm.expectRevert();
-        arrowpad.swapExactTokensForETH(t, 1e18, 0, block.timestamp);
+        fyuz.swapExactTokensForETH(t, 1e18, 0, block.timestamp);
 
-        arrowpad.unpause();
+        fyuz.unpause();
 
         // Now should work
-        fee = arrowpad.getFirstBuyFee(t);
+        fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.01 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
             0,
@@ -1444,46 +1456,46 @@ contract ArrowpadTest is Test {
         address t = _create("EmergToken", "EMRG", 1);
 
         // Buy to put ETH into an ACTIVE bonding curve.
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 1 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 1 ether + fee}(
             t,
             1 ether,
             0,
             block.timestamp
         );
 
-        uint256 curveEth = arrowpad.totalCurveEthReserve();
+        uint256 curveEth = fyuz.totalCurveEthReserve();
         assertGt(curveEth, 0, "curve holds ETH");
         // Curve-backed ETH is NOT withdrawable (anti soft-rug). Only rounding dust
         // (<< curve ETH) may be withdrawable before any stray ETH is donated.
-        uint256 dust = arrowpad.withdrawableEth();
+        uint256 dust = fyuz.withdrawableEth();
         assertLt(dust, 1e12, "curve ETH is protected (only dust withdrawable)");
         vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
-        arrowpad.requestEmergencyWithdrawETH(curveEth);
+        fyuz.requestEmergencyWithdrawETH(curveEth);
 
         // Now STRAY ETH lands in the contract (donation / leftover). Only that
         // (plus pre-existing dust) becomes withdrawable — curve ETH stays protected.
         uint256 stray = 0.5 ether;
-        (bool ok, ) = address(arrowpad).call{value: stray}("");
+        (bool ok, ) = address(fyuz).call{value: stray}("");
         require(ok, "stray send failed");
-        uint256 withdrawable = arrowpad.withdrawableEth();
+        uint256 withdrawable = fyuz.withdrawableEth();
         assertEq(withdrawable, dust + stray, "stray added to withdrawable");
 
         // Cannot take more than the withdrawable amount (curve ETH stays protected).
         vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
-        arrowpad.requestEmergencyWithdrawETH(withdrawable + 1);
+        fyuz.requestEmergencyWithdrawETH(withdrawable + 1);
 
-        arrowpad.requestEmergencyWithdrawETH(withdrawable);
+        fyuz.requestEmergencyWithdrawETH(withdrawable);
         vm.expectRevert("Timelock not expired");
-        arrowpad.executeEmergencyWithdrawETH();
+        fyuz.executeEmergencyWithdrawETH();
 
         vm.warp(block.timestamp + 24 hours + 1);
         uint256 ownerBefore = address(this).balance;
-        arrowpad.executeEmergencyWithdrawETH();
+        fyuz.executeEmergencyWithdrawETH();
         assertEq(address(this).balance - ownerBefore, withdrawable, "withdrew only stray+dust");
         // Curve ETH is still fully backed.
-        assertGe(address(arrowpad).balance, arrowpad.totalCurveEthReserve(), "curve still backed");
+        assertGe(address(fyuz).balance, fyuz.totalCurveEthReserve(), "curve still backed");
         console.log("Emergency withdraw protects curve-backed ETH");
     }
 
@@ -1491,9 +1503,9 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 11g: Cancel emergency withdraw ===");
         address t = _create("CancelToken", "CANC", 1);
 
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
             0,
@@ -1501,14 +1513,14 @@ contract ArrowpadTest is Test {
         );
 
         // Donate stray ETH so there is a withdrawable (non-curve) balance to request.
-        (bool ok, ) = address(arrowpad).call{value: 0.2 ether}("");
+        (bool ok, ) = address(fyuz).call{value: 0.2 ether}("");
         require(ok, "stray send failed");
-        arrowpad.requestEmergencyWithdrawETH(0.1 ether);
-        arrowpad.cancelEmergencyWithdraw();
+        fyuz.requestEmergencyWithdrawETH(0.1 ether);
+        fyuz.cancelEmergencyWithdraw();
 
         vm.warp(block.timestamp + 24 hours + 1);
         vm.expectRevert("No pending withdrawal");
-        arrowpad.executeEmergencyWithdrawETH();
+        fyuz.executeEmergencyWithdrawETH();
 
         console.log("Cancel emergency withdraw works");
     }
@@ -1519,7 +1531,7 @@ contract ArrowpadTest is Test {
 
         // Cannot withdraw from active pool
         vm.expectRevert("Cannot withdraw from active pool");
-        arrowpad.emergencyWithdrawTokens(t, 1e18);
+        fyuz.emergencyWithdrawTokens(t, 1e18);
 
         console.log("Emergency token withdraw correctly blocked for active pool");
     }
@@ -1530,46 +1542,46 @@ contract ArrowpadTest is Test {
 
         // Cannot execute without a pending request
         vm.expectRevert("No pending change");
-        arrowpad.executeLiquidityManagerChange();
+        fyuz.executeLiquidityManagerChange();
 
         // Request the change
-        arrowpad.requestLiquidityManagerChange(newManager);
+        fyuz.requestLiquidityManagerChange(newManager);
         assertEq(
-            arrowpad.pendingLiquidityManager(),
+            fyuz.pendingLiquidityManager(),
             newManager,
             "pending set"
         );
         // Not applied yet
         assertTrue(
-            address(arrowpad.liquidityManager()) != newManager,
+            address(fyuz.liquidityManager()) != newManager,
             "not applied before timelock"
         );
 
         // Cannot execute before timelock expires
         vm.expectRevert("Timelock not expired");
-        arrowpad.executeLiquidityManagerChange();
+        fyuz.executeLiquidityManagerChange();
 
         // Warp past the 24h timelock and execute
         vm.warp(block.timestamp + 24 hours + 1);
-        arrowpad.executeLiquidityManagerChange();
+        fyuz.executeLiquidityManagerChange();
         assertEq(
-            address(arrowpad.liquidityManager()),
+            address(fyuz.liquidityManager()),
             newManager,
             "manager updated after timelock"
         );
         assertEq(
-            arrowpad.pendingLiquidityManager(),
+            fyuz.pendingLiquidityManager(),
             address(0),
             "pending cleared"
         );
 
         // Cancel path: request then cancel blocks execution
         address another = makeAddr("another");
-        arrowpad.requestLiquidityManagerChange(another);
-        arrowpad.cancelLiquidityManagerChange();
+        fyuz.requestLiquidityManagerChange(another);
+        fyuz.cancelLiquidityManagerChange();
         vm.warp(block.timestamp + 24 hours + 1);
         vm.expectRevert("No pending change");
-        arrowpad.executeLiquidityManagerChange();
+        fyuz.executeLiquidityManagerChange();
 
         console.log("Liquidity manager timelock + cancel work");
     }
@@ -1583,9 +1595,9 @@ contract ArrowpadTest is Test {
         address t = _create("MultiUser", "MU", 1);
 
         // User 1 buys
-        uint256 fee1 = arrowpad.getFirstBuyFee(t);
+        uint256 fee1 = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee1}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee1}(
             t,
             0.1 ether,
             0,
@@ -1597,9 +1609,9 @@ contract ArrowpadTest is Test {
         _logPriceAndMcap("After user1 buy", t);
 
         // User 2 buys
-        uint256 fee2 = arrowpad.getFirstBuyFee(t);
+        uint256 fee2 = fyuz.getFirstBuyFee(t);
         vm.prank(addr2);
-        arrowpad.swapExactETHForTokens{value: 0.2 ether + fee2}(
+        fyuz.swapExactETHForTokens{value: 0.2 ether + fee2}(
             t,
             0.2 ether,
             0,
@@ -1611,9 +1623,9 @@ contract ArrowpadTest is Test {
         _logPriceAndMcap("After user2 buy", t);
 
         // User 3 buys
-        uint256 fee3 = arrowpad.getFirstBuyFee(t);
+        uint256 fee3 = fyuz.getFirstBuyFee(t);
         vm.prank(addr3);
-        arrowpad.swapExactETHForTokens{value: 0.05 ether + fee3}(
+        fyuz.swapExactETHForTokens{value: 0.05 ether + fee3}(
             t,
             0.05 ether,
             0,
@@ -1627,8 +1639,8 @@ contract ArrowpadTest is Test {
         // User 1 sells half
         uint256 sell1 = bal1 / 2;
         vm.startPrank(addr1);
-        IERC20(t).approve(address(arrowpad), sell1);
-        arrowpad.swapExactTokensForETH(t, sell1, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), sell1);
+        fyuz.swapExactTokensForETH(t, sell1, 0, block.timestamp);
         vm.stopPrank();
         console.log("User1 sold", sell1 / 1e18, "tokens");
 
@@ -1636,8 +1648,8 @@ contract ArrowpadTest is Test {
 
         // User 2 sells all
         vm.startPrank(addr2);
-        IERC20(t).approve(address(arrowpad), bal2);
-        arrowpad.swapExactTokensForETH(t, bal2, 0, block.timestamp);
+        IERC20(t).approve(address(fyuz), bal2);
+        fyuz.swapExactTokensForETH(t, bal2, 0, block.timestamp);
         vm.stopPrank();
         console.log("User2 sold all tokens");
 
@@ -1669,17 +1681,17 @@ contract ArrowpadTest is Test {
 
         for (uint i = 0; i < 200 && !launched; i++) {
             address buyer = buyers[i % 3];
-            uint256 fee = arrowpad.getFirstBuyFee(t);
+            uint256 fee = fyuz.getFirstBuyFee(t);
 
             vm.prank(buyer);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
                 t,
                 0.5 ether,
                 0,
                 block.timestamp
             );
 
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) {
                 launched = true;
                 round = i + 1;
@@ -1708,9 +1720,9 @@ contract ArrowpadTest is Test {
         address t = _create("PriceCurve", "PC", 1);
 
         // Buyer 1: early
-        uint256 fee1 = arrowpad.getFirstBuyFee(t);
+        uint256 fee1 = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee1}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee1}(
             t,
             0.1 ether,
             0,
@@ -1720,9 +1732,9 @@ contract ArrowpadTest is Test {
         console.log("Early buyer (0.1 ETH) tokens:", tokens1 / 1e18);
 
         // Push price up with a large buy
-        uint256 fee2 = arrowpad.getFirstBuyFee(t);
+        uint256 fee2 = fyuz.getFirstBuyFee(t);
         vm.prank(addr2);
-        arrowpad.swapExactETHForTokens{value: 1 ether + fee2}(
+        fyuz.swapExactETHForTokens{value: 1 ether + fee2}(
             t,
             1 ether,
             0,
@@ -1730,9 +1742,9 @@ contract ArrowpadTest is Test {
         );
 
         // Buyer 3: late (same 0.1 ETH)
-        uint256 fee3 = arrowpad.getFirstBuyFee(t);
+        uint256 fee3 = fyuz.getFirstBuyFee(t);
         vm.prank(addr3);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee3}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee3}(
             t,
             0.1 ether,
             0,
@@ -1761,12 +1773,12 @@ contract ArrowpadTest is Test {
 
         uint256 desiredTokens = 1_000_000 * 1e18; // 1M tokens
         uint256 maxETH = 0.1 ether;
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
 
         _logPriceAndMcap("Before exact token buy", t);
 
         vm.prank(addr1);
-        arrowpad.swapETHForExactTokens{value: maxETH + fee}(
+        fyuz.swapETHForExactTokens{value: maxETH + fee}(
             t,
             desiredTokens,
             maxETH,
@@ -1788,32 +1800,32 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 14: Bonding curve progress tracking ===");
         address t = _create("ProgressToken", "PROG", 1);
 
-        uint256 progress0 = arrowpad.getBondingCurveProgress(t);
+        uint256 progress0 = fyuz.getBondingCurveProgress(t);
         console.log("Progress at start:", progress0, "bps");
         assertEq(progress0, 0, "0% at start");
 
         // Buy some
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.5 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.5 ether + fee}(
             t,
             0.5 ether,
             0,
             block.timestamp
         );
 
-        uint256 progress1 = arrowpad.getBondingCurveProgress(t);
+        uint256 progress1 = fyuz.getBondingCurveProgress(t);
         console.log("Progress after 0.5 ETH:", progress1, "bps");
         assertTrue(progress1 > 0, "progress > 0");
         assertTrue(progress1 < 10000, "progress < 100%");
 
         // Buy more
         for (uint i = 0; i < 10; i++) {
-            IArrowpad.PoolInfo memory p = _pool(t);
+            IFyuz.PoolInfo memory p = _pool(t);
             if (p.launched) break;
-            uint256 f = arrowpad.getFirstBuyFee(t);
+            uint256 f = fyuz.getFirstBuyFee(t);
             vm.prank(addr2);
-            arrowpad.swapExactETHForTokens{value: 0.5 ether + f}(
+            fyuz.swapExactETHForTokens{value: 0.5 ether + f}(
                 t,
                 0.5 ether,
                 0,
@@ -1821,11 +1833,11 @@ contract ArrowpadTest is Test {
             );
         }
 
-        IArrowpad.PoolInfo memory pFinal = _pool(t);
+        IFyuz.PoolInfo memory pFinal = _pool(t);
         if (pFinal.launched) {
             console.log("Token graduated - progress complete");
         } else {
-            uint256 progressN = arrowpad.getBondingCurveProgress(t);
+            uint256 progressN = fyuz.getBondingCurveProgress(t);
             console.log("Progress after more buys:", progressN, "bps");
             assertTrue(progressN > progress1, "progress increased");
         }
@@ -1844,7 +1856,7 @@ contract ArrowpadTest is Test {
             uint256 targetMcap,
             uint256 progressPct,
             bool canLaunch
-        ) = arrowpad.getLaunchProgress(t);
+        ) = fyuz.getLaunchProgress(t);
 
         console.log("Current mcap:", currentMcap / 1e18);
         console.log("Target mcap:", targetMcap / 1e18);
@@ -1855,16 +1867,16 @@ contract ArrowpadTest is Test {
         assertFalse(canLaunch, "cannot launch at start");
 
         // Buy to increase mcap
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 1 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 1 ether + fee}(
             t,
             1 ether,
             0,
             block.timestamp
         );
 
-        (uint256 mcap2, , uint256 prog2, bool can2) = arrowpad
+        (uint256 mcap2, , uint256 prog2, bool can2) = fyuz
             .getLaunchProgress(t);
         console.log("After 1 ETH buy - mcap:", mcap2 / 1e18, "progress:", prog2);
         assertTrue(mcap2 > currentMcap, "mcap increased");
@@ -1888,7 +1900,7 @@ contract ArrowpadTest is Test {
             uint256 vPrice,
             uint256 actPrice,
             bool launched
-        ) = arrowpad.getPoolDetails(t);
+        ) = fyuz.getPoolDetails(t);
 
         console.log("ethReserve:", ethRes);
         console.log("tokenReserve:", tokRes / 1e18);
@@ -1904,30 +1916,30 @@ contract ArrowpadTest is Test {
         assertFalse(launched, "not launched");
 
         // getMaxSellableETH
-        uint256 maxSell = arrowpad.getMaxSellableETH(t);
+        uint256 maxSell = fyuz.getMaxSellableETH(t);
         assertEq(maxSell, 0, "no sellable ETH at start");
 
         // Buy some
-        uint256 fee = arrowpad.getFirstBuyFee(t);
+        uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 0.1 ether + fee}(
+        fyuz.swapExactETHForTokens{value: 0.1 ether + fee}(
             t,
             0.1 ether,
             0,
             block.timestamp
         );
 
-        uint256 maxSellAfter = arrowpad.getMaxSellableETH(t);
+        uint256 maxSellAfter = fyuz.getMaxSellableETH(t);
         assertTrue(maxSellAfter > 0, "sellable ETH after buy");
         console.log("Max sellable ETH:", maxSellAfter);
 
         // getPrice (actual)
-        uint256 actPriceAfter = arrowpad.getPrice(t);
+        uint256 actPriceAfter = fyuz.getPrice(t);
         assertTrue(actPriceAfter > 0, "actual price > 0 after buy");
         console.log("Actual price after buy:", actPriceAfter);
 
         // ETH price
-        uint256 ethUSD = arrowpad.getETHPriceByUSD();
+        uint256 ethUSD = fyuz.getETHPriceByUSD();
         assertTrue(ethUSD > 0, "ETH price > 0");
         console.log("ETH/USD:", ethUSD / 1e18);
     }
@@ -1977,11 +1989,11 @@ contract ArrowpadTest is Test {
     function test_17_V2PoolSeededAtTargetMcap() public {
         console.log("=== TEST 17: V2 pool seeded at target market cap ===");
         address t = _create("MigTarget", "MTGT", 1);
-        uint256 ethPriceUSD = arrowpad.getETHPriceByUSD();
+        uint256 ethPriceUSD = fyuz.getETHPriceByUSD();
 
         for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether}(
+            fyuz.swapExactETHForTokens{value: 0.05 ether}(
                 t,
                 0.05 ether,
                 0,
@@ -2006,7 +2018,7 @@ contract ArrowpadTest is Test {
         address t = _create("NoGap", "NOGAP", 1);
 
         // Degenerate only if ETH is so expensive the curve starts above target.
-        if (arrowpad.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
+        if (fyuz.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
             console.log("ETH price starts curve above target; skipping.");
             return;
         }
@@ -2019,10 +2031,10 @@ contract ArrowpadTest is Test {
                 launched = true;
                 break;
             }
-            lastCurvePrice = arrowpad.getVirtualPrice(t);
-            lastMcap = arrowpad.getTokenVirtualMarketCap(t);
+            lastCurvePrice = fyuz.getVirtualPrice(t);
+            lastMcap = fyuz.getTokenVirtualMarketCap(t);
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.01 ether}(
+            fyuz.swapExactETHForTokens{value: 0.01 ether}(
                 t,
                 0.01 ether,
                 0,
@@ -2050,20 +2062,20 @@ contract ArrowpadTest is Test {
     function test_19_OvershootStillPinsV2ToTarget() public {
         console.log("=== TEST 19: Large final buy overshoot still pins V2 ===");
         address t = _create("Overshoot", "OVSH", 1);
-        uint256 ethPriceUSD = arrowpad.getETHPriceByUSD();
+        uint256 ethPriceUSD = fyuz.getETHPriceByUSD();
 
-        if (arrowpad.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
+        if (fyuz.getTokenVirtualMarketCap(t) >= TARGET_MCAP_USD) {
             console.log("ETH price starts curve above target; skipping.");
             return;
         }
 
         // Creep up to just under the target with tiny buys.
         for (uint256 i = 0; i < 2000; i++) {
-            uint256 mcap = arrowpad.getTokenVirtualMarketCap(t);
+            uint256 mcap = fyuz.getTokenVirtualMarketCap(t);
             if (_pool(t).launched) break;
             if (mcap >= (TARGET_MCAP_USD * 95) / 100) break;
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.01 ether}(
+            fyuz.swapExactETHForTokens{value: 0.01 ether}(
                 t,
                 0.01 ether,
                 0,
@@ -2073,14 +2085,14 @@ contract ArrowpadTest is Test {
         assertFalse(_pool(t).launched, "should not be launched yet");
 
         // One deliberately oversized buy that blows through the target.
-        uint256 curvePriceBefore = arrowpad.getVirtualPrice(t);
+        uint256 curvePriceBefore = fyuz.getVirtualPrice(t);
         uint256 balBefore = IERC20(t).balanceOf(addr2);
-        uint256 maxBuy = (_pool(t).virtualEthReserve * arrowpad.MAX_BUY_PERCENT()) /
+        uint256 maxBuy = (_pool(t).virtualEthReserve * fyuz.MAX_BUY_PERCENT()) /
             10_000;
         uint256 bigBuy = maxBuy > 1 ether ? 1 ether : maxBuy;
 
         vm.prank(addr2);
-        arrowpad.swapExactETHForTokens{value: bigBuy}(
+        fyuz.swapExactETHForTokens{value: bigBuy}(
             t,
             bigBuy,
             0,
@@ -2140,7 +2152,7 @@ contract ArrowpadTest is Test {
         t = _create(name, sym, 2); // poolType 2 = Uniswap V3
         for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether}(
+            fyuz.swapExactETHForTokens{value: 0.05 ether}(
                 t,
                 0.05 ether,
                 0,
@@ -2156,7 +2168,7 @@ contract ArrowpadTest is Test {
         address t = _graduateV3("V3Mig", "V3M");
 
         // Curve fully cleared
-        IArrowpad.PoolInfo memory p = _pool(t);
+        IFyuz.PoolInfo memory p = _pool(t);
         assertEq(p.ethReserve, 0, "curve ETH cleared");
         assertEq(p.tokenReserve, 0, "curve token cleared");
         assertEq(p.virtualEthReserve, 0, "vETH cleared");
@@ -2175,7 +2187,7 @@ contract ArrowpadTest is Test {
     ///         the bonding curve graduated at, with no price gap.
     function test_21_NoPriceGap_V3Migration() public {
         console.log("=== TEST 21: No price gap after V3 migration ===");
-        uint256 ethPriceUSD = arrowpad.getETHPriceByUSD();
+        uint256 ethPriceUSD = fyuz.getETHPriceByUSD();
         address t = _graduateV3("V3Gap", "V3G");
 
         uint256 fdv = _v3FdvUsd(t, ethPriceUSD);
@@ -2197,7 +2209,7 @@ contract ArrowpadTest is Test {
         address tV2 = _create("ParityV2", "PV2", 1);
         for (uint256 i = 0; i < 1000 && !_pool(tV2).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether}(
+            fyuz.swapExactETHForTokens{value: 0.05 ether}(
                 tV2,
                 0.05 ether,
                 0,
@@ -2235,83 +2247,13 @@ contract ArrowpadTest is Test {
         });
     }
 
-    /// @dev V4 spot price (ETH-wei per token, 1e18-scaled) read from the pool's slot0.
-    function _v4PriceScaled(address t) internal view returns (uint256) {
-        (uint160 sp, , , ) = IPoolManager(V4_POOL_MGR).getSlot0(
-            _v4PoolKey(t).toId()
-        );
-        require(sp > 0, "V4 pool not initialized");
-        uint256 Q96 = 0x1000000000000000000000000;
-        // token1 per token0, 1e18-scaled (mulDiv avoids sqrtP^2 overflow)
-        uint256 priceX = Math.mulDiv(
-            Math.mulDiv(uint256(sp), uint256(sp), Q96),
-            1e18,
-            Q96
-        );
-        // Normalize to ETH-per-token regardless of currency ordering
-        return t < router.WETH() ? priceX : (1e36 / priceX);
-    }
-
-    function _v4FdvUsd(address t, uint256 ethPriceUSD)
-        internal
-        view
-        returns (uint256)
-    {
-        return (ethPriceUSD * TOTAL_SUPPLY * _v4PriceScaled(t)) / 1e36;
-    }
-
-    function _graduateV4(string memory name, string memory sym)
-        internal
-        returns (address t)
-    {
-        t = _create(name, sym, 3); // poolType 3 = Uniswap V4
-        for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
-            vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.05 ether}(
-                t,
-                0.05 ether,
-                0,
-                block.timestamp
-            );
-        }
-        require(_pool(t).launched, "V4 token did not graduate");
-    }
-
-    /// @notice V4 migration must succeed (tick alignment) and fund a real pool.
-    function test_23_V4MigrationCreatesFundedPool() public {
-        console.log("=== TEST 23: V4 migration creates a funded pool ===");
-        address t = _graduateV4("V4Mig", "V4M");
-
-        IArrowpad.PoolInfo memory p = _pool(t);
-        assertEq(p.ethReserve, 0, "curve ETH cleared");
-        assertEq(p.virtualEthReserve, 0, "vETH cleared");
-        assertTrue(Token(t).launched(), "token launched");
-
-        // Fresh token → its only V4 holder is the PoolManager singleton.
-        uint256 tokInPool = IERC20(t).balanceOf(V4_POOL_MGR);
-        uint256 price = _v4PriceScaled(t);
-        console.log("V4 token liquidity:", tokInPool / 1e18);
-        console.log("V4 spot price     :", price);
-        assertTrue(tokInPool > 0, "tokens in V4 pool");
-        assertTrue(price > 0, "V4 pool initialized");
-    }
-
-    /// @notice V4 pool must open at the target market cap — no price gap.
-    function test_24_NoPriceGap_V4Migration() public {
-        console.log("=== TEST 24: No price gap after V4 migration ===");
-        uint256 ethPriceUSD = arrowpad.getETHPriceByUSD();
-        uint256 target = arrowpad.TARGET_MARKET_CAP_USD();
-        address t = _graduateV4("V4Gap", "V4G");
-
-        uint256 fdv = _v4FdvUsd(t, ethPriceUSD);
-        console.log("Target MCAP USD :", target / 1e18);
-        console.log("V4 pool FDV USD :", fdv / 1e18);
-        console.log("V4 open price   :", _v4PriceScaled(t));
-        console.log("FDV gap (bps)   :", _absGapBps(fdv, target));
-
-        // Same invariant as V2 (test_17) and V3 (test_21): opens at target price.
-        assertApproxEqRel(fdv, target, 0.02e18, "V4 FDV != target mcap (price gap)");
-    }
+    // V4 graduation tests (old test_23 V4MigrationCreatesFundedPool and test_24
+    // NoPriceGap_V4Migration) and their helpers (_graduateV4/_v4PriceScaled/
+    // _v4FdvUsd) were removed: createToken now rejects poolType 3, so a V4 token
+    // can no longer be produced through Fyuz and these paths are unreachable.
+    // The equivalent V2 (test_17) and V3 (test_21) invariants still run, and
+    // test_10h now asserts poolType 3 is rejected. The dormant V4 seeding code in
+    // FyuzLiquidityManager is still exercised directly by TickBoundaryProbe.t.sol.
 
     // ================================================================
     //  25. LP FEE ROUTING AT GRADUATION
@@ -2323,10 +2265,10 @@ contract ArrowpadTest is Test {
         console.log("=== TEST 25: LP fees routed to designated recipients ===");
 
         // Zero trading fees so only the graduation LP-fee split moves balances.
-        arrowpad.setPlatformBuyFeeBps(0);
-        arrowpad.setTokenOwnerFeeBps(0);
-        arrowpad.setPlatformLPFee(0.1 ether);
-        arrowpad.setTokenOwnerLPFee(0.05 ether);
+        fyuz.setPlatformBuyFeeBps(0);
+        fyuz.setTokenOwnerFeeBps(0);
+        fyuz.setPlatformLPFee(0.1 ether);
+        fyuz.setTokenOwnerLPFee(0.05 ether);
 
         address creator = address(this); // _create is called by this test contract
         address t = _create("LPFee", "LPF", 1);
@@ -2336,7 +2278,7 @@ contract ArrowpadTest is Test {
 
         for (uint256 i = 0; i < 1000 && !_pool(t).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
+            fyuz.swapExactETHForTokens{value: 0.1 ether}(
                 t,
                 0.1 ether,
                 0,
@@ -2367,13 +2309,13 @@ contract ArrowpadTest is Test {
     /// @dev Buy 0.1 ETH increments until MCAP reaches pctBps/10000 of target,
     ///      stopping before graduation.
     function _driveTo(address t, uint256 pctBps) internal {
-        uint256 target = arrowpad.TARGET_MARKET_CAP_USD();
+        uint256 target = fyuz.TARGET_MARKET_CAP_USD();
         for (uint256 i = 0; i < 3000; i++) {
             if (_pool(t).launched) break;
-            if (arrowpad.getTokenVirtualMarketCap(t) >= (target * pctBps) / 10000)
+            if (fyuz.getTokenVirtualMarketCap(t) >= (target * pctBps) / 10000)
                 break;
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
+            fyuz.swapExactETHForTokens{value: 0.1 ether}(
                 t,
                 0.1 ether,
                 0,
@@ -2397,7 +2339,7 @@ contract ArrowpadTest is Test {
         // Graduation must still succeed (was a permanent brick before the fix).
         for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
+            fyuz.swapExactETHForTokens{value: 0.1 ether}(
                 t,
                 0.1 ether,
                 0,
@@ -2406,11 +2348,11 @@ contract ArrowpadTest is Test {
         }
         assertTrue(_pool(t).launched, "graduated despite pre-seeded pair");
 
-        uint256 fdv = _v2FdvUsd(t, arrowpad.getETHPriceByUSD());
+        uint256 fdv = _v2FdvUsd(t, fyuz.getETHPriceByUSD());
         console.log("V2 FDV after grief:", fdv / 1e18);
         assertApproxEqRel(
             fdv,
-            arrowpad.TARGET_MARKET_CAP_USD(),
+            fyuz.TARGET_MARKET_CAP_USD(),
             0.03e18,
             "V2 opens at target despite grief"
         );
@@ -2433,54 +2375,38 @@ contract ArrowpadTest is Test {
 
         // The graduation-crossing buy does NOT revert (the V3 addLiquidity reverts
         // internally, caught by the try/catch fallback, and V2 is used instead).
-        vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 1 ether}(
-            t,
-            1 ether,
-            0,
-            block.timestamp
-        );
+        // Loop rather than guess a single amount: the old flat `1 ether` was sized
+        // for the ETH-era curve (vETH 2.5 / $20k target), where the last 20% of the
+        // curve spanned ~0.46 ETH. At the shipping vETH 8.25 / $30k target on BNB
+        // that same 20% is ~2.34 ETH, so one 1 ETH buy no longer crossed and the
+        // token never graduated at all. Buying until launched keeps this tracking
+        // any recalibration — and the crossing buy still reverting would surface
+        // here, since nothing catches it at the test level.
+        for (uint256 i = 0; i < 500 && !_pool(t).launched; i++) {
+            vm.prank(addr1);
+            fyuz.swapExactETHForTokens{value: 1 ether}(
+                t,
+                1 ether,
+                0,
+                block.timestamp
+            );
+        }
 
         // Graduation must have succeeded via the V2 fallback path.
         assertTrue(_pool(t).launched, "graduated via V2 fallback");
         // poolType was flipped to V2 by the fallback.
         assertEq(_pool(t).poolType, 1, "poolType reset to V2");
         assertApproxEqRel(
-            _v2FdvUsd(t, arrowpad.getETHPriceByUSD()),
-            arrowpad.TARGET_MARKET_CAP_USD(),
+            _v2FdvUsd(t, fyuz.getETHPriceByUSD()),
+            fyuz.TARGET_MARKET_CAP_USD(),
             0.03e18,
             "V2 fallback opens at target mcap"
         );
     }
 
-    /// @notice V4: hostile pre-init — same auto-fallback to V2.
-    function test_28_V4HostilePreInit_FallsBackToV2() public {
-        console.log("=== TEST 28: V4 hostile pre-init falls back to V2 ===");
-        address t = _create("V4Grief", "V4GR", 3);
-
-        // Attacker initializes the V4 pool at a hostile price.
-        IPoolManager(V4_POOL_MGR).initialize(_v4PoolKey(t), HOSTILE_SQRT_PRICE);
-
-        _driveTo(t, 8000);
-        assertFalse(_pool(t).launched, "not launched while driving");
-
-        vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 1 ether}(
-            t,
-            1 ether,
-            0,
-            block.timestamp
-        );
-
-        assertTrue(_pool(t).launched, "graduated via V2 fallback");
-        assertEq(_pool(t).poolType, 1, "poolType reset to V2");
-        assertApproxEqRel(
-            _v2FdvUsd(t, arrowpad.getETHPriceByUSD()),
-            arrowpad.TARGET_MARKET_CAP_USD(),
-            0.03e18,
-            "V2 fallback opens at target mcap"
-        );
-    }
+    // Old test_28 (V4 hostile pre-init falls back to V2) was removed: poolType 3
+    // can no longer be created, so no V4 token can exist to be griefed. The V3
+    // hostile pre-init test above still covers the auto-fallback-to-V2 mechanism.
 
     /// @notice A buy whose platform fee rounds to 1 wei (feeHalf==0) must not revert.
     function test_29_DustFeeBuyDoesNotRevert() public {
@@ -2488,7 +2414,7 @@ contract ArrowpadTest is Test {
         address t = _create("Dust", "DUST", 1);
         // buyFee = 100 wei * 100 bps / 10000 = 1 wei -> feeHalf == 0
         vm.prank(addr1);
-        arrowpad.swapExactETHForTokens{value: 100}(t, 100, 0, block.timestamp);
+        fyuz.swapExactETHForTokens{value: 100}(t, 100, 0, block.timestamp);
         assertGt(IERC20(t).balanceOf(addr1), 0, "received tokens on dust buy");
     }
 
@@ -2499,15 +2425,22 @@ contract ArrowpadTest is Test {
 
         vm.prank(addr1);
         vm.expectRevert();
-        arrowpad.recoverPoolType(t, 1);
+        fyuz.recoverPoolType(t, 1);
 
-        vm.expectRevert("Invalid pool type");
-        arrowpad.recoverPoolType(t, 4);
+        vm.expectRevert("Only V2 or V3 pool type");
+        fyuz.recoverPoolType(t, 4);
+
+        // Back door: recoverPoolType must enforce the SAME V2/V3 gate as
+        // createToken, or the owner could route a token onto dormant V4 after
+        // creation and reach the code that createToken's gate blocks.
+        vm.expectRevert("Only V2 or V3 pool type");
+        fyuz.recoverPoolType(t, 3);
+        assertEq(_pool(t).poolType, 2, "poolType unchanged after rejected V4 recover");
 
         vm.expectRevert("Pool does not exist");
-        arrowpad.recoverPoolType(address(0xdead), 1);
+        fyuz.recoverPoolType(address(0xdead), 1);
 
-        arrowpad.recoverPoolType(t, 1);
+        fyuz.recoverPoolType(t, 1);
         assertEq(_pool(t).poolType, 1, "poolType updated by owner");
     }
 
@@ -2523,7 +2456,7 @@ contract ArrowpadTest is Test {
         address t = _create("BurnV2", "BV2", 1);
         for (uint256 i = 0; i < 2000 && !_pool(t).launched; i++) {
             vm.prank(addr1);
-            arrowpad.swapExactETHForTokens{value: 0.1 ether}(
+            fyuz.swapExactETHForTokens{value: 0.1 ether}(
                 t,
                 0.1 ether,
                 0,
@@ -2541,14 +2474,14 @@ contract ArrowpadTest is Test {
         assertGt(IERC20(pair).balanceOf(DEAD), 0, "LP held at burn address");
         // Nobody controllable holds LP.
         assertEq(IERC20(pair).balanceOf(address(liquidityManager)), 0, "LM=0");
-        assertEq(IERC20(pair).balanceOf(address(arrowpad)), 0, "arrowpad=0");
+        assertEq(IERC20(pair).balanceOf(address(fyuz)), 0, "fyuz=0");
         assertEq(IERC20(pair).balanceOf(address(this)), 0, "creator=0");
         assertEq(IERC20(pair).balanceOf(addr1), 0, "buyer=0");
         console.log("V2 LP totalSupply :", supply);
         console.log("V2 LP at 0xdead   :", IERC20(pair).balanceOf(DEAD));
     }
 
-    /// @notice V3 position NFT is minted to the burn address; LM/arrowpad hold none.
+    /// @notice V3 position NFT is minted to the burn address; LM/fyuz hold none.
     /// @notice V3 position is LOCKED IN THE MANAGER, not burned. Burning the NFT
     ///         would strand every fee the position ever earns, because collect() is
     ///         owner-only and 0xdEaD can never call it. Locking gives the same
@@ -2569,9 +2502,9 @@ contract ArrowpadTest is Test {
             "LM holds the position"
         );
         assertEq(
-            IERC20(V3_POS_MGR).balanceOf(address(arrowpad)),
+            IERC20(V3_POS_MGR).balanceOf(address(fyuz)),
             0,
-            "arrowpad holds no position"
+            "fyuz holds no position"
         );
         uint256 id = liquidityManager.v3PositionOf(t);
         assertTrue(id != 0, "position id recorded for fee collection");
@@ -2582,28 +2515,10 @@ contract ArrowpadTest is Test {
         );
     }
 
-    /// @notice V4 position is locked in the LM rather than burned, for the same
-    ///         reason as V3: a burned position's fees are unreachable forever.
-    function test_33_V4PositionLockedInManager() public {
-        console.log("=== TEST 33: V4 position NFT locked in LM ===");
-        uint256 deadBefore = IERC20(V4_POS_MGR).balanceOf(DEAD);
-        uint256 lmBefore = IERC20(V4_POS_MGR).balanceOf(address(liquidityManager));
-        address t = _graduateV4("LockV4", "LV4");
-        assertEq(
-            IERC20(V4_POS_MGR).balanceOf(DEAD),
-            deadBefore,
-            "position must NOT be burned"
-        );
-        assertEq(
-            IERC20(V4_POS_MGR).balanceOf(address(liquidityManager)),
-            lmBefore + 1,
-            "LM holds the position"
-        );
-        assertTrue(
-            liquidityManager.v4PositionOf(t) != 0,
-            "position id recorded for fee collection"
-        );
-    }
+    // Old test_33 (V4 position NFT locked in LM) was removed: it graduated a
+    // poolType 3 token, which createToken now rejects. The equivalent V3 position-
+    // lock invariant (test_32) still runs and covers the "never burn the position"
+    // rule for every DEX version Fyuz can actually reach.
 
     receive() external payable {}
 }
