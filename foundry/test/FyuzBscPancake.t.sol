@@ -97,6 +97,39 @@ contract FyuzBscPancakeTest is Test {
         emit log_named_uint("opening virtual mcap (USD, 1e18)", live);
     }
 
+    /// Protocol fee split per buy (1% total): treasury 0.6% + leaderboard 0.2%
+    /// (the 0.8% platform fee, split 3:1 by _payPlatformFee) + creator 0.2%.
+    function test_ProtocolFeeSplit_060_020_020() public {
+        address treasury = address(0x1111);
+        address leaderboard = address(0x2222);
+        address buyer = address(0x3333);
+        vm.deal(buyer, 1 ether);
+
+        fyuz.setFeeAddress(treasury);
+        fyuz.setDistributorAddress(leaderboard);
+        fyuz.setPlatformBuyFeeBps(80); // 0.6% treasury + 0.2% leaderboard
+        fyuz.setTokenOwnerFeeBps(20); // 0.2% creator
+
+        vm.prank(trader); // trader becomes pool.owner => the creator
+        address token = fyuz.createToken{value: 0.001 ether}(
+            "Fee", "FEE", 0, 0, 0, 1, block.timestamp + 1
+        );
+
+        uint256 tre0 = treasury.balance;
+        uint256 lb0 = leaderboard.balance;
+        uint256 cr0 = trader.balance; // creator == trader
+
+        uint256 buyAmt = 0.01 ether; // fees divide evenly at 80/20 bps
+        vm.prank(buyer);
+        fyuz.swapExactETHForTokens{value: buyAmt}(token, buyAmt, 0, block.timestamp + 1);
+
+        assertEq(treasury.balance - tre0, (buyAmt * 60) / 10000, "treasury 0.6%");
+        assertEq(leaderboard.balance - lb0, (buyAmt * 20) / 10000, "leaderboard 0.2%");
+        assertEq(trader.balance - cr0, (buyAmt * 20) / 10000, "creator 0.2%");
+        // treasury : leaderboard must be exactly 3 : 1
+        assertEq(treasury.balance - tre0, 3 * (leaderboard.balance - lb0), "3:1 split");
+    }
+
     /// The curve must actually be ABLE to reach the graduation target on BSC.
     ///
     /// Regression cover for a launch-blocking miscalibration: the virtual reserves

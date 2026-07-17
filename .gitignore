@@ -49,3 +49,4 @@ foundry/bin/
 .vscode/
 .mcp.json
 claude-flow.config.json
+forgepad-testnet-db.sql.gz

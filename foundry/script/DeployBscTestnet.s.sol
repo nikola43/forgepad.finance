@@ -69,15 +69,19 @@ contract DeployFyuzBscTestnet is Script {
     // feed. Fyuz reads priceFeedDecimals dynamically, so 8 decimals is handled.
     address constant DATA_FEED = 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526;
 
+    // ---- Protocol fee split (per buy/sell): 1% total ----
+    // Treasury 0.6% + Leaderboard 0.2% form the 0.8% PLATFORM fee (feeAddress =
+    // treasury, distributorAddress = leaderboard; _payPlatformFee splits 3:1).
+    // Token creator 0.2% is TOKEN_OWNER_FEE_BPS, paid to the token's owner.
+    address constant TREASURY = 0xFD84d752ca76C0C74EF13902ed388f2f9530E8B1;
+    address constant LEADERBOARD = 0x180b9B92da14818A82503b93BAa35B942BD63447;
+    uint256 constant PLATFORM_FEE_BPS = 80; // 0.6% treasury + 0.2% leaderboard
+    uint256 constant CREATOR_FEE_BPS = 20; // 0.2% to the token creator
+
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         require(pk != 0, "Set PRIVATE_KEY env var");
         address deployer = vm.addr(pk);
-
-        // No Distributor contract on BSC testnet; default to deployer and
-        // override via DISTRIBUTOR once a real one is deployed. Fyuz rejects a
-        // zero distributor.
-        address distributor = vm.envOr("DISTRIBUTOR", deployer);
 
         // ponytail: staleness overridable — testnet Chainlink feeds lag far more
         // than mainnet's ~60s heartbeat, so bump STALENESS if graduation locks up
@@ -107,11 +111,13 @@ contract DeployFyuzBscTestnet is Script {
         );
         console.log("FyuzLiquidityManager:", address(lm));
 
+        // feeAddress = TREASURY, distributorAddress = LEADERBOARD. _payPlatformFee
+        // splits the 0.8% platform fee 3:1 → 0.6% treasury + 0.2% leaderboard.
         Fyuz fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(lm),
-            deployer, // _feeAddress
-            distributor, // _distributorAddress
+            TREASURY, // _feeAddress      (0.6% treasury)
+            LEADERBOARD, // _distributorAddress (0.2% leaderboard)
             deployer
         );
         console.log("Fyuz:", address(fyuz));
@@ -119,9 +125,12 @@ contract DeployFyuzBscTestnet is Script {
         // Authorize Fyuz to drive the liquidity manager at graduation.
         lm.setAuthorizedCaller(address(fyuz), true);
 
-        // 1% buy / 1% sell (100 bps), full buy/sell size allowed.
-        fyuz.setPlatformBuyFeeBps(100);
-        fyuz.setPlatformSellFeeBps(100);
+        // Protocol fee split, 1% total per buy/sell:
+        //   0.6% treasury + 0.2% leaderboard = 0.8% platform (PLATFORM_FEE_BPS)
+        //   0.2% token creator                = CREATOR_FEE_BPS
+        fyuz.setPlatformBuyFeeBps(PLATFORM_FEE_BPS);
+        fyuz.setPlatformSellFeeBps(PLATFORM_FEE_BPS);
+        fyuz.setTokenOwnerFeeBps(CREATOR_FEE_BPS);
         fyuz.setMaxBuyPercent(10000);
         fyuz.setMaxSellPercent(10000);
         fyuz.setPriceStalenessThreshold(staleness);
@@ -136,7 +145,10 @@ contract DeployFyuzBscTestnet is Script {
         console.log("  ProxyAdmin:     ", _proxyAdmin(address(fyuz)));
         console.log("LiquidityManager: ", address(lm));
         console.log("  ProxyAdmin:     ", _proxyAdmin(address(lm)));
-        console.log("Distributor:      ", distributor);
+        console.log("Treasury (0.6%):  ", fyuz.feeAddress());
+        console.log("Leaderboard(0.2%):", fyuz.distributorAddress());
+        console.log("Creator fee bps:  ", fyuz.TOKEN_OWNER_FEE_BPS());
+        console.log("Platform fee bps: ", fyuz.PLATFORM_BUY_FEE_BPS());
         console.log("Data feed (BNB/USD):", DATA_FEED);
         console.log("Target MCAP (USD):", fyuz.TARGET_MARKET_CAP_USD() / 1e18);
         console.log("Staleness (s):    ", fyuz.priceStalenessThreshold());

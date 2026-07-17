@@ -1056,13 +1056,18 @@ contract Fyuz is
         }
     }
 
-    /// @dev Split a platform fee to feeAddress + distributor, tolerant of a
-    ///      misconfigured recipient (never bricks trading).
+    /// @dev Split the per-trade platform fee 3:1 — treasury (feeAddress) gets
+    ///      3/4, leaderboard (distributorAddress) gets 1/4. With the 80bps
+    ///      platform fee this realizes the protocol split of 0.6% treasury +
+    ///      0.2% leaderboard per buy/sell; the token creator's 0.2% is paid
+    ///      separately in _payTokenOwnerFee. The remainder (fee - treasuryCut)
+    ///      goes to the leaderboard so no wei is lost to rounding. Tolerant of a
+    ///      misconfigured recipient so a bad address never bricks trading.
     function _payPlatformFee(uint256 fee) private {
         if (fee == 0) return;
-        uint256 half = fee / 2;
-        if (half > 0) _transferETHTolerant(feeAddress, half);
-        _transferETHTolerant(distributorAddress, fee - half);
+        uint256 treasuryCut = (fee * 3) / 4; // 0.6% of the 0.8% platform fee
+        if (treasuryCut > 0) _transferETHTolerant(feeAddress, treasuryCut);
+        _transferETHTolerant(distributorAddress, fee - treasuryCut); // 0.2%
     }
 
     // ==================== ADMIN FUNCTIONS ====================
