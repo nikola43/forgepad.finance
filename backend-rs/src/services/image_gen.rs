@@ -93,6 +93,9 @@ async fn generate_openai(
             "prompt": prompt,
             "n": 1,
             "size": "1024x1024",
+            // Fusions name real public figures; default moderation rejects most
+            // of those outright. "low" is the documented relaxed tier.
+            "moderation": "low",
         }))
         .send()
         .await

@@ -65,7 +65,12 @@ services:
       # Set it to the deployment block (or the anvil fork block on a localnet).
       INDEXER_START_BLOCK: ${INDEXER_START_BLOCK:-0}
       PORT: "5001"
-      CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,http://localhost:3000,http://localhost:8080"
+      # :3000 = npm-dev frontend, :3001 = the dockerised frontend service below.
+      CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,http://localhost:3000,http://localhost:3001,http://localhost:8080"
+      # Fusion image generation: "openai" (default) needs OPENAI_API_KEY and fails
+      # loudly without it; localnet.sh sets "mock" so the flow works offline.
+      IMAGE_GEN_PROVIDER: ${IMAGE_GEN_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: https://api.fyuz.fun/uploads
@@ -149,9 +154,12 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
-        NEXT_PUBLIC_LOCAL_MODE: "false"
-        NEXT_PUBLIC_API_URL: https://api.fyuz.fun
-        NEXT_PUBLIC_BSC_RPC_URL: ${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}
+        NEXT_PUBLIC_LOCAL_MODE: ${NEXT_PUBLIC_LOCAL_MODE:-false}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.fyuz.fun}
+        # Browser-facing RPC/chain id — on a localnet these must be the host-reachable
+        # anvil (127.0.0.1) and its chain id, same caveat as BSC_PUBLIC_RPC_URL above.
+        NEXT_PUBLIC_BSC_RPC_URL: ${BSC_PUBLIC_RPC_URL:-${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}}
+        NEXT_PUBLIC_BSC_CHAIN_ID: ${CHAIN_ID:-56}
         NEXT_PUBLIC_BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://bscscan.com}
     ports:
       - "3001:80"

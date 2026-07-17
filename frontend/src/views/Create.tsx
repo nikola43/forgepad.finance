@@ -48,6 +48,10 @@ import { socket } from "@/utils/socket";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "../hooks/config";
 //import { uploadImageToIPFS } from "../utils";
 
+// Every launch must open with at least this much bought, in USD. Converted to
+// BNB at confirm time via the contract's Chainlink feed.
+const MIN_CREATE_BUY_USD = 10;
+
 // Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`
   font-family: var(--font-display);
@@ -311,6 +315,8 @@ export default function Create() {
   // const [showParticles, setShowParticles] = React.useState(false)
   const [poolType, setPoolType] = React.useState(1);
   const [isDirectLaunch, setIsDirectLaunch] = React.useState(false);
+  // Mandatory $10 initial buy, converted to BNB at confirm time (see effect below).
+  const [minBuyBnb, setMinBuyBnb] = React.useState<number>();
 
 
   const chain = useMemo(
@@ -341,10 +347,37 @@ export default function Create() {
     if (!character2) return "You have to name the second character";
     if (!coinName) return "You have to type token name";
     if (!coinTicker) return "You have to type token ticker";
+    if (!isDirectLaunch && minBuyBnb && Number(initBuyAmount || 0) < minBuyBnb)
+      return `Minimum initial buy is $${MIN_CREATE_BUY_USD} (${minBuyBnb} BNB)`;
     // if (maxBuyAmount && Number(initBuyAmount) > maxBuyAmount)
     //     return `The initial purchase cannot exceed ${priceFormatter(maxBuyAmount)} ETH`
     return undefined;
-  }, [character1, character2, coinName, coinTicker]);
+  }, [character1, character2, coinName, coinTicker, isDirectLaunch, minBuyBnb, initBuyAmount]);
+
+  // Mandatory minimum buy: when the confirm modal opens, read live BNB/USD from
+  // the contract's Chainlink feed (getETHPriceByUSD, 1e18-scaled) and pre-fill
+  // the Spend field with $10 worth of BNB. The error memo above keeps the
+  // confirm button disabled below that amount.
+  // ponytail: UI-level enforcement only — the contract itself doesn't require it.
+  React.useEffect(() => {
+    if (!deployModal || isDirectLaunch || !chain) return;
+    (async () => {
+      try {
+        const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
+        const fyuz = new ethers.Contract(chain.contractAddress, chain.abi, provider);
+        const bnbUsd = Number(ethers.formatEther(await fyuz.getETHPriceByUSD()));
+        if (!bnbUsd) return;
+        // Round UP to 6 decimals so the prefilled amount never dips below $10.
+        const min = Math.ceil((MIN_CREATE_BUY_USD / bnbUsd) * 1e6) / 1e6;
+        setMinBuyBnb(min);
+        setInitBuyAmount((cur) => (Number(cur || 0) < min ? String(min) : cur));
+      } catch (e) {
+        // Price read failed (e.g. stale feed on a paused fork): don't block
+        // creation on a UI-only check.
+        console.error("min-buy price fetch failed:", e);
+      }
+    })();
+  }, [deployModal, isDirectLaunch, chain]);
 
   // const setInitLiquidityPercent = (percent: number) => {
   //     const amount = maxLiquidity * (percent * 100) / 100
@@ -355,6 +388,10 @@ export default function Create() {
     const amount = Number(userInfo?.balance ?? 0) * percent;
     setInitBuyAmount(priceWithoutZero(amount));
   };
+
+  // The fused image is the token logo — block confirming until it exists.
+  const imageReady = !!avatar && String(avatar).startsWith("http");
+  const confirmDisabled = isLoading || generating || !imageReady || !!error;
 
   const handleClickOpen = () => {
     if (!address) {
@@ -397,7 +434,9 @@ export default function Create() {
     // preview is (usually) ready by the time the user reviews their buy amount.
     if (!avatar || !String(avatar).startsWith("http")) {
       generateFusionImage().catch((err: any) => {
-        toast.error(err?.response?.data?.error || err?.message || "Image generation failed");
+        // No Regenerate button and the confirm button stays disabled without an
+        // image — tell the user the retry path.
+        toast.error(`${err?.response?.data?.error || err?.message || "Image generation failed"} — close and reopen to retry`);
       });
     }
   };
@@ -478,6 +517,13 @@ export default function Create() {
         sig,
         isDirectLaunch,
       })
+      // Arm the deploy listener BEFORE sending the tx: on a fast chain the
+      // backend can index the deployment and broadcast 'deployed' before the
+      // wallet promise below resolves — arming afterwards drops that event and
+      // the modal spins until the safety timeout.
+      redirectNetworkRef.current = chain?.network;
+      awaitingDeployRef.current = true;
+
       if (isDirectLaunch) {
         await handlers.createTokenDirect(
           {
@@ -514,14 +560,42 @@ export default function Create() {
       // Tx submitted. Keep the first modal's button in its loading state until
       // the backend confirms the deployment, then redirect to the token page.
       // No intermediate "waiting confirmation" modal.
-      redirectNetworkRef.current = chain?.network;
-      awaitingDeployRef.current = true;
       setWaitingForDeploy(true);
       playSuccessSound();
+
+      // Fallback: the socket can drop or the event can slip by — poll the API
+      // for the indexed token and redirect from here if the event never lands.
+      const creator = String(address).toLowerCase();
+      const pollForToken = setInterval(async () => {
+        if (!awaitingDeployRef.current) {
+          clearInterval(pollForToken);
+          return;
+        }
+        try {
+          const { data } = await axios.get(`${API_ENDPOINT}/tokens`, {
+            params: { searchWord: coinTicker },
+          });
+          const t = (data?.tokenList ?? []).find(
+            (t: any) =>
+              t?.tokenSymbol === coinTicker &&
+              t?.creatorAddress?.toLowerCase() === creator &&
+              t?.tokenAddress
+          );
+          if (t) {
+            clearInterval(pollForToken);
+            awaitingDeployRef.current = false;
+            if (deployTimeoutRef.current) clearTimeout(deployTimeoutRef.current);
+            window.location.href = `/token?network=${redirectNetworkRef.current || t.network}&address=${t.tokenAddress}`;
+          }
+        } catch {
+          // transient API hiccup — keep polling until the safety timeout
+        }
+      }, 3000);
 
       // Safety net: release the button if confirmation never arrives.
       if (deployTimeoutRef.current) clearTimeout(deployTimeoutRef.current);
       deployTimeoutRef.current = setTimeout(() => {
+        clearInterval(pollForToken);
         if (!awaitingDeployRef.current) return;
         awaitingDeployRef.current = false;
         setWaitingForDeploy(false);
@@ -532,6 +606,10 @@ export default function Create() {
       // Leave isLoading = true; the button keeps spinning until the redirect.
       return;
     } catch (ex: any) {
+      // The tx never went through — disarm so a stray 'deployed' broadcast
+      // from someone else's launch can't redirect this tab.
+      awaitingDeployRef.current = false;
+      setWaitingForDeploy(false);
       console.error("Error deploying token:", ex);
       const messageError =
         ex?.shortMessage || ex?.data?.message || ex?.message || "Unknown error";
@@ -866,25 +944,16 @@ export default function Create() {
                 <CircularProgress size={28} sx={{ position: "absolute", color: "var(--citron)" }} />
               )}
             </Box>
-            <Button
-              size="small"
-              disabled={generating}
-              onClick={() => generateFusionImage().catch((err: any) => toast.error(err?.response?.data?.error || err?.message || "Image generation failed"))}
-              sx={{ textTransform: "none", color: "var(--muted)", fontSize: 12 }}
-            >
-              {generating ? "Fusing…" : "↻ Regenerate"}
-            </Button>
           </Box>
           <DialogContentText mb="1rem" fontSize={14}>
             {isDirectLaunch
               ? "Create token with 1B supply. No bonding curve."
-              : `Choose how many ${network?.nativeCurrency.symbol} you want to buy (optional).`
+              : `Choose how many ${network?.nativeCurrency.symbol} you want to buy (minimum $${MIN_CREATE_BUY_USD}).`
             }
           </DialogContentText>
           {!isDirectLaunch && (
             <DialogContentText mb="1rem" fontSize={14}>
-              Tip: its optional but buying a small amount of coins helps protect
-              your coin from snipers
+              Tip: your opening buy helps protect your coin from snipers
             </DialogContentText>
           )}
           {!isDirectLaunch && (
@@ -938,7 +1007,7 @@ export default function Create() {
         </DialogContent>
         <DialogActions>
           <Button
-            disabled={isLoading || !!error}
+            disabled={confirmDisabled}
             endIcon={
               isLoading ? (
                 <CircularProgress size={18} sx={{ color: "var(--moss-black)" }} />
@@ -947,7 +1016,7 @@ export default function Create() {
             onClick={deployToken}
             fullWidth
             sx={{
-              background: isLoading || !!error
+              background: confirmDisabled
                 ? "rgba(191, 209, 67, 0.3)"
                 : "var(--citron)",
               color: "var(--moss-black)",
@@ -958,12 +1027,12 @@ export default function Create() {
               textTransform: "none",
               transition: "all 0.2s ease",
               "&:hover": {
-                background: isLoading || !!error
+                background: confirmDisabled
                   ? "rgba(191, 209, 67, 0.3)"
                   : "var(--accent-light)",
               },
               "&:active": {
-                transform: isLoading || !!error ? "none" : "scale(0.98)",
+                transform: confirmDisabled ? "none" : "scale(0.98)",
               },
               "&:disabled": {
                 // Pure moss-black loading label + spinner for clear contrast on the
@@ -976,7 +1045,9 @@ export default function Create() {
               ? waitingForDeploy
                 ? "Confirming on-chain..."
                 : "Creating token..."
-              : "Book the bout"}
+              : generating
+                ? "Fusing image..."
+                : "Book the bout"}
           </Button>
         </DialogActions>
         {
