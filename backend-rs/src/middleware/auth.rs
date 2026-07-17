@@ -139,9 +139,10 @@ pub fn recover_fresh(
 /// PLUS single-use enforcement — the signature is recorded in Redis for its
 /// validity window so it cannot be replayed even within the freshness window.
 ///
-/// Fail-open on Redis errors: if Redis is unreachable we still return the
-/// freshness/binding-verified address, so an infra blip never locks users out;
-/// replay is then bounded only by the (short) freshness window.
+/// Fail-CLOSED on Redis errors: if the single-use store is unreachable we reject
+/// the action rather than silently degrading to replay-able within the freshness
+/// window. For a financial app the correct posture is to refuse the mutation when
+/// the anti-replay guard can't be enforced; Redis is expected to be HA in prod.
 pub async fn verify_signed_action(
     state: &crate::AppState,
     message: &str,
@@ -160,28 +161,34 @@ pub async fn verify_signed_action(
     let key = format!("sig_nonce:{}", hex::encode(hasher.finalize()));
     let ttl_secs = (SIGNATURE_MAX_AGE_MS / 1000) + 60;
 
-    match state.redis.get_multiplexed_async_connection().await {
-        Ok(mut conn) => {
-            // SET key 1 NX EX ttl -> Some on first use, None if it already exists.
-            let res: Result<Option<String>, redis::RedisError> = redis::cmd("SET")
-                .arg(&key)
-                .arg(1)
-                .arg("NX")
-                .arg("EX")
-                .arg(ttl_secs)
-                .query_async(&mut conn)
-                .await;
-            match res {
-                Ok(Some(_)) => {}
-                Ok(None) => {
-                    return Err(AppError::Unauthorized(
-                        "Signature already used".to_string(),
-                    ))
-                }
-                Err(e) => tracing::warn!("Redis nonce check failed (fail-open): {e}"),
-            }
-        }
-        Err(e) => tracing::warn!("Redis unavailable for nonce check (fail-open): {e}"),
+    let mut conn = state
+        .redis
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|e| {
+            tracing::error!("Redis unavailable for nonce check (fail-closed): {e}");
+            AppError::Internal(anyhow::anyhow!(
+                "Anti-replay store unavailable; try again shortly"
+            ))
+        })?;
+
+    // SET key 1 NX EX ttl -> Some on first use, None if it already exists.
+    let res: Option<String> = redis::cmd("SET")
+        .arg(&key)
+        .arg(1)
+        .arg("NX")
+        .arg("EX")
+        .arg(ttl_secs)
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| {
+            tracing::error!("Redis nonce check failed (fail-closed): {e}");
+            AppError::Internal(anyhow::anyhow!(
+                "Anti-replay store unavailable; try again shortly"
+            ))
+        })?;
+    if res.is_none() {
+        return Err(AppError::Unauthorized("Signature already used".to_string()));
     }
 
     Ok(recovered)

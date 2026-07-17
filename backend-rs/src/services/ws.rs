@@ -29,11 +29,29 @@ pub fn create_socketio(state: Arc<AppState>) -> SocketIoLayer {
             "SubAdd",
             |socket: SocketRef, Data(payload): Data<SubAddPayload>, _state: SioState<Arc<AppState>>| async move {
                 tracing::debug!("SubAdd: {}", payload.address);
+                // Validate the room name looks like a token address and cap how
+                // many rooms one socket may join — otherwise a client can join
+                // unbounded arbitrary rooms and exhaust server memory.
+                const MAX_ROOMS_PER_SOCKET: usize = 100;
+                let addr = payload.address.trim();
+                let looks_like_address = addr.len() <= 64
+                    && addr
+                        .strip_prefix("0x")
+                        .unwrap_or(addr)
+                        .chars()
+                        .all(|c| c.is_ascii_hexdigit());
+                if !looks_like_address {
+                    return;
+                }
+                if socket.rooms().len() >= MAX_ROOMS_PER_SOCKET {
+                    tracing::debug!("SubAdd room cap reached for socket {}", socket.id);
+                    return;
+                }
                 // Room membership (join/leave) is the source of truth for
                 // subscriptions. The previous ws_subs bookkeeping keyed on a
                 // parsed socket id that always resolved to 0, so it was dead
                 // code and has been removed.
-                let _ = socket.join(payload.address);
+                let _ = socket.join(addr.to_string());
             },
         );
 

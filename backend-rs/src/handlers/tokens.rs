@@ -27,6 +27,8 @@ pub struct ListTokensQuery {
     pub order_flag: Option<String>,
     pub search_word: Option<String>,
     pub network: Option<String>,
+    /// Exact-match filter on the fusion's image style ("all" = no filter).
+    pub style: Option<String>,
     pub include_nsfw: Option<bool>,
     pub page_number: Option<i64>,
     pub page_size: Option<i64>,
@@ -46,6 +48,7 @@ pub struct CreateTokenBody {
     pub token_name: String,
     pub token_symbol: String,
     pub token_description: Option<String>,
+    pub image_style: Option<String>,
     pub token_image: Option<String>,
     pub network: String,
     pub telegram_link: Option<String>,
@@ -173,6 +176,12 @@ pub async fn list_tokens(
                 where_clauses.push(format!("t.network = ${}", bind_values.len()));
             }
         }
+        if let Some(ref style) = params.style {
+            if style != "all" && !style.is_empty() {
+                bind_values.push(style.clone());
+                where_clauses.push(format!("t.image_style = ${}", bind_values.len()));
+            }
+        }
 
         let where_sql = if where_clauses.is_empty() {
             String::new()
@@ -259,10 +268,18 @@ pub async fn list_tokens(
                     .load(&mut conn)
                     .await?
             }
+            2 => {
+                diesel::sql_query(&id_query)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .bind::<Text, _>(bind_values[1].clone())
+                    .load(&mut conn)
+                    .await?
+            }
             _ => {
                 diesel::sql_query(&id_query)
                     .bind::<Text, _>(bind_values[0].clone())
                     .bind::<Text, _>(bind_values[1].clone())
+                    .bind::<Text, _>(bind_values[2].clone())
                     .load(&mut conn)
                     .await?
             }
@@ -276,10 +293,18 @@ pub async fn list_tokens(
                     .load(&mut conn)
                     .await?
             }
+            2 => {
+                diesel::sql_query(&count_str)
+                    .bind::<Text, _>(bind_values[0].clone())
+                    .bind::<Text, _>(bind_values[1].clone())
+                    .load(&mut conn)
+                    .await?
+            }
             _ => {
                 diesel::sql_query(&count_str)
                     .bind::<Text, _>(bind_values[0].clone())
                     .bind::<Text, _>(bind_values[1].clone())
+                    .bind::<Text, _>(bind_values[2].clone())
                     .load(&mut conn)
                     .await?
             }
@@ -337,6 +362,12 @@ pub async fn list_tokens(
         }
     }
 
+    if let Some(ref style) = params.style {
+        if style != "all" && !style.is_empty() {
+            query = query.filter(tokens::image_style.eq(style));
+        }
+    }
+
     if let Some(ref word) = params.search_word {
         if !word.is_empty() {
             // Bound parameter via ilike (case-insensitive) — never interpolate input.
@@ -368,6 +399,11 @@ pub async fn list_tokens(
     if let Some(ref network) = params.network {
         if network != "all" {
             count_q = count_q.filter(tokens::network.eq(network));
+        }
+    }
+    if let Some(ref style) = params.style {
+        if style != "all" && !style.is_empty() {
+            count_q = count_q.filter(tokens::image_style.eq(style));
         }
     }
     if let Some(ref word) = params.search_word {
@@ -444,9 +480,13 @@ pub async fn get_king(
 ) -> AppResult<Json<serde_json::Value>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
+    // King of the Hill is a bonding-curve race: once a token graduates
+    // (launched_at set), it leaves the hill and the crown passes to the
+    // highest-marketcap token still on the curve.
     let result: Option<(Token, User)> = tokens::table
         .inner_join(users::table.on(users::id.eq(tokens::creator_id)))
         .filter(tokens::category.eq(TokenCategory::Normal))
+        .filter(tokens::launched_at.is_null())
         .order(tokens::marketcap.desc())
         .first(&mut conn)
         .await
@@ -630,6 +670,13 @@ pub async fn create_token(
     if body.token_symbol.is_empty() || body.token_symbol.len() > 20 {
         return Err(AppError::BadRequest("Token symbol must be 1-20 chars".to_string()));
     }
+    // image_style lands in a VARCHAR(200) at indexing time — reject oversized
+    // values here, before the token deploys on-chain and indexing would fail.
+    if body.image_style.as_deref().is_some_and(|s| s.chars().count() > 200) {
+        return Err(AppError::BadRequest(
+            "imageStyle must be 200 characters or fewer".to_string(),
+        ));
+    }
 
     // Validate network
     let _chain = find_chain(&state, &body.network)?;
@@ -647,6 +694,7 @@ pub async fn create_token(
                 "tokenName": body.token_name,
                 "tokenSymbol": body.token_symbol,
                 "tokenDescription": body.token_description,
+                "imageStyle": body.image_style,
                 "tokenImage": body.token_image,
                 "network": body.network,
                 "telegramLink": body.telegram_link,
@@ -691,8 +739,11 @@ pub async fn create_token(
                 .signature
                 .as_deref()
                 .ok_or_else(|| AppError::Unauthorized("Signature required".to_string()))?;
-            let recovered =
-                verify_signed_action(&state, msg, signature, Some("Update token ")).await?;
+            // Bind the signature to THIS token (like move_token does) so an
+            // "Update token" signature for one token can't be redirected to
+            // another via the attacker-controlled token_address in the body.
+            let prefix = format!("Update token {token_addr}");
+            let recovered = verify_signed_action(&state, msg, signature, Some(&prefix)).await?;
             if !recovered.eq_ignore_ascii_case(&user.address) {
                 return Err(AppError::Forbidden(
                     "Only the creator can update this token".to_string(),
@@ -755,8 +806,11 @@ pub async fn move_token(
         _ => return Err(AppError::BadRequest("Category must be 'normal' or 'NSFW'".to_string())),
     };
 
+    // Stored addresses are always lowercase (the indexer hex-encodes them), so
+    // match case-insensitively — a checksummed path param would otherwise
+    // silently no-op the moderation update (updated == 0).
     let updated = diesel::update(
-        tokens::table.filter(tokens::token_address.eq(&token_address)),
+        tokens::table.filter(tokens::token_address.eq(token_address.to_lowercase())),
     )
     .set(tokens::category.eq(category))
     .execute(&mut conn)
@@ -809,6 +863,12 @@ pub struct GenerateImageBody {
     pub character2: String,
     #[serde(default)]
     pub name: Option<String>,
+    /// Universe/art style for the fusion. Blank → a random curated style.
+    #[serde(default)]
+    pub style: Option<String>,
+    /// Wallet-signed authorization: the frontend signs "Generate image\n<addr>\n<ts>".
+    pub msg: String,
+    pub signature: String,
 }
 
 /// POST /tokens/generate-image
@@ -818,18 +878,17 @@ pub struct GenerateImageBody {
 /// gpt-image-1), stores it on our own S3, and returns the URL — so the browser
 /// never sees the OpenAI key and the image is served from our bucket, not a
 /// short-lived provider URL.
+///
+/// Auth: this is a PAID path (each call spends OpenAI credits), so it requires a
+/// fresh, single-use wallet signature — NOT a shared api-key. The old api-key
+/// gate used a constant that had to be shipped to the browser, making the paid
+/// endpoint anonymously reachable. A per-call signature ties every generation to
+/// a real wallet and is replay-protected; the per-IP rate limiter bounds volume.
 pub async fn generate_image(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(body): Json<GenerateImageBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let api_key = headers
-        .get("api-key")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if api_key != state.api_key {
-        return Err(AppError::Unauthorized("Invalid API key".to_string()));
-    }
+    verify_signed_action(&state, &body.msg, &body.signature, Some("Generate image")).await?;
 
     let c1 = body.character1.trim();
     let c2 = body.character2.trim();
@@ -844,10 +903,17 @@ pub async fn generate_image(
             "Character descriptions must be 200 characters or fewer".to_string(),
         ));
     }
+    if body.style.as_deref().is_some_and(|s| s.chars().count() > 200) {
+        return Err(AppError::BadRequest(
+            "Style must be 200 characters or fewer".to_string(),
+        ));
+    }
 
-    let img = crate::services::image_gen::generate_fusion(c1, c2, body.name.as_deref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Image generation failed: {e}")))?;
+    let style = crate::services::image_gen::resolve_style(body.style.as_deref());
+    let img =
+        crate::services::image_gen::generate_fusion(c1, c2, body.name.as_deref(), &style.clause)
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Image generation failed: {e}")))?;
 
     let (url, key) = store_image_bytes(&state, &img.bytes, img.ext, img.content_type).await?;
 
@@ -855,6 +921,9 @@ pub async fn generate_image(
         "success": true,
         "url": url,
         "key": key,
+        // The style actually used (canonical label when curated/auto-picked) so
+        // the client can persist it with the token.
+        "style": style.label,
     })))
 }
 

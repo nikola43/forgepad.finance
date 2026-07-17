@@ -7,7 +7,8 @@ use futures::StreamExt;
 
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 use serde_json::json;
 use std::str::FromStr;
 
@@ -15,7 +16,7 @@ use crate::config::chains::ChainConfig;
 use crate::models::enums::TradeType;
 use crate::models::indexing::{IndexingState, NewIndexingState};
 use crate::models::request::TokenCreationRequest;
-use crate::schema::{holders, indexing_state, token_creation_requests, tokens, trades, users};
+use crate::schema::{holders, indexing_state, kings, token_creation_requests, tokens, trades, users};
 use crate::{AppState, WsEvent};
 
 /// Score decay function matching the Node.js implementation:
@@ -208,17 +209,32 @@ async fn catch_up<P: Provider>(
     contract_address: Address,
     mut last_block: u64,
 ) -> anyhow::Result<u64> {
-    const CHUNK_SIZE: u64 = 50_000;
+    // Chunk size bounded by the RPC's getLogs range cap. Archive nodes handle
+    // 50k; some providers cap lower — override with INDEXER_CHUNK_SIZE.
+    let chunk_size: u64 = std::env::var("INDEXER_CHUNK_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(50_000);
+    // Confirmation depth: index only up to head - N so a near-head reorg is
+    // resolved BEFORE we index those blocks (a reorged-out trade would otherwise
+    // corrupt reserves/holder balances permanently). Prod-safe default; the
+    // localnet fork sets INDEXER_CONFIRMATIONS=0 for immediate indexing.
+    let confirmations: u64 = std::env::var("INDEXER_CONFIRMATIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(12);
     let head = provider
         .get_block_number()
         .await
-        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?
+        .saturating_sub(confirmations);
 
     // Cursor semantics (consistent with the subscribe loop): `last_block` is the
     // highest FULLY-PROCESSED block; the next block to fetch is `last_block + 1`.
     while last_block < head {
         let from = last_block + 1;
-        let end = (from + CHUNK_SIZE - 1).min(head);
+        let end = (from + chunk_size - 1).min(head);
         tracing::info!("Chain {} catching up blocks {} to {}", chain.network, from, end);
 
         let filter = Filter::new()
@@ -301,6 +317,7 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     let token_created_sig = keccak256(b"TokenCreated(address,uint256,uint256,uint32,uint256)");
     let buy_tokens_sig = keccak256(b"BuyTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
     let sell_tokens_sig = keccak256(b"SellTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
+    let token_launched_sig = keccak256(b"TokenLaunched(address,uint256)");
 
     // log index within its block — used together with tx_hash as the trade's
     // idempotency key so replays/reorgs cannot double-count.
@@ -315,6 +332,16 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     } else if *topic == sell_tokens_sig {
         let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
         process_swap_log(state, chain, &data.data, false, &tx_hash, log_index).await?;
+    } else if *topic == token_launched_sig {
+        // TokenLaunched(address token, uint256 date) — both non-indexed, in data.
+        let d = &data.data;
+        if d.len() >= 64 {
+            let token_address = format!("0x{}", hex::encode(&d[12..32])).to_lowercase();
+            let timestamp = U256::from_be_slice(&d[32..64]).to::<u64>() as i64;
+            // ponytail: event has no pair address; launched_at is what gates
+            // king/discover/rewards. Backfill pair via factory lookup if needed.
+            process_token_launched(state, &token_address, "", timestamp).await?;
+        }
     }
 
     Ok(())
@@ -335,10 +362,20 @@ async fn process_token_created_log(
     let token_address = format!("0x{}", hex::encode(&data[12..32]));
     // String-parse (not u64::try_from) so a large price never silently truncates to 0.
     let token_price = U256::from_be_slice(&data[32..64]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
+    // The event carries the contract's own ethPriceUSD — use it. Falling back to a
+    // hardcoded $2040 ETH price is wrong on BSC (BNB ≈ $565) and inflates the
+    // creation-time marketcap ~3.6x; a live RPC read is the next-best source, and
+    // 0 (self-heals on the first trade) is better than a fabricated number.
+    let event_eth_price =
+        U256::from_be_slice(&data[64..96]).to_string().parse::<f64>().unwrap_or(0.0) / 1e18;
     let request_id = u64::try_from(U256::from_be_slice(&data[96..128])).unwrap_or(0) as i32;
     let timestamp = u64::try_from(U256::from_be_slice(&data[128..160])).unwrap_or(0) as i64;
 
-    let eth_price = fetch_eth_price(chain).await.unwrap_or(2040.0);
+    let eth_price = if event_eth_price > 0.0 {
+        event_eth_price
+    } else {
+        fetch_eth_price(chain).await.unwrap_or(0.0)
+    };
     let pool_type = fetch_pool_type(chain, &token_address).await.unwrap_or(crate::models::enums::PoolType::V2);
 
     process_token_created(
@@ -579,28 +616,32 @@ pub async fn process_token_created(
 
     let body = &request.body;
 
-    // The staging request (POST /tokens) is unauthenticated and carries a
-    // client-claimed creator_address, so it cannot be trusted for attribution.
-    // Authenticate the creator against the actual on-chain transaction sender.
-    // Fall back to the claimed address only if the RPC lookup fails.
-    let mut creator_address = request.creator_address.to_lowercase();
-    match fetch_tx_sender(chain, tx_hash).await {
+    // The staging request (POST /tokens) is unauthenticated and its `sig` (the PK)
+    // is guessable, so an attacker could deploy their own token quoting a VICTIM's
+    // pending sig to bind the victim's name/image to the attacker's token and
+    // consume (brick) the victim's request. Defend by requiring the on-chain tx
+    // SENDER to match the request's claimed creator: a hijacker's deploy is sent
+    // from the attacker's address, which won't match, so we skip WITHOUT consuming
+    // the request — the real creator's later deploy still matches and succeeds.
+    // If the sender lookup fails (RPC blip) we fall back to trusting the claimed
+    // creator rather than bricking a legitimate launch.
+    let claimed = request.creator_address.to_lowercase();
+    let creator_address = match fetch_tx_sender(chain, tx_hash).await {
+        Some(sender) if sender.eq_ignore_ascii_case(&claimed) => claimed,
         Some(sender) => {
-            if !sender.eq_ignore_ascii_case(&creator_address) {
-                tracing::warn!(
-                    "TokenCreated creator mismatch (request claimed {}, on-chain sender {}); using on-chain sender",
-                    creator_address,
-                    sender
-                );
-                creator_address = sender.to_lowercase();
-            }
+            tracing::warn!(
+                "TokenCreated sig {request_id}: on-chain sender {sender} != claimed creator {claimed}; \
+                 skipping (possible hijack) and leaving the request for its real creator"
+            );
+            return Ok(());
         }
-        None => tracing::warn!(
-            "Could not fetch tx sender for {}; trusting claimed creator {}",
-            tx_hash,
-            creator_address
-        ),
-    }
+        None => {
+            tracing::warn!(
+                "Could not fetch tx sender for {tx_hash}; trusting claimed creator {claimed}"
+            );
+            claimed
+        }
+    };
 
     // Find or create the creator user (the on-chain deployer may not have a row).
     let creator: crate::models::user::User = match users::table
@@ -670,6 +711,10 @@ pub async fn process_token_created(
             .get("twitterLink")
             .and_then(|v| v.as_str())
             .map(String::from),
+        image_style: body
+            .get("imageStyle")
+            .and_then(|v| v.as_str())
+            .map(String::from),
     };
 
     diesel::insert_into(tokens::table)
@@ -699,6 +744,11 @@ pub async fn process_token_created(
     });
 
     tracing::info!("Token created: {token_address} on {}", chain.network);
+
+    // A brand-new token can immediately be the highest-marketcap token on the
+    // curve (e.g. the very first launch) — seed the reign now.
+    reconcile_king(state).await;
+
     Ok(())
 }
 
@@ -714,7 +764,9 @@ fn wei_to_bd(bytes: &[u8]) -> BigDecimal {
 /// Process a buy/sell event from the blockchain.
 pub async fn process_swap(
     state: &AppState,
-    chain: &ChainConfig,
+    // Formerly used to fabricate a marketcap from chain.total_supply when the
+    // event carried none; that fabrication was removed (see new_marketcap_bd).
+    _chain: &ChainConfig,
     token_address: &str,
     swapper_address: &str,
     is_buy: bool,
@@ -734,11 +786,23 @@ pub async fn process_swap(
 ) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    // Find the token
-    let token: crate::models::token::Token = tokens::table
+    // Find the token. A swap for a token we don't have a row for (e.g. its
+    // TokenCreated was missed, or it was deployed outside our staged flow) must
+    // NOT hard-error: that Err propagates up to the indexer supervisor and
+    // wedges the whole chain into an infinite reconnect loop, halting ALL trade
+    // indexing. Skip this one event instead and keep indexing.
+    let token: crate::models::token::Token = match tokens::table
         .filter(tokens::token_address.eq(token_address))
         .first(&mut conn)
-        .await?;
+        .await
+        .optional()?
+    {
+        Some(t) => t,
+        None => {
+            tracing::warn!("Swap for unknown token {token_address}; skipping event");
+            return Ok(());
+        }
+    };
 
     // Find or create swapper user
     let swapper: crate::models::user::User = match users::table
@@ -787,12 +851,16 @@ pub async fn process_swap(
     } else {
         old_veth_bd
     };
+    // The event's marketCap is the contract's authoritative getTokenVirtualMarketCap.
+    // It reads 0 only when the price feed is unusable (e.g. a stale Chainlink round).
+    // In that case DON'T fabricate one from a fallback native price — the old code
+    // used a hardcoded $2040 ETH fallback on BSC (BNB ≈ $565), inflating marketcap
+    // ~3.6x and pushing tokens to a false ~100% graduation progress. Keep the last
+    // good marketcap until a trade arrives with a valid price.
     let new_marketcap_bd = if marketcap_usd > 0.0 {
         BigDecimal::from_str(&marketcap_usd.to_string()).unwrap_or_default()
     } else {
-        new_price_bd
-            * BigDecimal::from_str(&chain.total_supply.to_string()).unwrap_or_default()
-            * &eth_price_bd
+        token.marketcap.clone()
     };
 
     // Score decay calculation
@@ -803,10 +871,6 @@ pub async fn process_swap(
 
     let old_volume: f64 = token.volume.to_string().parse().unwrap_or(0.0);
 
-    // Idempotent trade insert FIRST. (tx_hash, log_index) is unique, so a
-    // re-delivered log (reconnect reprocess / reorg replay) inserts nothing and we
-    // bail out BEFORE touching any aggregate — otherwise volume/score/reserves and
-    // holder balances would double-count on every duplicate.
     let trade_type = if is_buy {
         TradeType::Buy
     } else {
@@ -818,7 +882,9 @@ pub async fn process_swap(
         swapper_id: swapper.id,
         trade_type,
         eth_amount: eth_amount_bd,
-        token_amount: token_amount_bd,
+        // Exact token amount (wei-derived), reused below for the holder balance
+        // so balances never round-trip through lossy f64.
+        token_amount: token_amount_bd.clone(),
         token_price: token_price_bd.clone(),
         eth_price: eth_price_bd.clone(),
         tx_hash: tx_hash.to_string(),
@@ -826,77 +892,93 @@ pub async fn process_swap(
         log_index,
     };
 
-    let inserted = diesel::insert_into(trades::table)
-        .values(&new_trade)
-        .on_conflict((trades::tx_hash, trades::log_index))
-        .do_nothing()
-        .execute(&mut conn)
+    // Owned copies for the transaction closure (async move captures by value).
+    let token_id = token.id;
+    let swapper_id = swapper.id;
+    let price_for_update = token_price_bd.clone();
+    let eth_price_for_update = eth_price_bd.clone();
+    let score_bd = BigDecimal::from_str(&new_score.to_string()).unwrap_or_default();
+    let volume_bd =
+        BigDecimal::from_str(&(old_volume + volume_usd).to_string()).unwrap_or_default();
+    let holder_delta = token_amount_bd; // exact
+
+    // Apply the whole trade atomically. The idempotent insert, the token
+    // aggregate update, and the holder balance must commit together — otherwise
+    // a crash between them permanently loses reserves/volume/holder deltas while
+    // the (tx_hash, log_index) idempotency guard blocks re-application on replay.
+    // A duplicate log inserts nothing and leaves every aggregate untouched.
+    let applied: bool = conn
+        .transaction::<bool, diesel::result::Error, _>(|conn| {
+            async move {
+                let inserted = diesel::insert_into(trades::table)
+                    .values(&new_trade)
+                    .on_conflict((trades::tx_hash, trades::log_index))
+                    .do_nothing()
+                    .execute(conn)
+                    .await?;
+                if inserted == 0 {
+                    return Ok(false);
+                }
+
+                diesel::update(tokens::table.find(token_id))
+                    .set((
+                        tokens::virtual_eth_amount.eq(&new_veth_bd),
+                        tokens::virtual_token_amount.eq(&new_vtoken_bd),
+                        tokens::price.eq(&price_for_update),
+                        tokens::marketcap.eq(&new_marketcap_bd),
+                        tokens::eth_price.eq(&eth_price_for_update),
+                        tokens::score.eq(&score_bd),
+                        tokens::volume.eq(&volume_bd),
+                    ))
+                    .execute(conn)
+                    .await?;
+
+                // Holder balance in exact BigDecimal (no f64 round-trip).
+                let holder_exists: Option<crate::models::holder::Holder> = holders::table
+                    .filter(holders::token_id.eq(token_id).and(holders::user_id.eq(swapper_id)))
+                    .first(conn)
+                    .await
+                    .optional()?;
+                match holder_exists {
+                    Some(holder) => {
+                        let mut new_amount = if is_buy {
+                            &holder.amount + &holder_delta
+                        } else {
+                            &holder.amount - &holder_delta
+                        };
+                        if new_amount < BigDecimal::from(0) {
+                            new_amount = BigDecimal::from(0);
+                        }
+                        diesel::update(holders::table.find(holder.id))
+                            .set(holders::amount.eq(new_amount))
+                            .execute(conn)
+                            .await?;
+                    }
+                    None if is_buy => {
+                        diesel::insert_into(holders::table)
+                            .values(crate::models::holder::NewHolder {
+                                token_id,
+                                user_id: swapper_id,
+                                amount: holder_delta.clone(),
+                            })
+                            .execute(conn)
+                            .await?;
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
+            .scope_boxed()
+        })
         .await?;
 
-    if inserted == 0 {
+    if !applied {
         tracing::debug!(
             "Duplicate swap log skipped: tx={} log_index={}",
             tx_hash,
             log_index
         );
         return Ok(());
-    }
-
-    // Genuinely new trade — now safe to apply aggregates exactly once.
-    diesel::update(tokens::table.find(token.id))
-        .set((
-            tokens::virtual_eth_amount.eq(&new_veth_bd),
-            tokens::virtual_token_amount.eq(&new_vtoken_bd),
-            tokens::price.eq(&new_price_bd),
-            tokens::marketcap.eq(&new_marketcap_bd),
-            tokens::eth_price.eq(&eth_price_bd),
-            tokens::score.eq(BigDecimal::from_str(&new_score.to_string()).unwrap_or_default()),
-            tokens::volume
-                .eq(BigDecimal::from_str(&(old_volume + volume_usd).to_string())
-                    .unwrap_or_default()),
-        ))
-        .execute(&mut conn)
-        .await?;
-
-    // Update or create holder record
-    let holder_exists: Option<crate::models::holder::Holder> = holders::table
-        .filter(
-            holders::token_id
-                .eq(token.id)
-                .and(holders::user_id.eq(swapper.id)),
-        )
-        .first(&mut conn)
-        .await
-        .optional()?;
-
-    match holder_exists {
-        Some(holder) => {
-            let old_amount: f64 = holder.amount.to_string().parse().unwrap_or(0.0);
-            let new_amount = if is_buy {
-                old_amount + token_amount
-            } else {
-                (old_amount - token_amount).max(0.0)
-            };
-            diesel::update(holders::table.find(holder.id))
-                .set(
-                    holders::amount
-                        .eq(BigDecimal::from_str(&new_amount.to_string()).unwrap_or_default()),
-                )
-                .execute(&mut conn)
-                .await?;
-        }
-        None if is_buy => {
-            let new_holder = crate::models::holder::NewHolder {
-                token_id: token.id,
-                user_id: swapper.id,
-                amount: BigDecimal::from_str(&token_amount.to_string()).unwrap_or_default(),
-            };
-            diesel::insert_into(holders::table)
-                .values(&new_holder)
-                .execute(&mut conn)
-                .await?;
-        }
-        _ => {}
     }
 
     // Emit WebSocket event
@@ -906,6 +988,9 @@ pub async fn process_swap(
         token_price: new_price_bd.to_string(),
         volume: volume_usd.to_string(),
     });
+
+    // A trade moved this token's marketcap — the crown may have changed hands.
+    reconcile_king(state).await;
 
     Ok(())
 }
@@ -919,15 +1004,93 @@ pub async fn process_token_launched(
 ) -> anyhow::Result<()> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    diesel::update(tokens::table.filter(tokens::token_address.eq(token_address)))
-        .set((
-            tokens::launched_at.eq(chrono::DateTime::from_timestamp(timestamp, 0)),
-            tokens::pair_address.eq(Some(pair_address)),
-        ))
-        .execute(&mut conn)
-        .await?;
+    // The TokenLaunched event carries no pair address; callers pass "" when it
+    // is unknown, and we keep the column NULL rather than storing "".
+    if pair_address.is_empty() {
+        diesel::update(tokens::table.filter(tokens::token_address.eq(token_address)))
+            .set(tokens::launched_at.eq(chrono::DateTime::from_timestamp(timestamp, 0)))
+            .execute(&mut conn)
+            .await?;
+    } else {
+        diesel::update(tokens::table.filter(tokens::token_address.eq(token_address)))
+            .set((
+                tokens::launched_at.eq(chrono::DateTime::from_timestamp(timestamp, 0)),
+                tokens::pair_address.eq(Some(pair_address)),
+            ))
+            .execute(&mut conn)
+            .await?;
+    }
 
     tracing::info!("Token launched to DEX: {token_address} -> pair {pair_address}");
+
+    // The graduated token just left the hill — hand the crown to the next
+    // highest token still on the curve.
+    reconcile_king(state).await;
+
+    Ok(())
+}
+
+/// Record King-of-the-Hill reign changes into the `kings` table (powers the
+/// Hall of Champions history). Best-effort: reign bookkeeping must never block
+/// or fail trade/graduation indexing, so errors are logged and swallowed.
+pub async fn reconcile_king(state: &AppState) {
+    if let Err(e) = reconcile_king_inner(state).await {
+        tracing::warn!("king reconcile failed: {e}");
+    }
+}
+
+async fn reconcile_king_inner(state: &AppState) -> anyhow::Result<()> {
+    let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    // Current king: highest marketcap, normal category, still on the bonding
+    // curve (graduated tokens leave the hill). Mirrors GET /tokens/king.
+    let king_id: Option<i32> = tokens::table
+        .filter(tokens::category.eq(crate::models::enums::TokenCategory::Normal))
+        .filter(tokens::launched_at.is_null())
+        .order(tokens::marketcap.desc())
+        .select(tokens::id)
+        .first(&mut conn)
+        .await
+        .optional()?;
+
+    let now = chrono::Utc::now();
+
+    match king_id {
+        Some(kid) => {
+            // Does the current king already hold an open reign?
+            let has_open: bool = kings::table
+                .filter(kings::ended_at.is_null().and(kings::token_id.eq(kid)))
+                .select(kings::id)
+                .first::<i32>(&mut conn)
+                .await
+                .optional()?
+                .is_some();
+
+            // Close every other open reign (crown changed hands).
+            diesel::update(
+                kings::table.filter(kings::ended_at.is_null().and(kings::token_id.ne(kid))),
+            )
+            .set(kings::ended_at.eq(now))
+            .execute(&mut conn)
+            .await?;
+
+            // Open a reign for the new king if it doesn't have one yet.
+            if !has_open {
+                diesel::insert_into(kings::table)
+                    .values((kings::token_id.eq(kid), kings::started_at.eq(now)))
+                    .execute(&mut conn)
+                    .await?;
+            }
+        }
+        None => {
+            // No eligible token — close any lingering open reign.
+            diesel::update(kings::table.filter(kings::ended_at.is_null()))
+                .set(kings::ended_at.eq(now))
+                .execute(&mut conn)
+                .await?;
+        }
+    }
+
     Ok(())
 }
 

@@ -144,6 +144,8 @@ diesel::table! {
         launched_at -> Nullable<Timestamptz>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        #[max_length = 200]
+        image_style -> Nullable<Varchar>,
     }
 }
 

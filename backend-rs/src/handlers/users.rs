@@ -123,6 +123,54 @@ fn generate_referral_code(address: &str) -> String {
     stripped[..8.min(stripped.len())].to_lowercase()
 }
 
+/// Random 10-char lowercase alphanumeric code, used as a collision fallback for
+/// the address-derived referral code.
+fn random_referral_code() -> String {
+    use rand::RngExt;
+    const CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::rng();
+    (0..10)
+        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
+        .collect()
+}
+
+/// Bounds for free-text profile fields (columns are text; without a cap a
+/// client can store megabytes and bloat every profile response).
+const MAX_USERNAME_LEN: usize = 50;
+const MAX_BIO_LEN: usize = 500;
+const MAX_AVATAR_LEN: usize = 512;
+
+/// Validate the free-text profile fields at the trust boundary. Shared by
+/// create_user and update_user so neither path can store oversized input.
+fn validate_profile_fields(
+    username: Option<&str>,
+    bio: Option<&str>,
+    avatar: Option<&str>,
+) -> Result<(), AppError> {
+    if let Some(u) = username {
+        if u.chars().count() > MAX_USERNAME_LEN {
+            return Err(AppError::BadRequest(format!(
+                "Username must be {MAX_USERNAME_LEN} characters or fewer"
+            )));
+        }
+    }
+    if let Some(b) = bio {
+        if b.chars().count() > MAX_BIO_LEN {
+            return Err(AppError::BadRequest(format!(
+                "Bio must be {MAX_BIO_LEN} characters or fewer"
+            )));
+        }
+    }
+    if let Some(a) = avatar {
+        if a.chars().count() > MAX_AVATAR_LEN {
+            return Err(AppError::BadRequest(format!(
+                "Avatar URL must be {MAX_AVATAR_LEN} characters or fewer"
+            )));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // GET /users?userAddress=0x...
 // ---------------------------------------------------------------------------
@@ -173,6 +221,11 @@ pub async fn create_user(
     .await?;
 
     validate_eth_address(&recovered)?;
+    validate_profile_fields(
+        body.user.username.as_deref(),
+        body.user.bio.as_deref(),
+        body.user.avatar.as_deref(),
+    )?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
@@ -187,16 +240,35 @@ pub async fn create_user(
 
     let user = match existing {
         Some(u) => {
-            // Update fields if provided
-            diesel::update(users::table.filter(users::id.eq(u.id)))
-                .set((
-                    users::username.eq(body.user.username.as_deref().or(u.username.as_deref())),
-                    users::bio.eq(body.user.bio.as_deref().or(u.bio.as_deref())),
-                    users::avatar.eq(body.user.avatar.as_deref().or(u.avatar.as_deref())),
-                    users::updated_at.eq(Utc::now()),
-                ))
-                .get_result::<User>(&mut conn)
-                .await?
+            // For an EXISTING user, "Register on Fyuz" must not double as an
+            // uncapped profile-update path (that would bypass update_user's
+            // cooldown). Only touch profile fields when the caller actually sent
+            // new ones, and enforce the same cooldown update_user uses.
+            let wants_profile_change = body.user.username.is_some()
+                || body.user.bio.is_some()
+                || body.user.avatar.is_some();
+            if wants_profile_change {
+                let cooldown_hours: i64 = std::env::var("PROFILE_UPDATE_COOLDOWN_HOURS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                if cooldown_hours > 0
+                    && Utc::now().signed_duration_since(u.updated_at).num_hours() < cooldown_hours
+                {
+                    return Err(AppError::RateLimited);
+                }
+                diesel::update(users::table.filter(users::id.eq(u.id)))
+                    .set((
+                        users::username.eq(body.user.username.as_deref().or(u.username.as_deref())),
+                        users::bio.eq(body.user.bio.as_deref().or(u.bio.as_deref())),
+                        users::avatar.eq(body.user.avatar.as_deref().or(u.avatar.as_deref())),
+                        users::updated_at.eq(Utc::now()),
+                    ))
+                    .get_result::<User>(&mut conn)
+                    .await?
+            } else {
+                u
+            }
         }
         None => {
             let new_user = NewUser {
@@ -221,15 +293,45 @@ pub async fn create_user(
         .optional()?;
 
     if has_ref_info.is_none() {
-        let code = generate_referral_code(&user.address);
-        let new_ref_info = NewReferralInfo {
-            user_id: user.id,
-            referral_code: code,
-        };
-        diesel::insert_into(referral_info::table)
-            .values(&new_ref_info)
-            .execute(&mut conn)
-            .await?;
+        // The address-derived code (32 bits) can collide; a bare insert would
+        // then 500 and permanently block this user's registration. Try the
+        // derived code first, then fall back to random codes until one is free.
+        let mut code = generate_referral_code(&user.address);
+        for attempt in 0..12 {
+            let res = diesel::insert_into(referral_info::table)
+                .values(NewReferralInfo {
+                    user_id: user.id,
+                    referral_code: code.clone(),
+                })
+                .execute(&mut conn)
+                .await;
+            match res {
+                Ok(_) => break,
+                Err(diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    _,
+                )) => {
+                    // If THIS user already has a code (concurrent request won the
+                    // race on user_id), we're done; otherwise it was a code
+                    // collision — retry with a fresh random 10-char code.
+                    let mine = referral_info::table
+                        .filter(referral_info::user_id.eq(user.id))
+                        .first::<ReferralInfo>(&mut conn)
+                        .await
+                        .optional()?;
+                    if mine.is_some() {
+                        break;
+                    }
+                    code = random_referral_code();
+                    if attempt == 11 {
+                        return Err(AppError::Internal(anyhow::anyhow!(
+                            "could not allocate a unique referral code"
+                        )));
+                    }
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
     }
 
     // Process referral code if provided
@@ -244,23 +346,18 @@ pub async fn create_user(
             if let Some(ref_info) = referrer_info {
                 // Don't allow self-referral
                 if ref_info.user_id != user.id {
-                    // Check not already referred
-                    let already_referred = referrals::table
-                        .filter(referrals::referee_id.eq(user.id))
-                        .first::<Referral>(&mut conn)
-                        .await
-                        .optional()?;
-
-                    if already_referred.is_none() {
-                        let new_referral = NewReferral {
+                    // Attribute atomically: a UNIQUE(referee_id) constraint plus
+                    // ON CONFLICT DO NOTHING makes "a referee is credited to at
+                    // most one referrer" a DB invariant, instead of a racy
+                    // check-then-insert two concurrent registrations could both pass.
+                    diesel::insert_into(referrals::table)
+                        .values(NewReferral {
                             referrer_id: ref_info.user_id,
                             referee_id: user.id,
-                        };
-                        diesel::insert_into(referrals::table)
-                            .values(&new_referral)
-                            .execute(&mut conn)
-                            .await?;
-                    }
+                        })
+                        .on_conflict_do_nothing()
+                        .execute(&mut conn)
+                        .await?;
                 }
             }
         }
@@ -614,7 +711,11 @@ pub async fn follow_user(
     Path(address): Path<String>,
     Json(body): Json<SignatureBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some("follow ")).await?;
+    // Bind the signature to THIS followee — the frontend signs "Follow <addr>\n<ts>",
+    // so requiring that exact prefix stops a "Follow A" signature being replayed to
+    // follow B (and matches the frontend's capitalized verb).
+    let prefix = format!("Follow {address}");
+    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some(&prefix)).await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
@@ -671,7 +772,9 @@ pub async fn unfollow_user(
     Path(address): Path<String>,
     Json(body): Json<SignatureBody>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some("unfollow ")).await?;
+    // Bind to THIS followee (frontend signs "Unfollow <addr>\n<ts>").
+    let prefix = format!("Unfollow {address}");
+    let recovered = verify_signed_action(&state, &body.msg, &body.signature, Some(&prefix)).await?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
@@ -720,6 +823,12 @@ pub async fn update_user(
         Some("Update profile"),
     )
     .await?;
+
+    validate_profile_fields(
+        body.user.username.as_deref(),
+        body.user.bio.as_deref(),
+        body.user.avatar.as_deref(),
+    )?;
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 

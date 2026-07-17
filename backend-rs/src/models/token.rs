@@ -38,6 +38,7 @@ pub struct Token {
     pub launched_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub image_style: Option<String>,
 }
 
 /// Insertable struct for creating new tokens.
@@ -65,6 +66,7 @@ pub struct NewToken {
     pub web_link: Option<String>,
     pub telegram_link: Option<String>,
     pub twitter_link: Option<String>,
+    pub image_style: Option<String>,
 }
 
 /// Minimal creator info nested in TokenResponse so the UI can show the creator's
@@ -86,6 +88,7 @@ pub struct TokenResponse {
     pub token_name: String,
     pub token_symbol: String,
     pub token_description: Option<String>,
+    pub image_style: Option<String>,
     pub token_image: Option<String>,
     pub token_banner: Option<String>,
     pub creator_address: String,
@@ -164,6 +167,7 @@ impl TokenResponse {
             token_name: token.name.clone(),
             token_symbol: token.symbol.clone(),
             token_description: token.description.clone(),
+            image_style: token.image_style.clone(),
             token_image: token.image.clone(),
             token_banner: token.banner.clone(),
             creator_address: creator.address.clone(),

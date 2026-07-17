@@ -50,13 +50,13 @@ pub fn default_chains() -> Vec<ChainConfig> {
             ),
             explorer_url: std::env::var("BSC_EXPLORER_URL")
                 .unwrap_or_else(|_| "https://bscscan.com".to_string()),
-            // Set FYUZ_CONTRACT_ADDRESS to the deployed Fyuz proxy. The default
-            // below is the address the deploy script produces on a fresh anvil
-            // BSC fork — it is NOT a mainnet deployment.
+            // The money-critical indexer reads events from THIS address; a wrong
+            // one silently indexes nothing (or the wrong contract). Fail closed —
+            // require FYUZ_CONTRACT_ADDRESS rather than defaulting to a stale
+            // anvil-fork address, matching how API_KEY/DATABASE_URL fail closed.
+            // localnet.sh always sets it after deploy.
             contract_address: std::env::var("FYUZ_CONTRACT_ADDRESS")
-                .unwrap_or_else(|_| {
-                    "0xdd4C1D9837AdFf44C2e29d7e3EF93e8A51D55F86".to_string()
-                }),
+                .expect("FYUZ_CONTRACT_ADDRESS must be set (the Fyuz proxy address the indexer reads)"),
             abi,
             // These MIRROR the on-chain constants in foundry/src/Fyuz.sol and must
             // be kept in step with them — the frontend prices the curve off these.

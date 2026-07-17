@@ -17,6 +17,8 @@ services:
       # Every migration must be listed here, or the DB only ever gets the base schema.
       - ./backend-rs/migrations/00000000000000_create_schema/up.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./backend-rs/migrations/2026-07-14-000000_add_direct_pool_type/up.sql:/docker-entrypoint-initdb.d/02-add-direct-pool-type.sql
+      - ./backend-rs/migrations/2026-07-17-000000_add_image_style/up.sql:/docker-entrypoint-initdb.d/03-add-image-style.sql
+      - ./backend-rs/migrations/2026-07-17-100000_referral_referee_unique/up.sql:/docker-entrypoint-initdb.d/04-referral-referee-unique.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
@@ -57,13 +59,17 @@ services:
       # tx targets the wrong network. 56 for real BSC; a localnet fork overrides this
       # with its own id (see scripts/localnet.sh).
       CHAIN_ID: ${CHAIN_ID:-56}
-      # The deployed Fyuz proxy on BSC.
-      FYUZ_CONTRACT_ADDRESS: ${FYUZ_CONTRACT_ADDRESS:-0xdd4C1D9837AdFf44C2e29d7e3EF93e8A51D55F86}
+      # The deployed Fyuz proxy on BSC. Required (the indexer fails closed rather
+      # than defaulting to a stale address that would silently index nothing).
+      FYUZ_CONTRACT_ADDRESS: ${FYUZ_CONTRACT_ADDRESS:?FYUZ_CONTRACT_ADDRESS must be set}
       # Block to start indexing from on a FRESH database. BSC is ~110M blocks deep
       # and nothing before the Fyuz deployment can contain our events, so leaving
       # this at 0 makes the indexer backfill the whole chain and never reach head.
       # Set it to the deployment block (or the anvil fork block on a localnet).
       INDEXER_START_BLOCK: ${INDEXER_START_BLOCK:-0}
+      # Reorg confirmation depth for the indexer (0 = index at head; localnet fork
+      # sets 0, production should use a safe lag like 12).
+      INDEXER_CONFIRMATIONS: ${INDEXER_CONFIRMATIONS:-12}
       PORT: "5001"
       # :3000 = npm-dev frontend, :3001 = the dockerised frontend service below.
       CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,http://localhost:3000,http://localhost:3001,http://localhost:8080"

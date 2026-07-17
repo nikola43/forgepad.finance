@@ -318,10 +318,15 @@ pub async fn join_stream(
         return Err(AppError::NotFound("This token is not live".to_string()));
     }
 
-    let identity = q
+    // Namespace viewer identities under "viewer:" so a viewer can NEVER be issued
+    // the publisher's identity (the creator's bare address) — LiveKit disconnects
+    // the older holder of a duplicate identity, so without this a viewer could
+    // join as the creator and kick them off their own stream.
+    let base = q
         .address
         .filter(|a| !a.is_empty())
         .unwrap_or_else(|| format!("guest-{}", uuid::Uuid::new_v4()));
+    let identity = format!("viewer:{base}");
     let room = token_address.to_lowercase();
     let viewers = touch_and_count_viewers(&state, &room, &identity).await;
 
@@ -354,6 +359,13 @@ pub async fn heartbeat(
     Path(token_address): Path<String>,
     Json(body): Json<HeartbeatBody>,
 ) -> AppResult<Json<ViewerCount>> {
+    // Only count heartbeats for identities issued by join_stream (the "viewer:"
+    // namespace). This stops a heartbeat from registering the publisher's bare
+    // identity as a viewer, and bounds the identity length so the viewer set
+    // can't be spammed with arbitrarily long keys.
+    if !body.identity.starts_with("viewer:") || body.identity.len() > 128 {
+        return Err(AppError::BadRequest("Invalid viewer identity".to_string()));
+    }
     let viewers = touch_and_count_viewers(&state, &token_address, &body.identity).await;
     Ok(Json(ViewerCount { viewers }))
 }

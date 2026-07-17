@@ -31,6 +31,17 @@ pub struct DiscoverQuery {
     pub limit: Option<i64>,
 }
 
+/// Clamp a client-supplied float to a finite, non-negative value before it is
+/// inlined into SQL. serde parses "inf"/"nan" into f64, and `format!("{}", inf)`
+/// emits `inf`, which Postgres rejects — 500ing the endpoint on crafted input.
+fn finite_nonneg(x: f64) -> f64 {
+    if x.is_finite() {
+        x.max(0.0)
+    } else {
+        0.0
+    }
+}
+
 #[derive(QueryableByName)]
 struct Row {
     #[diesel(sql_type = Text)]
@@ -110,7 +121,7 @@ pub async fn discover(
         }
     }
     if let Some(mc) = p.min_marketcap {
-        wheres.push(format!("COALESCE(tk.marketcap::float8,0) >= {}", mc.max(0.0)));
+        wheres.push(format!("COALESCE(tk.marketcap::float8,0) >= {}", finite_nonneg(mc)));
     }
     if let Some(age) = p.max_age_secs {
         wheres.push(format!("EXTRACT(EPOCH FROM tk.created_at)::bigint >= (EXTRACT(EPOCH FROM NOW())::bigint - {})", age.max(0)));
@@ -125,7 +136,7 @@ pub async fn discover(
     // HAVING clauses reference the computed aggregates.
     let mut havings: Vec<String> = vec![];
     if let Some(v) = p.min_volume {
-        havings.push(format!("COALESCE(SUM(CASE WHEN t.traded_at >= cutoff.c THEN t.eth_amount::float8*t.eth_price::float8 ELSE 0 END),0) >= {}", v.max(0.0)));
+        havings.push(format!("COALESCE(SUM(CASE WHEN t.traded_at >= cutoff.c THEN t.eth_amount::float8*t.eth_price::float8 ELSE 0 END),0) >= {}", finite_nonneg(v)));
     }
     if let Some(h) = p.min_holders {
         havings.push(format!("(SELECT COUNT(*) FROM holders h WHERE h.token_id = tk.id AND h.amount > 0) >= {}", h.max(0)));

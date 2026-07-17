@@ -38,8 +38,13 @@ async fn main() -> anyhow::Result<()> {
     // Chain configs
     let chain_configs = chains::default_chains();
 
-    // API key (fail-closed: refuse to start without it)
+    // API key (fail-closed: refuse to start without it). `.expect` only catches
+    // an ABSENT var; an empty API_KEY= would otherwise make every api-key-gated
+    // endpoint compare against "" and accept a missing/empty header — reject it.
     let api_key = std::env::var("API_KEY").expect("API_KEY must be set");
+    if api_key.trim().is_empty() {
+        panic!("API_KEY must not be empty");
+    }
 
     // Create app state
     let state = AppState::new(db_pool, redis_client, chain_configs.clone(), api_key).await;
@@ -83,6 +88,21 @@ async fn main() -> anyhow::Result<()> {
     // Per-IP rate limiter (shared via request extensions)
     let limiter = rate_limit::create_rate_limiter();
 
+    // The keyed store never evicts on its own, so a stream of distinct IPs
+    // (IPv6 /64s, spoofed XFF behind the proxy) grows it unbounded. Periodically
+    // drop keys whose quota has fully recovered.
+    {
+        let limiter = limiter.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                tick.tick().await;
+                limiter.retain_recent();
+                limiter.shrink_to_fit();
+            }
+        });
+    }
+
     // Build router
     let app = forgepad_backend::routes::create_router(state)
         .layer(socketio)
@@ -93,12 +113,13 @@ async fn main() -> anyhow::Result<()> {
             axum::http::header::X_CONTENT_TYPE_OPTIONS,
             axum::http::HeaderValue::from_static("nosniff"),
         ))
-        // Make the limiter available to the rate-limit middleware, then enforce
-        // it. Extension is added before the middleware so it is the outer layer
-        // and the limiter is present in request extensions when the middleware
-        // runs.
-        .layer(axum::Extension(limiter))
-        .layer(axum::middleware::from_fn(rate_limit::rate_limit_middleware));
+        // Enforce the per-IP rate limit, and make the limiter available to it.
+        // In axum, the LAST-added layer is the OUTERMOST (runs first on ingress),
+        // so the Extension must be added AFTER the middleware — otherwise the
+        // middleware runs before the Extension populates request extensions,
+        // finds no limiter, and silently passes every request (rate limit off).
+        .layer(axum::middleware::from_fn(rate_limit::rate_limit_middleware))
+        .layer(axum::Extension(limiter));
 
     // Bind and serve
     let port: u16 = std::env::var("PORT")
