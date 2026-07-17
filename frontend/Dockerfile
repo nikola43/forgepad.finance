@@ -18,14 +18,19 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN apk add --no-cache python3 make g++ && npm install
+COPY package.json pnpm-lock.yaml .npmrc ./
+# --prod=false: NODE_ENV=production (above) makes pnpm skip devDependencies, but
+# the build needs them (typescript, @types/*, critters). Force a full install;
+# this is the builder stage, so devDeps never reach the final nginx image anyway.
+RUN apk add --no-cache python3 make g++ \
+    && corepack enable && corepack prepare pnpm@9 --activate \
+    && pnpm install --frozen-lockfile --prod=false
 
 COPY public ./public
 COPY src ./src
 COPY next.config.ts tsconfig.json next-env.d.ts ./
 
-RUN npm run build
+RUN pnpm run build
 
 FROM nginx:alpine
 

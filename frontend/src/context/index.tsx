@@ -24,6 +24,7 @@ import {
   bitcoin,
   base,
   bsc,
+  bscTestnet,
   defineChain,
 } from "@reown/appkit/networks";
 import { projectId } from "@/config";
@@ -33,43 +34,55 @@ import { WagmiProvider } from "wagmi";
 // so the canonical metadata (name, BNB nativeCurrency, BscScan, multicall3)
 // comes from upstream; we override the RPC/explorer so they can point at a
 // private node, and the chain id so a localnet can run beside real BSC.
-const bscRpcUrl =
-  process.env.NEXT_PUBLIC_BSC_RPC_URL || "https://bsc-dataseed.bnbchain.org";
-const bscExplorerUrl =
-  process.env.NEXT_PUBLIC_BSC_EXPLORER_URL || "https://bscscan.com";
-
-// Defaults to real BSC (56). A localnet MUST override this: an anvil BSC fork
-// still reports whatever chain id it was started with, and if that id is 56 the
-// wallet matches it to its own built-in BSC network and silently routes
-// transactions to MAINNET instead of the fork. Giving the localnet its own id
-// (e.g. 31337) makes the wallet treat it as a distinct network and keeps real
-// funds out of reach.
+// 56 = real BSC mainnet, 97 = the canonical BSC testnet, any other id = a local
+// anvil fork. A localnet MUST override the id: an anvil BSC fork still reports
+// whatever chain id it was started with, and if that id is 56 the wallet matches
+// it to its own built-in BSC network and silently routes transactions to MAINNET
+// instead of the fork. A distinct id keeps real funds out of reach.
 const bscChainId = Number(process.env.NEXT_PUBLIC_BSC_CHAIN_ID ?? 56);
-const isLocalnet = bscChainId !== 56;
+const isBscTestnet = bscChainId === 97;
+const isLocalnet = bscChainId !== 56 && !isBscTestnet;
+
+// Build on the matching upstream network so canonical metadata (BNB currency,
+// explorer, multicall3) is correct for the target chain.
+const baseChain = isBscTestnet ? bscTestnet : bsc;
+
+const bscRpcUrl =
+  process.env.NEXT_PUBLIC_BSC_RPC_URL ||
+  (isBscTestnet
+    ? "https://bsc-testnet-rpc.publicnode.com"
+    : "https://bsc-dataseed.bnbchain.org");
+const bscExplorerUrl =
+  process.env.NEXT_PUBLIC_BSC_EXPLORER_URL ||
+  (isBscTestnet ? "https://testnet.bscscan.com" : "https://bscscan.com");
 
 const ethNetwork = defineChain({
-  ...bsc,
+  ...baseChain,
   id: bscChainId,
-  name: isLocalnet ? `BNB Smart Chain (localnet ${bscChainId})` : bsc.name,
-  // The upstream `bsc` export is a plain viem chain; defineChain needs the CAIP
-  // fields added on top.
+  name: isBscTestnet
+    ? "BNB Smart Chain Testnet"
+    : isLocalnet
+      ? `BNB Smart Chain (localnet ${bscChainId})`
+      : bsc.name,
+  // The upstream export is a plain viem chain; defineChain needs the CAIP fields
+  // added on top.
   chainNamespace: "eip155",
   caipNetworkId: `eip155:${bscChainId}`,
   rpcUrls: {
-    ...bsc.rpcUrls,
+    ...baseChain.rpcUrls,
     default: { http: [bscRpcUrl] },
   },
   blockExplorers: {
-    ...bsc.blockExplorers,
+    ...baseChain.blockExplorers,
     default: {
-      ...bsc.blockExplorers?.default,
-      name: bsc.blockExplorers?.default?.name ?? "BscScan",
+      ...baseChain.blockExplorers?.default,
+      name: baseChain.blockExplorers?.default?.name ?? "BscScan",
       url: bscExplorerUrl,
     },
   },
-  // A local fork has no explorer and no multicall3 deployment of its own; the
-  // inherited BSC multicall3 address does exist in forked state, so it stays.
-  testnet: isLocalnet,
+  // Real BSC/testnet have a real explorer + multicall3; a local fork has neither
+  // of its own, but the inherited multicall3 address exists in forked state.
+  testnet: isLocalnet || isBscTestnet,
 });
 
 const theme = createTheme({

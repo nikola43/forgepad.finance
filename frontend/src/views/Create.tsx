@@ -51,9 +51,9 @@ import { socket } from "@/utils/socket";
 // import { useChainInfo, useContractInfo, useSwitchChain } from "../hooks/config";
 //import { uploadImageToIPFS } from "../utils";
 
-// Every launch must open with at least this much bought, in USD. Converted to
-// BNB at confirm time via the contract's Chainlink feed.
-const MIN_CREATE_BUY_USD = 10;
+// Minimum opening buy per launch, in USD, converted to BNB at confirm time via
+// the contract's Chainlink feed. 0 = no mandatory buy (opening buy optional).
+const MIN_CREATE_BUY_USD = 0;
 
 // Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`
@@ -995,7 +995,7 @@ export default function Create() {
           <DialogContentText mb="1rem" fontSize={14}>
             {isDirectLaunch
               ? "Create token with 1B supply. No bonding curve."
-              : `Choose how many ${network?.nativeCurrency.symbol} you want to buy (minimum $${MIN_CREATE_BUY_USD}).`
+              : `Choose how many ${network?.nativeCurrency.symbol} you want to buy${MIN_CREATE_BUY_USD > 0 ? ` (minimum $${MIN_CREATE_BUY_USD})` : " (optional)"}.`
             }
           </DialogContentText>
           {!isDirectLaunch && (
