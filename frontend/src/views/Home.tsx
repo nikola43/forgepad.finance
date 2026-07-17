@@ -4,7 +4,7 @@ import { useMainContext } from "@/context";
 import { Box, IconButton, InputAdornment, Pagination, PaginationItem, Stack, styled, TextField, Typography, useMediaQuery } from "@mui/material";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { API_ENDPOINT } from "@/config";
+import { API_ENDPOINT, STYLE_PRESETS } from "@/config";
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -272,6 +272,7 @@ const SectionDivider = () => (
 
 export default function Home() {
     const [network, setNetwork] = useState('all');
+    const [style, setStyle] = useState('all');
     const [orderType, setOrderType] = useState('marketcap');
     const [orderFlag] = useState('DESC');
     const [searchWord, setSearchWord] = useState('');
@@ -368,7 +369,7 @@ export default function Home() {
     }, [width])
 
     const { tokens, count } = useTokens({
-        network, searchWord, orderType, orderFlag, pageNumber, pageSize
+        network, style, searchWord, orderType, orderFlag, pageNumber, pageSize
     })
 
     const { tokens: trends } = useTokens({
@@ -656,6 +657,10 @@ export default function Home() {
                             }), {})
                         )
                     }} value={network} onChange={setNetwork} />
+                    <ComboBox label="Style" border="1px solid #BFD143" values={{
+                        all: 'All',
+                        ...Object.fromEntries(STYLE_PRESETS.map(s => [s, s]))
+                    }} value={style} onChange={setStyle} />
                 </Box>
             </Box>
 
@@ -669,7 +674,7 @@ export default function Home() {
                             ))
                         }
                     </CardGrid> :
-                    count === 0 && (searchWord || network !== 'all') ?
+                    count === 0 && (searchWord || network !== 'all' || style !== 'all') ?
                         <EmptyState
                             icon={<SearchIcon sx={{ fontSize: 32, color: 'var(--muted)' }} />}
                             title="No tokens found"

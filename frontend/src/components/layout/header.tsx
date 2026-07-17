@@ -491,11 +491,7 @@ export default function Header() {
                                 fontSize="12px"
                                 color="#131208"
                             />
-                            {
-                                isSwitching
-                                ? <CircularProgress size={20} />
-                                : <NetworkLogo network={caipNetwork} />
-                            }
+                            {isSwitching && <CircularProgress size={20} />}
                         </StyledButton>
                         <div>
                             {

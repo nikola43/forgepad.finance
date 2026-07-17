@@ -603,8 +603,8 @@ const SwapContent = ({
         )}
         {
             isConnected
-                ? tokenNetwork?.caipNetworkId !== caipNetwork?.caipNetworkId
-                    ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => appKit?.switchNetwork(tokenNetwork as AppKitNetwork)}>
+                ? tokenNetwork && tokenNetwork.caipNetworkId !== caipNetwork?.caipNetworkId
+                    ? <Button fullWidth sx={{ borderRadius: '16px', fontSize: '20px', py: '12px', textTransform: 'none' }} onClick={() => tokenNetwork && appKit?.switchNetwork(tokenNetwork as AppKitNetwork)}>
                         Switch Network
                     </Button>
                     : tradeType === "sell" && amountIn && tokenAllowance < ethers.parseEther(amountIn)
@@ -1284,7 +1284,7 @@ export default function Token() {
                                     <Typography fontSize={11} color="var(--text-muted)" mt={0.5} lineHeight={1.4} textAlign="right" maxWidth="400px">
                                         When the market cap reaches the target, liquidity will be automatically added to the DEX and the token will be freely tradeable.
                                     </Typography>
-                                    <Box display="flex" alignItems="center" gap="8px">
+                                    {/* <Box display="flex" alignItems="center" gap="8px">
                                         <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M5.05762 13.3333H11.7243" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
                                             <path d="M7.05762 13.3333C10.7243 11.6667 7.59095 9.06666 9.05762 6.66666" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
@@ -1292,7 +1292,7 @@ export default function Token() {
                                             <path d="M9.79097 3.99999C9.28269 4.79436 9.02702 5.72409 9.05764 6.66666C10.3243 6.59999 11.2576 6.26666 11.9243 5.73332C12.591 5.06666 12.991 4.19999 13.0576 2.66666C11.2576 2.73332 10.391 3.33332 9.79097 3.99999Z" stroke="#C1C1C1" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
                                         <Typography fontSize={{ xs: 10, sm: 10, md: 14 }} fontFamily="var(--font-data)" color="#DDD">1d liquidity: {priceFormatter(detailData?.liquidity1d ?? 0)} {tokenNetwork?.nativeCurrency.symbol}</Typography>
-                                    </Box>
+                                    </Box> */}
                                     <Box display="flex" alignItems="center" justifyContent="center" gap="8px" mt={1}>
                                         {!!webLink && (
                                             <SocialLink href={webLink} target="_blank">
@@ -1584,9 +1584,19 @@ export default function Token() {
                                         <Box display="flex" gap="0.2rem">
                                             <Typography fontSize={24} fontFamily="var(--font-display)" color="var(--bone)">{detailData?.tokenName}</Typography>
                                         </Box>
-                                        <Box display="flex" gap="0.2rem" alignItems="center">
-                                            <Typography color="#D9D9D9" fontSize={14}>{detailData?.tokenDescription}</Typography>
-                                        </Box>
+                                        {/* Hide the description when it's just the style text (the create
+                                            form's field is repurposed as universe/style). */}
+                                        {!!detailData?.tokenDescription && detailData?.tokenDescription !== detailData?.imageStyle && (
+                                            <Box display="flex" gap="0.2rem" alignItems="center">
+                                                <Typography color="#D9D9D9" fontSize={14}>{detailData?.tokenDescription}</Typography>
+                                            </Box>
+                                        )}
+                                        {!!detailData?.imageStyle && (
+                                            <Box display="flex" gap="0.2rem" alignItems="center">
+                                                <Typography color="#9E9E9E" fontSize={14}>Style:</Typography>
+                                                <Typography color="#D9D9D9" fontSize={14}>{detailData?.imageStyle}</Typography>
+                                            </Box>
+                                        )}
                                         <Box display="flex" gap="0.2rem" mt={1}>
                                             <Creator token={detailData} />
                                             <Typography color="#9E9E9E" fontSize={14}>—</Typography>

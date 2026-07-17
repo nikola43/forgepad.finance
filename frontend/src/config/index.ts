@@ -13,3 +13,33 @@ export const FILE_ENDPOINT = process.env.NEXT_PUBLIC_FILE_URL || `${API_ENDPOINT
 export const FYUZ_TWITTER_URL = "https://x.com/fyuzfun"
 export const FYUZ_WEBSITE_URL = "https://fyuz.fun"
 
+// Curated fusion universes/styles — mirrors backend-rs image_gen::STYLES labels.
+// Used by the create form (chips) and the home style filter.
+export const STYLE_PRESETS = [
+  "Dragon Ball Z / anime action",
+  "Cyberpunk neon",
+  "Medieval fantasy",
+  "Studio Ghibli-style",
+  "Pixel art / 8-bit",
+  "Film noir comic",
+  "Classic superhero comic",
+  "Renaissance oil painting",
+  "Claymation / stop-motion",
+  "Retro 80s synthwave",
+  "Steampunk",
+  "Wild West",
+  "Ancient mythology (Greek/Norse)",
+  "Space opera / sci-fi epic",
+  "Watercolor illustration",
+  "Graffiti / street art",
+  "Samurai / feudal Japan",
+  "Post-apocalyptic wasteland",
+  "Pop art (Warhol-style)",
+  "Gothic horror",
+  "Egyptian mythology",
+  "Cartoon Network style",
+  "Vaporwave",
+  "Baroque royal portrait",
+  "Manga black-and-white",
+]
+

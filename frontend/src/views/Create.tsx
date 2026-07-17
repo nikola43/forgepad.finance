@@ -18,6 +18,7 @@ import {
   CircularProgress,
   InputLabel,
   Alert,
+  Chip,
 } from "@mui/material";
 import React, { useMemo, useRef } from "react";
 import ArrowRightIcon from "@mui/icons-material/KeyboardArrowRightOutlined";
@@ -28,16 +29,18 @@ import { TransitionProps } from "@mui/material/transitions";
 import axios from "axios";
 import { NumericFormat } from "react-number-format";
 import PageBox from "../components/layout/pageBox";
-import { API_ENDPOINT } from "@/config";
+import { API_ENDPOINT, STYLE_PRESETS } from "@/config";
 import { priceFormatter, priceWithoutZero } from "@/utils/price";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   useAppKit,
   useAppKitAccount,
   useAppKitNetwork,
+  useAppKitProvider,
+  type Provider as EVMProvider,
 } from "@reown/appkit/react";
 import { useMainContext } from "@/context";
-import { ethers } from "ethers";
+import { ethers, BrowserProvider } from "ethers";
 import toast from "react-hot-toast";
 import { useUserInfo } from "@/hooks/user";
 import { useHandlers } from "@/hooks/token";
@@ -261,7 +264,11 @@ export default function Create() {
   const awaitingDeployRef = React.useRef(false);
   const redirectNetworkRef = React.useRef<string | undefined>(undefined);
   const deployTimeoutRef = React.useRef<any>(null);
+  // Style used for the current avatar (echoed by generate-image; the backend
+  // random-picks one when the field is blank).
+  const styleUsedRef = React.useRef<string>("");
   const { address } = useAppKitAccount();
+  const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155");
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -447,12 +454,30 @@ export default function Create() {
   const generateFusionImage = async () => {
     setGenerating(true);
     try {
+      // Image generation is a paid backend path, so it's gated by a fresh,
+      // single-use wallet signature (no shared secret in the browser). The user
+      // must have a connected wallet — they need one to deploy anyway.
+      if (!evmProvider || !address) {
+        throw Error("Connect your wallet to generate the fusion image");
+      }
+      const signer = await new BrowserProvider(evmProvider).getSigner();
+      const msg = `Generate image\n${address}\n${Date.now()}`;
+      const signature = await signer.signMessage(msg);
       const { data } = await axios.post(
         `${API_ENDPOINT}/tokens/generate-image`,
-        { character1: character1.trim(), character2: character2.trim(), name: coinName },
-        { headers: { "api-key": "hola" } }
+        {
+          character1: character1.trim(),
+          character2: character2.trim(),
+          name: coinName,
+          style: description.trim() || undefined,
+          msg,
+          signature,
+        }
       );
       if (!data?.url) throw Error("No image returned");
+      // The style actually used (backend picks a random one when the field is
+      // blank) — persisted with the token so it can show on the token page.
+      styleUsedRef.current = data.style || description.trim();
       setAvatar(data.url);
       return data.url as string;
     } finally {
@@ -479,6 +504,7 @@ export default function Create() {
 
       const metadata: any = {
         tokenDescription: description,
+        imageStyle: styleUsedRef.current || description.trim() || undefined,
         tokenName: coinName,
         tokenSymbol: coinTicker,
         tokenImage: logoLink,
@@ -748,16 +774,37 @@ export default function Create() {
         </Box>
         <FormControl variant="standard">
           <InputLabel shrink>
-            Description <span style={{ color: "var(--muted)" }}>(optional)</span>
+            Universe / style <span style={{ color: "var(--muted)" }}>(optional)</span>
           </InputLabel>
           <BootstrapInput
             fullWidth
-            placeholder="Description"
+            placeholder="e.g. 'Dragon Ball Z style', 'cyberpunk noir', 'medieval fantasy'"
             multiline
-            rows={4}
+            rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <Typography fontSize={12} color="var(--muted)" fontFamily="var(--font-data)" mt={1}>
+            Describe the world or art style for your fusion — leave blank and we&apos;ll pick one at random.
+          </Typography>
+          <Box display="flex" flexWrap="wrap" gap="6px" mt={1}>
+            {STYLE_PRESETS.map((s) => (
+              <Chip
+                key={s}
+                label={s}
+                size="small"
+                onClick={() => setDescription(description === s ? "" : s)}
+                sx={{
+                  fontSize: 11,
+                  fontFamily: "var(--font-data)",
+                  color: description === s ? "var(--moss-black)" : "var(--bone)",
+                  bgcolor: description === s ? "var(--citron)" : "transparent",
+                  border: "1px solid var(--border)",
+                  "&:hover": { bgcolor: description === s ? "var(--accent-light)" : "rgba(191,209,67,0.12)" },
+                }}
+              />
+            ))}
+          </Box>
         </FormControl>
         {!!address && (
           <FormControl variant="standard">
