@@ -806,33 +806,62 @@ export default function Create() {
             ))}
           </Box>
         </FormControl>
-        {!!address && (
-          <FormControl variant="standard">
-            <InputLabel shrink>
-              Choose Target Pool <span style={{ color: "var(--down)" }}>*</span>
-            </InputLabel>
-            <Box display="flex" alignItems="center" gap="8px" mt={3}>
-              {chain?.pools.map((pool: string, index) => (
-                <DexSelect
-                  key={pool}
-                  checked={poolType === index + 1}
-                  label="PancakeSwap"
-                  onClick={() => {
-                    setPoolType(index + 1);
-                    setIsDirectLaunch(pool.includes('direct'));
-                  }}
-                >
-                  <Avatar
-                    src={`/pools/${pool?.split(":")?.[0]}.png`}
-                    sx={{ width: 16, height: 16 }}
-                    alt="pancakeswap"
-                  />
-                  {pool?.split(":")?.[1]}
-                </DexSelect>
-              ))}
-            </Box>
-          </FormControl>
-        )}
+        <FormControl variant="standard">
+          <InputLabel shrink>
+            Choose Target Pool <span style={{ color: "var(--down)" }}>*</span>
+          </InputLabel>
+          <Box
+            sx={{
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              p: "10px 12px",
+              mt: 3,
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+            }}
+          >
+            <Typography fontSize={12} color="var(--bone)" fontFamily="var(--font-data)">
+              Every token starts on the Fyuz bonding curve — the pool you pick here is
+              where its liquidity moves on PancakeSwap when it graduates
+              {chain?.targetMarketCap
+                ? ` at $${chain.targetMarketCap.toLocaleString()} market cap`
+                : ""}.
+            </Typography>
+            <Typography fontSize={12} color="var(--muted)" fontFamily="var(--font-data)">
+              <Box component="span" sx={{ color: "var(--citron)" }}>V2</Box> — the
+              classic pool. Liquidity covers the full price range and the LP is burned
+              at graduation, so it&apos;s locked forever. Simple, battle-tested, and
+              supported by every bot and aggregator. 0.25% swap fee.
+            </Typography>
+            <Typography fontSize={12} color="var(--muted)" fontFamily="var(--font-data)">
+              <Box component="span" sx={{ color: "var(--citron)" }}>V3</Box> —
+              concentrated liquidity. Depth sits close to the live price, so traders
+              get lower slippage from the same liquidity. The LP position is locked in
+              the protocol at graduation. Lower 0.1% swap fee.
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap="8px" mt="10px">
+            {chain?.pools.map((pool: string, index) => (
+              <DexSelect
+                key={pool}
+                checked={poolType === index + 1}
+                label="PancakeSwap"
+                onClick={() => {
+                  setPoolType(index + 1);
+                  setIsDirectLaunch(pool.includes('direct'));
+                }}
+              >
+                <Avatar
+                  src={`/pools/${pool?.split(":")?.[0]}.png`}
+                  sx={{ width: 16, height: 16 }}
+                  alt="pancakeswap"
+                />
+                {pool?.split(":")?.[1]}
+              </DexSelect>
+            ))}
+          </Box>
+        </FormControl>
         <Box
         >
           {more ? (
