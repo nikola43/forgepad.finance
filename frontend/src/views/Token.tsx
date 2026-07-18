@@ -731,7 +731,7 @@ export default function Token() {
     // const [tokenAllowance, setTokenAllowance] = React.useState(0n);
     const pageSize = isMobile ? 5 : 10
     const [showSlipaggeDialog, setShowSlipaggeDialog] = React.useState(false);
-    const [slippage, setSlippage] = React.useState(0.1);
+    const [slippage, setSlippage] = React.useState(1);
 
     // Check if this is a Solana token
     const isSolanaToken = network === 'solana';
@@ -1163,14 +1163,9 @@ export default function Token() {
                                     : <StarBorderIcon sx={{ color: '#9E9E9E', width: 16, height: 16 }} />}
                             </IconButton>
                         )}
-                        <IconButton sx={{ width: 'fit-content' }} onClick={() => {
-                            const url = window.location.href
-                            if (navigator.share) {
-                                navigator.share({ title: `${detailData?.tokenName} (${detailData?.tokenSymbol})`, url })
-                            } else {
-                                copy(url)
-                                toast.success('Token link copied!', { duration: 2000 })
-                            }
+                        <IconButton sx={{ width: 'fit-content' }} title="View on Explorer" onClick={() => {
+                            const url = `${tokenChain?.explorerUrl}/address/${detailData?.tokenAddress}`
+                            window.open(url, '_blank', 'noopener,noreferrer')
                         }}>
                             <LinkIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
@@ -1215,7 +1210,7 @@ export default function Token() {
                                 </Box>
                                 <Box display="flex" gap="8px" alignItems="baseline">
                                     <Typography fontSize={14} fontFamily="var(--font-data)" color={Number(detailData?.price15m ?? 0) >= 0 ? "var(--up)" : "var(--down)"}>
-                                        {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
+                                        {Number(detailData?.price15m ?? 0) >= 0 ? '+' : '-'}${priceFormatter(Math.abs(Number(detailData?.price15m ?? 0)))} ({(Number(detailData?.priceChange15m) || 0).toFixed(2)}%)
                                     </Typography>
                                     <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Past 15m</Typography>
                                 </Box>
@@ -1336,7 +1331,7 @@ export default function Token() {
                         </Box>
                         <Box display="flex" gap="8px" alignItems="baseline">
                             <Typography fontSize={14} fontFamily="var(--font-data)" color={Number(detailData?.priceChange15m ?? 0) >= 0 ? "var(--up)" : "var(--down)"}>
-                                {Number(detailData?.price ?? 0) >= Number(detailData?.price15m ?? 0) ? '+' : '-'}${priceFormatter(Number(detailData?.price15m ?? 0) - Number(detailData?.price15MinAgo ?? 0))} ({Number(detailData?.priceChange15m).toFixed(2)}%)
+                                {Number(detailData?.price ?? 0) >= Number(detailData?.price15m ?? 0) ? '+' : '-'}${priceFormatter(Number(detailData?.price15m ?? 0) - Number(detailData?.price15MinAgo ?? 0))} ({(Number(detailData?.priceChange15m) || 0).toFixed(2)}%)
                             </Typography>
                             <Typography fontSize={12} fontFamily="var(--font-data)" textTransform="uppercase" letterSpacing="1px" color="var(--text-secondary)">Past 15m</Typography>
                         </Box>
