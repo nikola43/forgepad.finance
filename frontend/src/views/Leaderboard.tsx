@@ -90,15 +90,15 @@ export default function Leaderboard() {
                             Trade. Earn points. Get paid every week.
                         </Typography>
                         <Typography fontSize={13.5} color="rgba(234,230,218,0.75)" mt={0.75} lineHeight={1.6}>
-                            Every buy and sell carries a flat <b style={{ color: 'var(--citron)' }}>1% fee</b> — and half of it flows
+                            Every buy and sell carries a flat <b style={{ color: 'var(--citron)' }}>1% fee</b> — and 30% of it flows
                             straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 you keep invested</b>{' '}
                             (buys minus sells), so only real, held positions count — wash trading earns nothing.
-                            Each week we pool <b style={{ color: 'var(--citron)' }}>50% of all platform fees</b> and pay it out in{' '}
+                            Each week we pool <b style={{ color: 'var(--citron)' }}>30% of all platform fees</b> and pay it out in{' '}
                             <b style={{ color: 'var(--citron)' }}>BNB</b> to everyone here, split by your share of points. Trade more,
                             hold your conviction, and claim a bigger weekly cut.
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                            {['1 pt / $1 net invested', 'No wash-trade farming', '1% flat fee', '50% shared weekly', 'Paid in BNB'].map((chip) => (
+                            {['1 pt / $1 net invested', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Paid in BNB'].map((chip) => (
                                 <Box
                                     key={chip}
                                     sx={{

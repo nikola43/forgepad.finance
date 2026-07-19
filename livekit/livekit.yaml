@@ -15,5 +15,5 @@ rtc:
 # range so clients behind symmetric NAT/firewalls can relay media.
 turn:
   enabled: true
-  domain: livekit.arrowpad.io
+  domain: livekit.fyuz.fun
   udp_port: 3478
