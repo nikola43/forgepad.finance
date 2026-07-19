@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IV3PoolSlot0} from "../src/interfaces/IV3PoolSlot0.sol";
-import {FakeToken} from "../src/FakeToken.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * PancakeSwap V3 slot0 ABI compatibility, against a BSC mainnet fork.
@@ -65,13 +65,7 @@ contract PancakeV3Slot0Test is Test {
     /// pool first. The wide read must survive and return their price so the
     /// caller can enforce its tolerance check — previously it reverted here.
     function test_wideSlot0_survivesGrieferInitializedPool() public {
-        FakeToken token = new FakeToken(
-            "Fyuz Test",
-            "FYUZT",
-            18,
-            1_000_000,
-            address(this)
-        );
+        TestERC20 token = new TestERC20();
 
         address pool = IUniswapV3Factory(PANCAKE_V3_FACTORY).createPool(
             address(token),
@@ -100,5 +94,12 @@ contract PancakeV3Slot0Test is Test {
     function readNarrow(address pool) external view returns (uint160) {
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
         return sqrtPriceX96;
+    }
+}
+
+/// Minimal stand-in for the removed FakeToken — the pool only needs a real ERC20.
+contract TestERC20 is ERC20 {
+    constructor() ERC20("Fyuz Test", "FYUZT") {
+        _mint(msg.sender, 1_000_000 ether);
     }
 }

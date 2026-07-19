@@ -1,3 +1,8 @@
+//  ██████ ██████  ███████  █████  ████████ ███████ ██████       ██████  ███    ██     ███████ ██    ██ ██    ██ ███████    ███████ ██    ██ ███    ██ 
+// ██      ██   ██ ██      ██   ██    ██    ██      ██   ██     ██    ██ ████   ██     ██       ██  ██  ██    ██    ███     ██      ██    ██ ████   ██ 
+// ██      ██████  █████   ███████    ██    █████   ██   ██     ██    ██ ██ ██  ██     █████     ████   ██    ██   ███      █████   ██    ██ ██ ██  ██ 
+// ██      ██   ██ ██      ██   ██    ██    ██      ██   ██     ██    ██ ██  ██ ██     ██         ██    ██    ██  ███       ██      ██    ██ ██  ██ ██ 
+//  ██████ ██   ██ ███████ ██   ██    ██    ███████ ██████       ██████  ██   ████     ██         ██     ██████  ███████ ██ ██       ██████  ██   ████ 
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -8,6 +13,11 @@ interface ILaunchable {
 }
 
 contract Token is ERC20, Ownable, ILaunchable {
+
+    // Custom errors (one per former require/revert string).
+    error AlreadyLaunched(); // was: "contract already launched"
+    error NotLaunched(); // was: "This token is not launched and cannot be listed on dexes yet."
+    error TransferFromFailed(); // was: "transferFrom failed"
     bool public launched;
     constructor(
         string memory _name,
@@ -18,7 +28,7 @@ contract Token is ERC20, Ownable, ILaunchable {
     }
 
     function launch() external onlyOwner {
-        require(launched == false, "contract already launched");
+        if (launched != false) revert AlreadyLaunched();
         launched = true;
         renounceOwnership();
     }
@@ -38,11 +48,8 @@ contract Token is ERC20, Ownable, ILaunchable {
         uint256 value
     ) public override returns (bool) {
         bool isTransferAllowed = _transferAllowed(from, to);
-        require(
-            isTransferAllowed,
-            "This token is not launched and cannot be listed on dexes yet."
-        );
-        require(super.transferFrom(from, to, value), "transferFrom failed");
+        if (!isTransferAllowed) revert NotLaunched();
+        if (!(super.transferFrom(from, to, value))) revert TransferFromFailed();
         return true;
     }
 
@@ -50,10 +57,7 @@ contract Token is ERC20, Ownable, ILaunchable {
         address to,
         uint256 value
     ) public virtual override returns (bool) {
-        require(
-            _transferAllowed(msg.sender, to),
-            "This token is not launched and cannot be listed on dexes yet."
-        );
+        if (!(_transferAllowed(msg.sender, to))) revert NotLaunched();
         super._transfer(msg.sender, to, value);
         return true;
     }

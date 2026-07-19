@@ -84,8 +84,6 @@ contract FyuzAdvancedTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            10000,
-            10000,
             address(this)
         );
 
@@ -150,7 +148,7 @@ contract FyuzAdvancedTest is Test {
         assertEq(fyuz.PLATFORM_BUY_FEE_BPS(), 1000);
 
         // Buy fee above 10 should revert
-        vm.expectRevert("Buy fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.BuyFeeTooHigh.selector);
         fyuz.setPlatformBuyFeeBps(1001);
 
         // Sell fee at boundary (10) should succeed
@@ -158,14 +156,14 @@ contract FyuzAdvancedTest is Test {
         assertEq(fyuz.PLATFORM_SELL_FEE_BPS(), 1000);
 
         // Sell fee above 10 should revert
-        vm.expectRevert("Sell fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.SellFeeTooHigh.selector);
         fyuz.setPlatformSellFeeBps(1001);
 
         // Much larger values should also revert
-        vm.expectRevert("Buy fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.BuyFeeTooHigh.selector);
         fyuz.setPlatformBuyFeeBps(5000);
 
-        vm.expectRevert("Sell fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.SellFeeTooHigh.selector);
         fyuz.setPlatformSellFeeBps(10000);
 
         // Reset to defaults
@@ -188,7 +186,7 @@ contract FyuzAdvancedTest is Test {
         fyuz.setPlatformBuyFeeBps(300);
 
         // Owner fee cannot exceed 10
-        vm.expectRevert("Fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.FeeTooHigh.selector);
         fyuz.setTokenOwnerFeeBps(1001);
 
         // Reset
@@ -293,7 +291,7 @@ contract FyuzAdvancedTest is Test {
 
         // One wei over the cap must be rejected.
         vm.prank(addr1);
-        vm.expectRevert("Exceeds maximum price impact");
+        vm.expectRevert(Fyuz.MaxPriceImpactExceeded.selector);
         fyuz.swapExactETHForTokens{value: maxBuy + 1}(t, maxBuy + 1, 0, block.timestamp);
 
         // ...and exactly at the cap must be allowed: proves the breaker is still
@@ -320,7 +318,7 @@ contract FyuzAdvancedTest is Test {
         uint256 cap = (_pool(t).virtualEthReserve * 300) / 10000;
 
         vm.prank(addr1);
-        vm.expectRevert("Exceeds maximum price impact");
+        vm.expectRevert(Fyuz.MaxPriceImpactExceeded.selector);
         fyuz.swapExactETHForTokens{value: cap + 1}(t, cap + 1, 0, block.timestamp);
     }
 
@@ -559,7 +557,7 @@ contract FyuzAdvancedTest is Test {
         // After launch, virtualEthReserve = 0, so maxBuy = 0 and any nonzero buy
         // hits "Exceeds maximum price impact" before reaching the launched check.
         vm.prank(addr1);
-        vm.expectRevert("Exceeds maximum price impact");
+        vm.expectRevert(Fyuz.MaxPriceImpactExceeded.selector);
         fyuz.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0, block.timestamp);
 
         // Attempt to sell after launch should revert.
@@ -569,7 +567,7 @@ contract FyuzAdvancedTest is Test {
         if (bal > 0) {
             vm.startPrank(addr2);
             IERC20(t).approve(address(fyuz), bal);
-            vm.expectRevert("Sell amount too large");
+            vm.expectRevert(Fyuz.SellAmountTooLarge.selector);
             fyuz.swapExactTokensForETH(t, bal / 2, 0, block.timestamp);
             vm.stopPrank();
         }
@@ -588,12 +586,12 @@ contract FyuzAdvancedTest is Test {
         fyuz.requestEmergencyWithdrawETH(0.5 ether);
 
         // Attempt to execute immediately should revert (timelock not expired)
-        vm.expectRevert("Timelock not expired");
+        vm.expectRevert(Fyuz.TimelockNotExpired.selector);
         fyuz.executeEmergencyWithdrawETH();
 
         // Warp 12 hours - still not enough
         vm.warp(block.timestamp + 12 hours);
-        vm.expectRevert("Timelock not expired");
+        vm.expectRevert(Fyuz.TimelockNotExpired.selector);
         fyuz.executeEmergencyWithdrawETH();
 
         // Warp past 24 hours total
@@ -610,7 +608,7 @@ contract FyuzAdvancedTest is Test {
         );
 
         // Second execution should revert (already executed / cleared)
-        vm.expectRevert("No pending withdrawal");
+        vm.expectRevert(Fyuz.NoPendingWithdrawal.selector);
         fyuz.executeEmergencyWithdrawETH();
     }
 
@@ -632,7 +630,7 @@ contract FyuzAdvancedTest is Test {
         uint256 contractBal = IERC20(t).balanceOf(address(fyuz));
         assertTrue(contractBal > 0, "Fyuz should hold tokens");
 
-        vm.expectRevert("Cannot withdraw from active pool");
+        vm.expectRevert(Fyuz.PoolStillActive.selector);
         fyuz.emergencyWithdrawTokens(t, contractBal);
 
         Token standalone = new Token("Standalone", "STKN", 1000 ether);
@@ -663,7 +661,7 @@ contract FyuzAdvancedTest is Test {
         vm.warp(block.timestamp + 25 hours);
 
         // Execution should fail because it was cancelled
-        vm.expectRevert("No pending withdrawal");
+        vm.expectRevert(Fyuz.NoPendingWithdrawal.selector);
         fyuz.executeEmergencyWithdrawETH();
     }
 

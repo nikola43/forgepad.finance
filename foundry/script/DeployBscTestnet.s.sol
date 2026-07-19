@@ -104,8 +104,6 @@ contract DeployFyuzBscTestnet is Script {
             V4_DISABLED_SENTINEL, // _v4PositionManager(V4 gated off in Fyuz)
             PERMIT2,
             deployer, // _owner
-            10000, // 100% BNB to LP
-            10000, // 100% tokens to LP
             deployer
         );
         console.log("FyuzLiquidityManager:", address(lm));

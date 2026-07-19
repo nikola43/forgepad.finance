@@ -64,8 +64,6 @@ contract DeployFyuz is Script {
             V4_POS_MGR,
             PERMIT2_ADDR,
             deployer,
-            10000,
-            10000,
             deployer
         );
         console.log("FyuzLiquidityManager:", address(liquidityManager));

@@ -63,6 +63,48 @@ contract Fyuz is
     OwnableUpgradeable,
     PausableUpgradeable
 {
+
+    // Custom errors (one per former require/revert string).
+    error AlreadyLaunched(); // was: "Already launched" / "Pool has been already launched" / "Pool has been launched"
+    error BelowMinLiquidity(); // was: "Below min liquidity"
+    error BuyFeeTooHigh(); // was: "Buy fee cannot exceed 10%"
+    error EthTransferFailed(); // was: "ETH transfer failed"
+    error ExceedsWithdrawable(); // was: "Exceeds withdrawable (curve-backed ETH protected)"
+    error FeeTooHigh(); // was: "Fee cannot exceed 10%" / "Fee too high"
+    error InsufficientEthValue(); // was: "Insufficient ETH value"
+    error InsufficientInput(); // was: "Insufficient input"
+    error InsufficientLiquidity(); // was: "Insufficient liquidity"
+    error InsufficientTokenBalance(); // was: "Insufficient token balance"
+    error InvalidOutput(); // was: "Invalid output"
+    error InvalidPoolType(); // was: "Only V2 or V3 pool type" / "Unsupported pool type"
+    error MathDivByZero(); // was: "Math: div by zero"
+    error MathMulOverflow(); // was: "Math: mul overflow"
+    error MaxBuyTooHigh(); // was: "Max buy cannot exceed 100%"
+    error MaxInputExceeded(); // was: "Exceeds maximum input"
+    error MaxPriceImpactExceeded(); // was: "Exceeds max price impact" / "Exceeds maximum price impact"
+    error MaxSellTooHigh(); // was: "Max sell cannot exceed 100%"
+    error NoPendingChange(); // was: "No pending change"
+    error NoPendingWithdrawal(); // was: "No pending withdrawal"
+    error NoV2PairForStable(); // was: "No V2 pair for stable"
+    error NotLaunched(); // was: "Not launched"
+    error PoolDoesNotExist(); // was: "Pool does not exist"
+    error PoolStillActive(); // was: "Cannot withdraw from active pool"
+    error SellAmountTooLarge(); // was: "Sell amount too large"
+    error SellFeeTooHigh(); // was: "Sell fee cannot exceed 10%"
+    error ShareTooHigh(); // was: "Share cannot exceed 100%"
+    error SlippageExceeded(); // was: "Slippage limit exceeded"
+    error StalePriceFeed(); // was: "Invalid or stale price feed"
+    error SwapExpired(); // was: "Swap expired"
+    error TimelockNotExpired(); // was: "Timelock not expired"
+    error TransferToZeroAddress(); // was: "Cannot transfer to zero address"
+    error UnknownToken(); // was: "Unknown token"
+    error UnsupportedStableDecimals(); // was: "Unsupported stable decimals"
+    error ZeroAmount(); // was: "Amount must be greater than zero"
+    error ZeroDataFeed(); // was: "Data feed cannot be zero"
+    error ZeroDistributor(); // was: "Distributor cannot be zero"
+    error ZeroFeeAddress(); // was: "Fee address cannot be zero"
+    error ZeroLiquidityManager(); // was: "Liquidity manager cannot be zero"
+    error ZeroThreshold(); // was: "Threshold must be > 0"
     using SafeERC20 for IERC20;
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
@@ -269,16 +311,10 @@ contract Fyuz is
         __Ownable_init(msg.sender);
         __Pausable_init();
 
-        require(_dataFeedAddress != address(0), "Data feed cannot be zero");
-        require(
-            _liquidityManagerAddress != address(0),
-            "Liquidity manager cannot be zero"
-        );
-        require(_feeAddress != address(0), "Fee address cannot be zero");
-        require(
-            _distributorAddress != address(0),
-            "Distributor cannot be zero"
-        );
+        if (_dataFeedAddress == address(0)) revert ZeroDataFeed();
+        if (_liquidityManagerAddress == address(0)) revert ZeroLiquidityManager();
+        if (_feeAddress == address(0)) revert ZeroFeeAddress();
+        if (_distributorAddress == address(0)) revert ZeroDistributor();
 
         priceFeed = AggregatorV3Interface(_dataFeedAddress);
         priceFeedDecimals = priceFeed.decimals();
@@ -302,12 +338,12 @@ contract Fyuz is
     // ==================== MATH HELPERS (native ^0.8.26) ====================
     function _mul(uint256 a, uint256 b) private pure returns (uint256) {
         uint256 c = a * b;
-        require(a == 0 || c / a == b, "Math: mul overflow");
+        if (!(a == 0 || c / a == b)) revert MathMulOverflow();
         return c;
     }
 
     function _div(uint256 a, uint256 b) private pure returns (uint256) {
-        require(b > 0, "Math: div by zero");
+        if (b <= 0) revert MathDivByZero();
         return a / b;
     }
 
@@ -317,10 +353,10 @@ contract Fyuz is
         uint256 reserveOut,
         uint256 feeBps
     ) internal pure returns (uint256) {
-        require(amountIn > 0, "Insufficient input");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
+        if (amountIn <= 0) revert InsufficientInput();
+        if (!(reserveIn > 0 && reserveOut > 0)) revert InsufficientLiquidity();
 
-        require(feeBps < DIVISOR, "Fee too high");
+        if (feeBps >= DIVISOR) revert FeeTooHigh();
 
         uint256 amountInWithFee = _mul(amountIn, DIVISOR - feeBps) / DIVISOR;
         uint256 numerator = _mul(amountInWithFee, reserveOut);
@@ -334,10 +370,10 @@ contract Fyuz is
         uint256 reserveOut,
         uint256 feeBps
     ) internal pure returns (uint256) {
-        require(amountOut > 0 && amountOut < reserveOut, "Invalid output");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
+        if (!(amountOut > 0 && amountOut < reserveOut)) revert InvalidOutput();
+        if (!(reserveIn > 0 && reserveOut > 0)) revert InsufficientLiquidity();
 
-        require(feeBps < DIVISOR, "Fee too high");
+        if (feeBps >= DIVISOR) revert FeeTooHigh();
 
         uint256 numerator = _mul(reserveIn, amountOut);
         uint256 denominator = reserveOut - amountOut;
@@ -351,8 +387,8 @@ contract Fyuz is
         uint256 reserveOut
     ) internal pure {
         uint256 impact = _mul(amountOut, DIVISOR) / reserveOut;
-        require(impact <= MAX_PRICE_IMPACT, "Exceeds max price impact");
-        require(reserveOut - amountOut >= MIN_LIQUIDITY, "Below min liquidity");
+        if (impact > MAX_PRICE_IMPACT) revert MaxPriceImpactExceeded();
+        if (reserveOut - amountOut < MIN_LIQUIDITY) revert BelowMinLiquidity();
     }
 
     function createToken(
@@ -364,19 +400,16 @@ contract Fyuz is
         uint8 poolType,
         uint256 deadline
     ) external payable whenNotPaused nonReentrant returns (address) {
-        require(deadline >= block.timestamp, "Swap expired");
+        if (deadline < block.timestamp) revert SwapExpired();
         // V4 (poolType 3) is deliberately gated off: the V4 seeding/graduation
         // internals remain in FyuzLiquidityManager but are unreachable. Only
         // 1 = Uniswap/Pancake V2 and 2 = Uniswap/Pancake V3 may be selected.
-        require(poolType == 1 || poolType == 2, "Only V2 or V3 pool type");
+        if (!(poolType == 1 || poolType == 2)) revert InvalidPoolType();
 
         address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
 
         uint256 firstBuyFee = buyAmount > 0 ? getFirstBuyFee(newToken) : 0;
-        require(
-            msg.value >= buyAmount + firstBuyFee + CREATE_TOKEN_FEE_AMOUNT,
-            "Insufficient ETH value"
-        );
+        if (msg.value < buyAmount + firstBuyFee + CREATE_TOKEN_FEE_AMOUNT) revert InsufficientEthValue();
 
         // Initialize exactly like Pump.fun: virtual curve + real reserves
         tokenPools[newToken] = PoolInfo({
@@ -445,8 +478,8 @@ contract Fyuz is
         address token
     ) external nonReentrant returns (uint256 ethFees, uint256 tokenFees) {
         PoolInfo storage pool = tokenPools[token];
-        require(pool.token != address(0), "Unknown token");
-        require(pool.launched, "Not launched");
+        if (pool.token == address(0)) revert UnknownToken();
+        if (!pool.launched) revert NotLaunched();
 
         (ethFees, tokenFees) = liquidityManager.collectFees(
             token,
@@ -478,7 +511,7 @@ contract Fyuz is
         uint256 buyAmount,
         uint256 minAmountOut
     ) internal returns (uint256 usedBuyAmount) {
-        require(!tokenPools[token].launched, "Pool has been already launched");
+        if (!(!tokenPools[token].launched)) revert AlreadyLaunched();
         PoolInfo storage pool = tokenPools[token];
 
         uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
@@ -503,7 +536,7 @@ contract Fyuz is
             pool.virtualTokenReserve,
             totalFeeBps
         );
-        require(amountOut >= minAmountOut, "Slippage limit exceeded");
+        if (amountOut < minAmountOut) revert SlippageExceeded();
 
         checkPriceImpact(amountOut, pool.virtualTokenReserve);
 
@@ -557,7 +590,7 @@ contract Fyuz is
         uint256 buyAmount,
         uint256 maxAmountIn
     ) internal returns (uint256) {
-        require(!tokenPools[token].launched, "Pool has been already launched");
+        if (!(!tokenPools[token].launched)) revert AlreadyLaunched();
         PoolInfo storage pool = tokenPools[token];
 
         uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;
@@ -575,7 +608,7 @@ contract Fyuz is
             pool.virtualTokenReserve,
             totalFeeBps
         );
-        require(amountIn <= maxAmountIn, "Exceeds maximum input");
+        if (amountIn > maxAmountIn) revert MaxInputExceeded();
 
         checkPriceImpact(buyAmount, pool.virtualTokenReserve);
 
@@ -605,7 +638,7 @@ contract Fyuz is
         uint256 sellAmount,
         uint256 minAmountOut
     ) internal {
-        require(!tokenPools[token].launched, "Pool has been already launched");
+        if (!(!tokenPools[token].launched)) revert AlreadyLaunched();
         PoolInfo storage pool = tokenPools[token];
 
         // Sell uses 0 fee in formula (fees applied explicitly on output)
@@ -623,7 +656,7 @@ contract Fyuz is
         uint256 tokenOwnerFee = _mul(grossOut, TOKEN_OWNER_FEE_BPS) / DIVISOR;
         uint256 netAmountOut = grossOut - sellFee - tokenOwnerFee;
 
-        require(netAmountOut >= minAmountOut, "Slippage limit exceeded");
+        if (netAmountOut < minAmountOut) revert SlippageExceeded();
 
         checkPriceImpact(grossOut, pool.virtualEthReserve);
 
@@ -680,16 +713,16 @@ contract Fyuz is
         uint256 minAmountOut,
         uint256 deadline
     ) public payable whenNotPaused nonReentrant {
-        require(deadline >= block.timestamp, "Swap expired");
-        require(tokenPools[token].token != address(0), "Pool does not exist");
+        if (deadline < block.timestamp) revert SwapExpired();
+        if (tokenPools[token].token == address(0)) revert PoolDoesNotExist();
         uint256 maxBuy = _mul(
             tokenPools[token].virtualEthReserve,
             MAX_BUY_PERCENT
         ) / DIVISOR;
-        require(buyAmount <= maxBuy, "Exceeds maximum price impact");
+        if (buyAmount > maxBuy) revert MaxPriceImpactExceeded();
 
         uint256 firstBuyFee = getFirstBuyFee(token);
-        require(msg.value >= buyAmount + firstBuyFee, "Insufficient ETH value");
+        if (msg.value < buyAmount + firstBuyFee) revert InsufficientEthValue();
 
         // Refund against the ACTUAL ETH consumed, not the requested buyAmount:
         // the reserve cap may shrink the effective buy near graduation, and the
@@ -714,19 +747,16 @@ contract Fyuz is
         uint256 maxAmountIn,
         uint256 deadline
     ) public payable whenNotPaused nonReentrant {
-        require(deadline >= block.timestamp, "Swap expired");
-        require(tokenPools[token].token != address(0), "Pool does not exist");
+        if (deadline < block.timestamp) revert SwapExpired();
+        if (tokenPools[token].token == address(0)) revert PoolDoesNotExist();
         uint256 maxBuy = _mul(
             tokenPools[token].virtualTokenReserve,
             MAX_BUY_PERCENT
         ) / DIVISOR;
-        require(buyAmount <= maxBuy, "Exceeds maximum price impact");
+        if (buyAmount > maxBuy) revert MaxPriceImpactExceeded();
 
         uint256 firstBuyFee = getFirstBuyFee(token);
-        require(
-            msg.value >= maxAmountIn + firstBuyFee,
-            "Insufficient ETH value"
-        );
+        if (msg.value < maxAmountIn + firstBuyFee) revert InsufficientEthValue();
 
         uint256 amountIn = _swapETHForExactTokens(
             token,
@@ -748,13 +778,13 @@ contract Fyuz is
         uint256 minAmountOut,
         uint256 deadline
     ) public whenNotPaused nonReentrant {
-        require(deadline >= block.timestamp, "Swap expired");
-        require(tokenPools[token].token != address(0), "Pool does not exist");
+        if (deadline < block.timestamp) revert SwapExpired();
+        if (tokenPools[token].token == address(0)) revert PoolDoesNotExist();
         uint256 maxSell = _mul(
             tokenPools[token].virtualTokenReserve,
             MAX_SELL_PERCENT
         ) / DIVISOR;
-        require(sellAmount <= maxSell, "Sell amount too large");
+        if (sellAmount > maxSell) revert SellAmountTooLarge();
 
         _swapExactTokensForETH(token, sellAmount, minAmountOut);
     }
@@ -828,7 +858,7 @@ contract Fyuz is
     ///         only where a real price is mandatory (graduation LP sizing).
     function getETHPriceByUSD() public view returns (uint256) {
         uint256 p = _rawEthPrice();
-        require(p > 0, "Invalid or stale price feed");
+        if (p <= 0) revert StalePriceFeed();
         return p;
     }
 
@@ -993,7 +1023,7 @@ contract Fyuz is
                 _addLiquidityV2(token, ethAmount, tokenAmount, ethPriceUSD);
             }
         } else {
-            revert("Unsupported pool type");
+            revert InvalidPoolType();
         }
 
         emit LiquidityAdded(
@@ -1039,10 +1069,10 @@ contract Fyuz is
     }
 
     function _transferETH(address to, uint256 amount) internal {
-        require(to != address(0), "Cannot transfer to zero address");
-        require(amount > 0, "Amount must be greater than zero");
+        if (to == address(0)) revert TransferToZeroAddress();
+        if (amount <= 0) revert ZeroAmount();
         (bool success, ) = payable(to).call{value: amount}("");
-        require(success, "ETH transfer failed");
+        if (!success) revert EthTransferFailed();
     }
 
     /// @dev Best-effort ETH send that NEVER reverts — used only for protocol/creator
@@ -1087,13 +1117,13 @@ contract Fyuz is
     ///         (PLATFORM_BUY/SELL_FEE_BPS) are set separately, so all three
     ///         destinations are independently tunable without an upgrade.
     function setPlatformTreasuryShareBps(uint256 bps) external onlyOwner {
-        require(bps <= DIVISOR, "Share cannot exceed 100%");
+        if (bps > DIVISOR) revert ShareTooHigh();
         platformTreasuryShareBps = bps;
     }
 
     // ==================== ADMIN FUNCTIONS ====================
     function setTokenOwnerFeeBps(uint256 bps) external onlyOwner {
-        require(bps <= 1000, "Fee cannot exceed 10%");
+        if (bps > 1000) revert FeeTooHigh();
         TOKEN_OWNER_FEE_BPS = bps;
     }
 
@@ -1108,7 +1138,7 @@ contract Fyuz is
     /// @notice Set the Chainlink staleness threshold. On L2 chains where the feed
     ///         timestamp originates from L1, increase this to 86400+ (24h).
     function setPriceStalenessThreshold(uint256 threshold) external onlyOwner {
-        require(threshold > 0, "Threshold must be > 0");
+        if (threshold <= 0) revert ZeroThreshold();
         priceStalenessThreshold = threshold;
     }
 
@@ -1130,13 +1160,13 @@ contract Fyuz is
         }
 
         uint8 dec = IERC20Metadata(stable).decimals();
-        require(dec <= 18, "Unsupported stable decimals");
+        if (dec > 18) revert UnsupportedStableDecimals();
 
         // Resolve the pair now so a typo fails here, loudly, instead of silently
         // reading 0 forever during the outage the fallback exists to cover.
         address pair = IUniswapV2Factory(IUniswapV2Router02(router).factory())
             .getPair(IUniswapV2Router02(router).WETH(), stable);
-        require(pair != address(0), "No V2 pair for stable");
+        if (pair == address(0)) revert NoV2PairForStable();
 
         fallbackRouterV2 = IUniswapV2Router02(router);
         fallbackStable = stable;
@@ -1153,47 +1183,41 @@ contract Fyuz is
     }
 
     function setMaxBuyPercent(uint256 percent) external onlyOwner {
-        require(percent <= DIVISOR, "Max buy cannot exceed 100%");
+        if (percent > DIVISOR) revert MaxBuyTooHigh();
         MAX_BUY_PERCENT = percent;
     }
 
     function setMaxSellPercent(uint256 percent) external onlyOwner {
-        require(percent <= DIVISOR, "Max sell cannot exceed 100%");
+        if (percent > DIVISOR) revert MaxSellTooHigh();
         MAX_SELL_PERCENT = percent;
     }
 
     function setPlatformBuyFeeBps(uint256 bps) external onlyOwner {
-        require(bps <= 1000, "Buy fee cannot exceed 10%");
+        if (bps > 1000) revert BuyFeeTooHigh();
         PLATFORM_BUY_FEE_BPS = bps;
     }
 
     function setPlatformSellFeeBps(uint256 bps) external onlyOwner {
-        require(bps <= 1000, "Sell fee cannot exceed 10%");
+        if (bps > 1000) revert SellFeeTooHigh();
         PLATFORM_SELL_FEE_BPS = bps;
     }
 
     function setFeeAddress(address newFeeAddress) external onlyOwner {
-        require(newFeeAddress != address(0), "Fee address cannot be zero");
+        if (newFeeAddress == address(0)) revert ZeroFeeAddress();
         feeAddress = newFeeAddress;
     }
 
     function setDistributorAddress(
         address newDistributorAddress
     ) external onlyOwner {
-        require(
-            newDistributorAddress != address(0),
-            "Distributor cannot be zero"
-        );
+        if (newDistributorAddress == address(0)) revert ZeroDistributor();
         distributorAddress = newDistributorAddress;
     }
 
     function requestLiquidityManagerChange(
         address newLiquidityManagerAddress
     ) external onlyOwner {
-        require(
-            newLiquidityManagerAddress != address(0),
-            "Liquidity manager cannot be zero"
-        );
+        if (newLiquidityManagerAddress == address(0)) revert ZeroLiquidityManager();
         pendingLiquidityManager = newLiquidityManagerAddress;
         liquidityManagerChangeTime = block.timestamp;
         emit LiquidityManagerChangeRequested(
@@ -1203,11 +1227,8 @@ contract Fyuz is
     }
 
     function executeLiquidityManagerChange() external onlyOwner {
-        require(pendingLiquidityManager != address(0), "No pending change");
-        require(
-            block.timestamp >= liquidityManagerChangeTime + EMERGENCY_TIMELOCK,
-            "Timelock not expired"
-        );
+        if (pendingLiquidityManager == address(0)) revert NoPendingChange();
+        if (block.timestamp < liquidityManagerChangeTime + EMERGENCY_TIMELOCK) revert TimelockNotExpired();
         liquidityManager = IFyuzLiquidityManager(pendingLiquidityManager);
         emit LiquidityManagerChanged(pendingLiquidityManager);
         pendingLiquidityManager = address(0);
@@ -1228,11 +1249,11 @@ contract Fyuz is
         address token,
         uint8 newPoolType
     ) external onlyOwner {
-        require(tokenPools[token].token != address(0), "Pool does not exist");
-        require(!tokenPools[token].launched, "Already launched");
+        if (tokenPools[token].token == address(0)) revert PoolDoesNotExist();
+        if (!(!tokenPools[token].launched)) revert AlreadyLaunched();
         // Must match createToken's gate, or V4 would be reachable through this
         // owner-only back door despite being disabled at creation time.
-        require(newPoolType == 1 || newPoolType == 2, "Only V2 or V3 pool type");
+        if (!(newPoolType == 1 || newPoolType == 2)) revert InvalidPoolType();
         tokenPools[token].poolType = newPoolType;
     }
 
@@ -1245,10 +1266,7 @@ contract Fyuz is
     }
 
     function requestEmergencyWithdrawETH(uint256 amount) external onlyOwner {
-        require(
-            amount <= withdrawableEth(),
-            "Exceeds withdrawable (curve-backed ETH protected)"
-        );
+        if (amount > withdrawableEth()) revert ExceedsWithdrawable();
         emergencyWithdrawRequestTime = block.timestamp;
         emergencyWithdrawAmount = amount;
         emit EmergencyWithdrawRequested(
@@ -1258,17 +1276,10 @@ contract Fyuz is
     }
 
     function executeEmergencyWithdrawETH() external onlyOwner {
-        require(emergencyWithdrawRequestTime > 0, "No pending withdrawal");
-        require(
-            block.timestamp >=
-                emergencyWithdrawRequestTime + EMERGENCY_TIMELOCK,
-            "Timelock not expired"
-        );
+        if (emergencyWithdrawRequestTime <= 0) revert NoPendingWithdrawal();
+        if (block.timestamp < emergencyWithdrawRequestTime + EMERGENCY_TIMELOCK) revert TimelockNotExpired();
         uint256 amount = emergencyWithdrawAmount;
-        require(
-            amount <= withdrawableEth(),
-            "Exceeds withdrawable (curve-backed ETH protected)"
-        );
+        if (amount > withdrawableEth()) revert ExceedsWithdrawable();
 
         emergencyWithdrawRequestTime = 0;
         emergencyWithdrawAmount = 0;
@@ -1287,14 +1298,8 @@ contract Fyuz is
         address token,
         uint256 amount
     ) external onlyOwner {
-        require(
-            amount <= IERC20(token).balanceOf(address(this)),
-            "Insufficient token balance"
-        );
-        require(
-            tokenPools[token].launched || tokenPools[token].token == address(0),
-            "Cannot withdraw from active pool"
-        );
+        if (!(amount <= IERC20(token).balanceOf(address(this)))) revert InsufficientTokenBalance();
+        if (!(tokenPools[token].launched || tokenPools[token].token == address(0))) revert PoolStillActive();
         IERC20(token).safeTransfer(owner(), amount);
     }
 
@@ -1346,7 +1351,7 @@ contract Fyuz is
         bool isETHInput
     ) external view returns (uint256 amountOut, uint256 priceImpact) {
         PoolInfo storage pool = tokenPools[token];
-        require(!pool.launched, "Pool has been launched");
+        if (!(!pool.launched)) revert AlreadyLaunched();
 
         if (isETHInput) {
             uint256 totalFeeBps = PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS;

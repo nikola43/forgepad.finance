@@ -81,8 +81,7 @@ contract FyuzHardeningTest is Test {
         router = IUniswapV2Router02(V2_ROUTER);
         lm = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER, V3_FACTORY, V3_POS_MGR, V4_POOL_MGR, UNIVERSAL_ROUTER,
-            V4_POS_MGR, PERMIT2, address(this), 10000, 10000,
-            address(this)
+            V4_POS_MGR, PERMIT2, address(this), address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED, address(lm), address(0xFEE), address(0xD15),

@@ -135,8 +135,6 @@ contract DeployFyuzBsc is Script {
             V4_DISABLED_SENTINEL, // _v4PositionManager(V4 gated off in Fyuz)
             PERMIT2,
             deployer, // _owner (transferred to multisig at end of run)
-            10000, // 100% BNB to LP
-            10000, // 100% tokens to LP
             multisig // _proxyAdminOwner (upgrade authority)
         );
         console.log("FyuzLiquidityManager:", address(lm));

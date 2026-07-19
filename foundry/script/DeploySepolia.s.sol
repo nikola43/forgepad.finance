@@ -60,8 +60,6 @@ contract DeployFyuzSepolia is Script {
             V4_POSITION_MANAGER,
             PERMIT2,
             deployer, // _owner
-            10000, // 100% ETH to LP
-            10000, // 100% tokens to LP
             deployer
         );
         console.log("FyuzLiquidityManager:", address(lm));

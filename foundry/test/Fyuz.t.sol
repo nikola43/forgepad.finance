@@ -119,8 +119,6 @@ contract FyuzTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            10000,
-            10000,
             address(this)
         );
 
@@ -950,18 +948,14 @@ contract FyuzTest is Test {
 
         // Direct transfer should revert
         vm.prank(addr1);
-        vm.expectRevert(
-            "This token is not launched and cannot be listed on dexes yet."
-        );
+        vm.expectRevert(Token.NotLaunched.selector);
         IERC20(t).transfer(addr2, bal / 2);
 
         // transferFrom should also revert
         vm.prank(addr1);
         IERC20(t).approve(addr2, bal / 2);
         vm.prank(addr2);
-        vm.expectRevert(
-            "This token is not launched and cannot be listed on dexes yet."
-        );
+        vm.expectRevert(Token.NotLaunched.selector);
         IERC20(t).transferFrom(addr1, addr3, bal / 2);
 
         console.log("Transfers correctly blocked before launch");
@@ -1143,15 +1137,15 @@ contract FyuzTest is Test {
 
     function test_10h_InvalidPoolTypeReverts() public {
         console.log("=== TEST 10h: Invalid pool type reverts at creation ===");
-        vm.expectRevert("Only V2 or V3 pool type");
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 0, block.timestamp);
 
-        vm.expectRevert("Only V2 or V3 pool type");
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 4, block.timestamp);
 
         // V4 (3) used to be valid and is now deliberately gated off. The V4 code
         // in the liquidity manager stays dormant; it must be unreachable from here.
-        vm.expectRevert("Only V2 or V3 pool type");
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.createToken{value: 0.001 ether}("Bad", "BAD", 0, 0, 0, 3, block.timestamp);
 
         // Valid types 1-2 succeed
@@ -1165,7 +1159,7 @@ contract FyuzTest is Test {
         console.log("=== TEST 10c: Non-existent pool reverts ===");
 
         vm.prank(addr1);
-        vm.expectRevert("Pool does not exist");
+        vm.expectRevert(Fyuz.PoolDoesNotExist.selector);
         fyuz.swapExactETHForTokens{value: 0.01 ether}(
             address(0xdead),
             0.01 ether,
@@ -1174,7 +1168,7 @@ contract FyuzTest is Test {
         );
 
         vm.prank(addr1);
-        vm.expectRevert("Pool does not exist");
+        vm.expectRevert(Fyuz.PoolDoesNotExist.selector);
         fyuz.swapExactTokensForETH(address(0xdead), 1e18, 0, block.timestamp);
     }
 
@@ -1199,7 +1193,7 @@ contract FyuzTest is Test {
 
         // After launch virtualEthReserve=0, so maxBuy=0, any buy reverts
         vm.prank(addr2);
-        vm.expectRevert("Exceeds maximum price impact");
+        vm.expectRevert(Fyuz.MaxPriceImpactExceeded.selector);
         fyuz.swapExactETHForTokens{value: 0.01 ether}(t, 0.01 ether, 0, block.timestamp);
 
         console.log("Buy after launch correctly reverts");
@@ -1229,7 +1223,7 @@ contract FyuzTest is Test {
         if (bal > 0) {
             vm.startPrank(addr1);
             IERC20(t).approve(address(fyuz), bal);
-            vm.expectRevert("Sell amount too large");
+            vm.expectRevert(Fyuz.SellAmountTooLarge.selector);
             fyuz.swapExactTokensForETH(t, bal, 0, block.timestamp);
             vm.stopPrank();
         }
@@ -1243,7 +1237,7 @@ contract FyuzTest is Test {
         // Try to buy with very high minAmountOut
         uint256 fee = fyuz.getFirstBuyFee(t);
         vm.prank(addr1);
-        vm.expectRevert("Slippage limit exceeded");
+        vm.expectRevert(Fyuz.SlippageExceeded.selector);
         fyuz.swapExactETHForTokens{value: 0.01 ether + fee}(
             t,
             0.01 ether,
@@ -1343,13 +1337,13 @@ contract FyuzTest is Test {
     function test_11b_FeeLimits() public {
         console.log("=== TEST 11b: Fee limit validation ===");
 
-        vm.expectRevert("Buy fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.BuyFeeTooHigh.selector);
         fyuz.setPlatformBuyFeeBps(1001);
 
-        vm.expectRevert("Sell fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.SellFeeTooHigh.selector);
         fyuz.setPlatformSellFeeBps(1001);
 
-        vm.expectRevert("Fee cannot exceed 10%");
+        vm.expectRevert(Fyuz.FeeTooHigh.selector);
         fyuz.setTokenOwnerFeeBps(1001);
 
         // Valid fee changes should succeed
@@ -1367,13 +1361,13 @@ contract FyuzTest is Test {
     function test_11c_AddressValidation() public {
         console.log("=== TEST 11c: Address validation ===");
 
-        vm.expectRevert("Fee address cannot be zero");
+        vm.expectRevert(Fyuz.ZeroFeeAddress.selector);
         fyuz.setFeeAddress(address(0));
 
-        vm.expectRevert("Distributor cannot be zero");
+        vm.expectRevert(Fyuz.ZeroDistributor.selector);
         fyuz.setDistributorAddress(address(0));
 
-        vm.expectRevert("Liquidity manager cannot be zero");
+        vm.expectRevert(Fyuz.ZeroLiquidityManager.selector);
         fyuz.requestLiquidityManagerChange(address(0));
 
         // Valid address changes
@@ -1395,10 +1389,10 @@ contract FyuzTest is Test {
     function test_11d_MaxPercentValidation() public {
         console.log("=== TEST 11d: Max percent validation ===");
 
-        vm.expectRevert("Max buy cannot exceed 100%");
+        vm.expectRevert(Fyuz.MaxBuyTooHigh.selector);
         fyuz.setMaxBuyPercent(10001);
 
-        vm.expectRevert("Max sell cannot exceed 100%");
+        vm.expectRevert(Fyuz.MaxSellTooHigh.selector);
         fyuz.setMaxSellPercent(10001);
 
         fyuz.setMaxBuyPercent(5000);
@@ -1470,7 +1464,7 @@ contract FyuzTest is Test {
         // (<< curve ETH) may be withdrawable before any stray ETH is donated.
         uint256 dust = fyuz.withdrawableEth();
         assertLt(dust, 1e12, "curve ETH is protected (only dust withdrawable)");
-        vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
+        vm.expectRevert(Fyuz.ExceedsWithdrawable.selector);
         fyuz.requestEmergencyWithdrawETH(curveEth);
 
         // Now STRAY ETH lands in the contract (donation / leftover). Only that
@@ -1482,11 +1476,11 @@ contract FyuzTest is Test {
         assertEq(withdrawable, dust + stray, "stray added to withdrawable");
 
         // Cannot take more than the withdrawable amount (curve ETH stays protected).
-        vm.expectRevert("Exceeds withdrawable (curve-backed ETH protected)");
+        vm.expectRevert(Fyuz.ExceedsWithdrawable.selector);
         fyuz.requestEmergencyWithdrawETH(withdrawable + 1);
 
         fyuz.requestEmergencyWithdrawETH(withdrawable);
-        vm.expectRevert("Timelock not expired");
+        vm.expectRevert(Fyuz.TimelockNotExpired.selector);
         fyuz.executeEmergencyWithdrawETH();
 
         vm.warp(block.timestamp + 24 hours + 1);
@@ -1518,7 +1512,7 @@ contract FyuzTest is Test {
         fyuz.cancelEmergencyWithdraw();
 
         vm.warp(block.timestamp + 24 hours + 1);
-        vm.expectRevert("No pending withdrawal");
+        vm.expectRevert(Fyuz.NoPendingWithdrawal.selector);
         fyuz.executeEmergencyWithdrawETH();
 
         console.log("Cancel emergency withdraw works");
@@ -1529,7 +1523,7 @@ contract FyuzTest is Test {
         address t = _create("EWToken", "EWT", 1);
 
         // Cannot withdraw from active pool
-        vm.expectRevert("Cannot withdraw from active pool");
+        vm.expectRevert(Fyuz.PoolStillActive.selector);
         fyuz.emergencyWithdrawTokens(t, 1e18);
 
         console.log("Emergency token withdraw correctly blocked for active pool");
@@ -1540,7 +1534,7 @@ contract FyuzTest is Test {
         address newManager = makeAddr("newManager");
 
         // Cannot execute without a pending request
-        vm.expectRevert("No pending change");
+        vm.expectRevert(Fyuz.NoPendingChange.selector);
         fyuz.executeLiquidityManagerChange();
 
         // Request the change
@@ -1557,7 +1551,7 @@ contract FyuzTest is Test {
         );
 
         // Cannot execute before timelock expires
-        vm.expectRevert("Timelock not expired");
+        vm.expectRevert(Fyuz.TimelockNotExpired.selector);
         fyuz.executeLiquidityManagerChange();
 
         // Warp past the 24h timelock and execute
@@ -1579,7 +1573,7 @@ contract FyuzTest is Test {
         fyuz.requestLiquidityManagerChange(another);
         fyuz.cancelLiquidityManagerChange();
         vm.warp(block.timestamp + 24 hours + 1);
-        vm.expectRevert("No pending change");
+        vm.expectRevert(Fyuz.NoPendingChange.selector);
         fyuz.executeLiquidityManagerChange();
 
         console.log("Liquidity manager timelock + cancel work");
@@ -2426,17 +2420,17 @@ contract FyuzTest is Test {
         vm.expectRevert();
         fyuz.recoverPoolType(t, 1);
 
-        vm.expectRevert("Only V2 or V3 pool type");
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.recoverPoolType(t, 4);
 
         // Back door: recoverPoolType must enforce the SAME V2/V3 gate as
         // createToken, or the owner could route a token onto dormant V4 after
         // creation and reach the code that createToken's gate blocks.
-        vm.expectRevert("Only V2 or V3 pool type");
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.recoverPoolType(t, 3);
         assertEq(_pool(t).poolType, 2, "poolType unchanged after rejected V4 recover");
 
-        vm.expectRevert("Pool does not exist");
+        vm.expectRevert(Fyuz.PoolDoesNotExist.selector);
         fyuz.recoverPoolType(address(0xdead), 1);
 
         fyuz.recoverPoolType(t, 1);

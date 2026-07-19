@@ -42,8 +42,7 @@ contract GriefSyncReproTest is Test {
         address DATA_FEED = vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
         lm = FyuzDeploy.deployLiquidityManager(
-            V2_ROUTER, V3_FACTORY, V3_POS, V4_MGR, UNIV, V4_POS, PERMIT2, address(this), 10000, 10000,
-            address(this)
+            V2_ROUTER, V3_FACTORY, V3_POS, V4_MGR, UNIV, V4_POS, PERMIT2, address(this), address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED, address(lm), address(0xFEE), address(0xD1),

@@ -124,8 +124,6 @@ contract FyuzLiquidityManager is
     IPermit2 permit2;
 
     // Set in initialize() — declaration-time values never run behind a proxy.
-    uint16 ethAmountPercentToLP; // 10000 = 100%
-    uint16 tokenAmountPercentToLP; // 10000 = 100%
 
     /// @notice V3 position NFT this contract holds for a launched token (0 = none).
     /// @dev The position is retained here forever so its trading fees stay
@@ -221,6 +219,21 @@ contract FyuzLiquidityManager is
     error InvalidTokenOrder();
     error ZeroAmount();
     error ZeroAddress();
+    error EthTransferFailed(); // was: "ETH transfer failed"
+    error InvalidAmounts(); // was: "Invalid amounts"
+    error InvalidFeeTier(); // was: "Invalid fee tier"
+    error NoClaimablePosition(); // was: "No claimable position"
+    error NotEnoughEth(); // was: "Not enough ETH"
+    error NotEnoughTokens(); // was: "Not enough tokens"
+    error Unauthorized(); // was: "Unauthorized"
+    error V3PoolPriceMismatch(); // was: "V3 pool price mismatch"
+    error V4PoolPriceMismatch(); // was: "V4 pool price mismatch"
+    error ZeroCalculatedAmounts(); // was: "Calculated amounts must be positive"
+    error ZeroCalculatedTokenAmount(); // was: "Calculated token amount must be positive"
+    error ZeroEthPrice(); // was: "ETH price must be positive"
+    error ZeroLiquidity(); // was: "Zero liquidity"
+    error ZeroTargetMarketCap(); // was: "Target market cap must be positive"
+    error ZeroTotalSupply(); // was: "Total supply must be positive"
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -247,10 +260,7 @@ contract FyuzLiquidityManager is
     }
 
     modifier onlyAuthorized() {
-        require(
-            authorizedCallers[msg.sender] || msg.sender == owner(),
-            "Unauthorized"
-        );
+        if (!(authorizedCallers[msg.sender] || msg.sender == owner())) revert Unauthorized();
         _;
     }
 
@@ -268,8 +278,6 @@ contract FyuzLiquidityManager is
      * @param _v4PositionManager V4 position manager address
      * @param _permit2 Permit2 contract address for token approvals
      * @param _owner Initial owner of the contract
-     * @param _ethAmountPercentToLP Percent of ETH to use for LP (in basis points)
-     * @param _tokenAmountPercentToLP Percent of tokens to use for LP (in basis points)
      */
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -284,9 +292,7 @@ contract FyuzLiquidityManager is
         address _universalRouter,
         address _v4PositionManager,
         address _permit2,
-        address _owner,
-        uint16 _ethAmountPercentToLP,
-        uint16 _tokenAmountPercentToLP
+        address _owner
     ) external initializer {
         __Ownable_init(_owner);
         __Pausable_init();
@@ -306,8 +312,6 @@ contract FyuzLiquidityManager is
         universalRouter = _universalRouter;
         positionManager = IPositionManager(_v4PositionManager);
         permit2 = IPermit2(_permit2);
-        ethAmountPercentToLP = _ethAmountPercentToLP;
-        tokenAmountPercentToLP = _tokenAmountPercentToLP;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -403,9 +407,8 @@ contract FyuzLiquidityManager is
         // Approve router to spend tokens
         IERC20(token).approve(address(routerV2), tokenAmount);
 
-        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
-        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
-            10000; // Calculate token amount to LP
+        uint256 ethAmountToLP = ethAmount;
+        uint256 tokenAmountToLP = tokenAmount;
 
         // Add liquidity with 2% slippage tolerance
         uint256 tokenMin = (tokenAmountToLP * 98) / 100;
@@ -466,8 +469,8 @@ contract FyuzLiquidityManager is
         notZeroAddress(recipient)
         returns (address pairAddress)
     {
-        require(targetMarketCap > 0, "Target market cap must be positive");
-        require(ethPriceUSD > 0, "ETH price must be positive");
+        if (targetMarketCap <= 0) revert ZeroTargetMarketCap();
+        if (ethPriceUSD <= 0) revert ZeroEthPrice();
 
         _validateTokenTransfer(token, tokenAmount);
         _validateETHBalance(ethAmount);
@@ -477,7 +480,7 @@ contract FyuzLiquidityManager is
 
         // Get total supply of the token
         uint256 totalSupply = IERC20(token).totalSupply();
-        require(totalSupply > 0, "Total supply must be positive");
+        if (totalSupply <= 0) revert ZeroTotalSupply();
 
         // Calculate the required ratio: ethReserve / tokenReserve = targetMarketCap / (totalSupply * ethPriceUSD)
         // tokenToAdd = ethToAdd * totalSupply * ethPriceUSD / targetMarketCap / 1e18
@@ -504,12 +507,9 @@ contract FyuzLiquidityManager is
         }
 
         // Ensure we have the amounts
-        require(
-            ethAmountToLP > 0 && tokenAmountToLP > 0,
-            "Calculated amounts must be positive"
-        );
-        require(ethAmountToLP <= ethAmount, "Not enough ETH");
-        require(tokenAmountToLP <= tokenAmount, "Not enough tokens");
+        if (!(ethAmountToLP > 0 && tokenAmountToLP > 0)) revert ZeroCalculatedAmounts();
+        if (ethAmountToLP > ethAmount) revert NotEnoughEth();
+        if (tokenAmountToLP > tokenAmount) revert NotEnoughTokens();
 
         // Seed the pair directly via first-mint instead of the router. The router
         // reverts if a pre-existing pair has one-sided (donated) reserves, which
@@ -542,7 +542,7 @@ contract FyuzLiquidityManager is
         uint256 tokenForPool = (poolWeth * totalSupply) / 1e18;
         tokenForPool = (tokenForPool * ethPriceUSD) / targetMarketCap;
         if (tokenForPool > tokenAmount) tokenForPool = tokenAmount;
-        require(tokenForPool > 0, "Calculated token amount must be positive");
+        if (tokenForPool <= 0) revert ZeroCalculatedTokenAmount();
 
         IERC20(token).safeTransfer(pairAddress, tokenForPool);
         IUniswapV2Pair(pairAddress).mint(recipient);
@@ -559,7 +559,7 @@ contract FyuzLiquidityManager is
         uint256 remainingETH = address(this).balance;
         if (remainingETH > 0) {
             (bool success, ) = owner().call{value: remainingETH}("");
-            require(success, "ETH transfer failed");
+            if (!success) revert EthTransferFailed();
         }
 
         emit LiquidityAddedV2(
@@ -616,9 +616,8 @@ contract FyuzLiquidityManager is
         address token0Address = token;
         address token1Address = routerV2.WETH();
 
-        uint256 ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
-        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
-            10000; // Calculate token amount to LP
+        uint256 ethAmountToLP = ethAmount;
+        uint256 tokenAmountToLP = tokenAmount;
 
         uint256 amount0Desired = tokenAmountToLP;
         uint256 amount1Desired = ethAmountToLP;
@@ -732,13 +731,9 @@ contract FyuzLiquidityManager is
         address token0Address = token;
         address token1Address = routerV2.WETH();
 
-        uint256 ethAmountToLP = 0;
-        if (ethAmount > 0) {
-            ethAmountToLP = (ethAmount * ethAmountPercentToLP) / 10000; // Calculate ETH amount to LP
-        }
+        uint256 ethAmountToLP = ethAmount;
 
-        uint256 tokenAmountToLP = (tokenAmount * tokenAmountPercentToLP) /
-            10000; // Calculate token amount to LP
+        uint256 tokenAmountToLP = tokenAmount;
 
         uint256 amount0Desired = tokenAmountToLP;
         uint256 amount1Desired = ethAmountToLP;
@@ -767,10 +762,7 @@ contract FyuzLiquidityManager is
         // mint into a hostile pool.
         (uint160 existingV4, , , ) = poolV4Manager.getSlot0(poolKey.toId());
         if (existingV4 != 0) {
-            require(
-                _withinTolerance(existingV4, sqrtPriceX96),
-                "V4 pool price mismatch"
-            );
+            if (!(_withinTolerance(existingV4, sqrtPriceX96))) revert V4PoolPriceMismatch();
         }
 
         // V4 pool uses TICK_SPACING, so full-range ticks must align to it.
@@ -933,10 +925,7 @@ contract FyuzLiquidityManager is
         // pre-initialised at a hostile price.
         (uint160 existingV4, , , ) = poolV4Manager.getSlot0(poolKey.toId());
         if (existingV4 != 0) {
-            require(
-                _withinTolerance(existingV4, sqrtPriceX96),
-                "V4 pool price mismatch"
-            );
+            if (!(_withinTolerance(existingV4, sqrtPriceX96))) revert V4PoolPriceMismatch();
         }
 
         int24 startTick = TickMath.getTickAtSqrtPrice(sqrtPriceX96);
@@ -969,7 +958,7 @@ contract FyuzLiquidityManager is
                 tokenAmount
             );
         }
-        require(liquidity > 0, "Zero liquidity");
+        if (liquidity <= 0) revert ZeroLiquidity();
 
         uint256 v4TokenId = positionManager.nextTokenId();
 
@@ -1092,7 +1081,7 @@ contract FyuzLiquidityManager is
         // V2 LP is fungible and its fees accrue straight into the pool reserves —
         // the only way to realise them is to burn LP, which would withdraw principal
         // too. There is nothing collectable, so callers must not be told otherwise.
-        require(v3Id != 0 || v4Id != 0, "No claimable position");
+        if (!(v3Id != 0 || v4Id != 0)) revert NoClaimablePosition();
 
         // Every pool (V2/V3/V4) pairs against WETH, so fees always arrive as WETH and
         // the ETH side is always the WETH balance delta.
@@ -1180,7 +1169,7 @@ contract FyuzLiquidityManager is
         if (fee == 500) return 10; // 0.05%
         if (fee == 3000) return 60; // 0.3%
         if (fee == 10000) return 200; // 1%
-        revert("Invalid fee tier");
+        revert InvalidFeeTier();
     }
 
     /**
@@ -1259,7 +1248,7 @@ contract FyuzLiquidityManager is
         uint256 amount0,
         uint256 amount1
     ) internal pure returns (uint160 sqrtPriceX96) {
-        require(amount0 > 0 && amount1 > 0, "Invalid amounts");
+        if (!(amount0 > 0 && amount1 > 0)) revert InvalidAmounts();
 
         // Calculate price as amount1/amount0
         uint256 price = (amount1 * 1e18) / amount0;
@@ -1303,10 +1292,7 @@ contract FyuzLiquidityManager is
         } else {
             // Pool already initialized (possibly by a griefer at a hostile price).
             // Abort unless its price is within tolerance of our target.
-            require(
-                _withinTolerance(existing, sqrtPriceX96),
-                "V3 pool price mismatch"
-            );
+            if (!(_withinTolerance(existing, sqrtPriceX96))) revert V3PoolPriceMismatch();
         }
     }
 
@@ -1464,31 +1450,12 @@ contract FyuzLiquidityManager is
         if (!success) revert TransferFailed();
     }
 
-    function setEthAmountPercentToLP(
-        uint16 _ethAmountPercentToLP
-    ) external onlyOwner {
-        require(
-            _ethAmountPercentToLP > 0 && _ethAmountPercentToLP <= 10000,
-            "Invalid percent"
-        );
-        ethAmountPercentToLP = _ethAmountPercentToLP;
-    }
-
-    function setTokenAmountPercentToLP(
-        uint16 _tokenAmountPercentToLP
-    ) external onlyOwner {
-        require(
-            _tokenAmountPercentToLP > 0 && _tokenAmountPercentToLP <= 10000,
-            "Invalid percent"
-        );
-        tokenAmountPercentToLP = _tokenAmountPercentToLP;
-    }
 
     function setAuthorizedCaller(
         address caller,
         bool authorized
     ) external onlyOwner {
-        require(caller != address(0), "Zero address");
+        if (caller == address(0)) revert ZeroAddress();
         authorizedCallers[caller] = authorized;
     }
 }

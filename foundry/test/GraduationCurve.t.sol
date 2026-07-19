@@ -9,6 +9,7 @@ import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV
 import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IV3PoolSlot0} from "../src/interfaces/IV3PoolSlot0.sol";
+import {V3PoolSwapper} from "./ClaimFees.t.sol";
 
 /// Captures the full price curve through graduation for both V2 and V3 launches
 /// and prints CSV rows (prefix "GCURVE,") for an off-chain Excel/chart export.
@@ -37,7 +38,7 @@ contract GraduationCurveTest is Test {
         vm.createSelectFork(vm.envOr("BSC_FORK_URL", string("https://bsc-rpc.publicnode.com")));
         lm = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER, V3_FACTORY, V3_POSITION_MANAGER, SENTINEL, SENTINEL, SENTINEL,
-            PERMIT2, deployer, 10000, 10000, deployer
+            PERMIT2, deployer, deployer
         );
         fyuz = FyuzDeploy.deployFyuz(DATA_FEED, address(lm), deployer, deployer, deployer);
         lm.setAuthorizedCaller(address(fyuz), true);
@@ -84,10 +85,82 @@ contract GraduationCurveTest is Test {
         require(_launched(token), "did not graduate");
 
         // Opening DEX price (BNB per token), continuous with the curve by design.
-        uint256 bnbUsd = fyuz.getETHPriceByUSD();
         uint256 dexPriceBNB = poolType == 1 ? _v2Price(token) : _v3Price(token);
-        // mcap at DEX open = price * circulating; report price only (mcap USD = price*bnbUsd*supply)
-        _row(market, "dex", step + 1, bnbIn, dexPriceBNB, bnbUsd, fyuz.getTokenVirtualMarketCap(token));
+        _row(market, "dex", step + 1, bnbIn, dexPriceBNB, fyuz.getETHPriceByUSD(), _dexMcap(token, dexPriceBNB));
+        _dexTrades(poolType, market, token, step + 1, bnbIn);
+    }
+
+    // Post-graduation trade context lives in storage to dodge stack-too-deep.
+    V3PoolSwapper internal sw;
+    address internal swPool;
+    address internal swHolder;
+    uint256 internal swStartBal;
+
+    /// Post-graduation DEX activity: buys are BNB amounts, 0 = sell half of the
+    /// tokens acquired on the DEX so far. Price captured after each trade.
+    function _dexTrades(uint8 poolType, string memory market, address token, uint256 step, uint256 bnbIn) internal {
+        uint256[6] memory plan = [uint256(1 ether), 2 ether, 0, 3 ether, 0, 2 ether];
+        sw = new V3PoolSwapper();
+        if (poolType == 2) {
+            swPool = IUniswapV3Factory(V3_FACTORY).getPool(token, WBNB, POOL_FEE);
+            vm.deal(address(sw), 20 ether);
+            sw.wrap(WBNB, 15 ether);
+        }
+        swHolder = poolType == 1 ? trader : address(sw);
+        swStartBal = IERC20(token).balanceOf(swHolder);
+
+        for (uint256 i = 0; i < plan.length; i++) {
+            if (plan[i] > 0) {
+                _dexBuy(poolType, token, plan[i]);
+                bnbIn += plan[i];
+            } else {
+                bnbIn += _dexSell(poolType, token);
+            }
+            step++;
+            uint256 p = poolType == 1 ? _v2Price(token) : _v3Price(token);
+            _row(market, "dex", step, bnbIn, p, fyuz.getETHPriceByUSD(), _dexMcap(token, p));
+        }
+    }
+
+    function _dexBuy(uint8 poolType, address token, uint256 amt) internal {
+        if (poolType == 1) {
+            address[] memory path = new address[](2);
+            path[0] = WBNB;
+            path[1] = token;
+            vm.prank(trader);
+            IUniswapV2Router02(V2_ROUTER).swapExactETHForTokensSupportingFeeOnTransferTokens{value: amt}(
+                0, path, trader, block.timestamp + 1
+            );
+        } else {
+            sw.swap(swPool, WBNB < token, amt);
+        }
+    }
+
+    /// Sells half of the tokens acquired on the DEX since graduation.
+    function _dexSell(uint8 poolType, address token) internal returns (uint256 received) {
+        uint256 amt = (IERC20(token).balanceOf(swHolder) - swStartBal) / 2;
+        if (poolType == 1) {
+            address[] memory path = new address[](2);
+            path[0] = token;
+            path[1] = WBNB;
+            uint256 before = trader.balance;
+            vm.startPrank(trader);
+            IERC20(token).approve(V2_ROUTER, amt);
+            IUniswapV2Router02(V2_ROUTER).swapExactTokensForETHSupportingFeeOnTransferTokens(
+                amt, 0, path, trader, block.timestamp + 1
+            );
+            vm.stopPrank();
+            received = trader.balance - before;
+        } else {
+            uint256 before = IERC20(WBNB).balanceOf(address(sw));
+            sw.swap(swPool, token < WBNB, amt);
+            received = IERC20(WBNB).balanceOf(address(sw)) - before;
+        }
+    }
+
+    /// Full-supply mcap in USD (1e18): price * totalSupply * BNB/USD.
+    function _dexMcap(address token, uint256 priceBNB) internal view returns (uint256) {
+        return priceBNB * IERC20(token).totalSupply() / 1e18 * fyuz.getETHPriceByUSD() / 1e18;
     }
 
     function _v2Price(address token) internal view returns (uint256) {

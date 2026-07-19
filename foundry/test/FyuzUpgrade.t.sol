@@ -68,8 +68,6 @@ contract FyuzUpgradeTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            10000,
-            10000,
             address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(
@@ -152,9 +150,7 @@ contract FyuzUpgradeTest is Test {
             UNIVERSAL_ROUTER,
             V4_POS_MGR,
             PERMIT2_ADDR,
-            address(this),
-            10000,
-            10000
+            address(this)
         );
     }
 

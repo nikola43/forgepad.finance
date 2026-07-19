@@ -208,8 +208,6 @@ contract ClaimFeesTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            10000,
-            10000,
             address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(
@@ -394,12 +392,12 @@ contract ClaimFeesTest is Test {
     ///      rather than silently paying zero.
     function test_Claim06_V2HasNothingToClaim() public {
         address t = _graduate("FeeV2", "FV2", 1);
-        vm.expectRevert("No claimable position");
+        vm.expectRevert(FyuzLiquidityManager.NoClaimablePosition.selector);
         fyuz.claimFees(t);
     }
 
     function test_Claim07_UnknownTokenReverts() public {
-        vm.expectRevert("Unknown token");
+        vm.expectRevert(Fyuz.UnknownToken.selector);
         fyuz.claimFees(makeAddr("nope"));
     }
 
@@ -414,7 +412,7 @@ contract ClaimFeesTest is Test {
             2, // was 3 (V4); V4 is gated off and would revert before the claim check
             block.timestamp + 1
         );
-        vm.expectRevert("Not launched");
+        vm.expectRevert(Fyuz.NotLaunched.selector);
         fyuz.claimFees(t);
     }
 
@@ -425,7 +423,7 @@ contract ClaimFeesTest is Test {
         _generateV3Fees(t);
 
         vm.prank(trader);
-        vm.expectRevert("Unauthorized");
+        vm.expectRevert(FyuzLiquidityManager.Unauthorized.selector);
         liquidityManager.collectFees(t, trader, trader);
     }
 
@@ -499,7 +497,7 @@ contract ClaimFeesTest is Test {
         console.log("V3 tok:", tokenFees);
 
         // V2 fees are only realisable by burning LP, so there is nothing to claim.
-        vm.expectRevert("No claimable position");
+        vm.expectRevert(FyuzLiquidityManager.NoClaimablePosition.selector);
         fyuz.claimFees(v2);
     }
 

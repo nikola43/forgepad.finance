@@ -43,8 +43,6 @@ contract CreateTokenRefundTest is Test {
             vm.envOr("V4_POS_MGR", 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e),
             PERMIT2_ADDR,
             address(this),
-            10000,
-            10000,
             address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(
@@ -191,7 +189,7 @@ contract CreateTokenRefundTest is Test {
     /// V4 is gated off: poolType 3 must be rejected at creation.
     function test_createToken_v4PoolTypeRejected() public {
         vm.prank(user);
-        vm.expectRevert(bytes("Only V2 or V3 pool type"));
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.createToken{value: fee}("T", "T", 0, 0, 0, 3, block.timestamp + 1);
     }
 
@@ -239,7 +237,7 @@ contract CreateTokenRefundTest is Test {
     ///      front, which would mask the fee check this test exists to prove.
     function test_decision_createBelowFeeReverts() public {
         vm.prank(user);
-        vm.expectRevert(bytes("Insufficient ETH value"));
+        vm.expectRevert(Fyuz.InsufficientEthValue.selector);
         fyuz.createToken{value: fee - 1}("T", "T", 0, 0, 0, 1, block.timestamp + 1);
     }
 
@@ -306,7 +304,7 @@ contract CreateTokenRefundTest is Test {
     /// Real ERC20 (so decimals() resolves) with no WETH pair on the V2 factory.
     function test_fallback_rejectsPairlessStable() public {
         Token orphan = new Token("Orphan", "ORP", 1e18);
-        vm.expectRevert(bytes("No V2 pair for stable"));
+        vm.expectRevert(Fyuz.NoV2PairForStable.selector);
         fyuz.setEthUsdFallback(_v2Router(), address(orphan));
     }
 

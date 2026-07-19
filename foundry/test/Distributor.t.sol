@@ -124,7 +124,7 @@ contract DistributorTest is Test {
     function test_RevertWhen_StartRoundByNonPoster() public {
         fundPot(1 ether);
         vm.prank(rando);
-        vm.expectRevert("Not poster");
+        vm.expectRevert(Distributor.NotPoster.selector);
         distributor.startRound(0, uint64(block.timestamp));
     }
 
@@ -133,7 +133,7 @@ contract DistributorTest is Test {
         startRound();
         vm.warp(block.timestamp + 8 days);
         vm.prank(poster);
-        vm.expectRevert("Round already active");
+        vm.expectRevert(Distributor.RoundAlreadyActive.selector);
         distributor.startRound(0, uint64(block.timestamp));
     }
 
@@ -146,13 +146,13 @@ contract DistributorTest is Test {
         distributor.distribute(rid);
 
         vm.prank(poster);
-        vm.expectRevert("Period not elapsed");
+        vm.expectRevert(Distributor.PeriodNotElapsed.selector);
         distributor.startRound(0, uint64(block.timestamp));
     }
 
     function test_RevertWhen_EmptyPot() public {
         vm.prank(poster);
-        vm.expectRevert("Nothing to distribute");
+        vm.expectRevert(Distributor.NothingToDistribute.selector);
         distributor.startRound(0, uint64(block.timestamp));
     }
 
@@ -160,11 +160,11 @@ contract DistributorTest is Test {
         fundPot(1 ether);
         (uint256 rid, uint256 requestId) = startRound();
 
-        vm.expectRevert("Randomness pending");
+        vm.expectRevert(Distributor.RandomnessPending.selector);
         distributor.distribute(rid);
 
         fulfill(requestId, 0);
-        vm.expectRevert("Shares pending");
+        vm.expectRevert(Distributor.SharesPending.selector);
         distributor.distribute(rid);
     }
 
@@ -172,7 +172,7 @@ contract DistributorTest is Test {
         fundPot(1 ether);
         (uint256 rid, ) = startRound();
         vm.prank(poster);
-        vm.expectRevert("Invalid packed length");
+        vm.expectRevert(Distributor.InvalidPackedLength.selector);
         distributor.postShares(rid, hex"deadbeef");
     }
 
@@ -205,7 +205,7 @@ contract DistributorTest is Test {
     // ---- admin -------------------------------------------------------------
 
     function test_SetPercents_RejectsOver100() public {
-        vm.expectRevert("Cannot exceed 100%");
+        vm.expectRevert(Distributor.BpsTooHigh.selector);
         distributor.setPercents(5001, 5000);
         distributor.setPercents(2000, 8000); // exactly 100% is fine
         assertEq(distributor.percentForWinner(), 2000);
@@ -237,7 +237,7 @@ contract DistributorTest is Test {
     }
 
     function test_SetPoster_RejectsZero() public {
-        vm.expectRevert("Zero poster");
+        vm.expectRevert(Distributor.ZeroPoster.selector);
         distributor.setPoster(address(0));
     }
 
@@ -250,7 +250,7 @@ contract DistributorTest is Test {
         (uint256 rid, uint256 requestId) = startRound();
         fulfill(requestId, 7); // reveal first
         vm.prank(poster);
-        vm.expectRevert("Random already revealed");
+        vm.expectRevert(Distributor.RandomAlreadyRevealed.selector);
         distributor.postShares(rid, packedShares3());
     }
 
@@ -261,7 +261,7 @@ contract DistributorTest is Test {
         (uint256 rid, ) = startRound();
         bytes memory packed = abi.encodePacked(alice, uint32(HALF), bob, uint32(HALF), carol, uint32(1));
         vm.prank(poster);
-        vm.expectRevert("Shares exceed 100%");
+        vm.expectRevert(Distributor.SharesExceedTotal.selector);
         distributor.postShares(rid, packed);
     }
 
@@ -276,7 +276,7 @@ contract DistributorTest is Test {
             packed = abi.encodePacked(packed, address(uint160(i + 1)), tiny);
         }
         vm.prank(poster);
-        vm.expectRevert("Too many holders");
+        vm.expectRevert(Distributor.TooManyHolders.selector);
         distributor.postShares(rid, packed);
     }
 
@@ -310,7 +310,7 @@ contract DistributorTest is Test {
         // Here we use the pull path directly: alice's payout succeeds normally,
         // so instead assert claim reverts cleanly when there's nothing owed.
         vm.prank(alice);
-        vm.expectRevert("Nothing to claim");
+        vm.expectRevert(Distributor.NothingToClaim.selector);
         distributor.claim();
     }
 

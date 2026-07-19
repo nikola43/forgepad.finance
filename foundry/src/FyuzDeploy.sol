@@ -23,8 +23,6 @@ library FyuzDeploy {
         address v4PositionManager,
         address permit2,
         address owner,
-        uint16 ethAmountPercentToLP,
-        uint16 tokenAmountPercentToLP,
         address proxyAdminOwner
     ) internal returns (FyuzLiquidityManager) {
         FyuzLiquidityManager impl = new FyuzLiquidityManager();
@@ -38,9 +36,7 @@ library FyuzDeploy {
                 universalRouter,
                 v4PositionManager,
                 permit2,
-                owner,
-                ethAmountPercentToLP,
-                tokenAmountPercentToLP
+                owner
             )
         );
         return

@@ -29,6 +29,27 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   Stuck rounds (VRF outage, bad shares) are cancelled by the poster/owner;
 ///   the pot simply rolls into the next round.
 contract Distributor is VRFConsumerBaseV2Plus, Pausable {
+
+    // Custom errors (one per former require/revert string).
+    error BpsTooHigh(); // was: "Cannot exceed 100%"
+    error ClaimTransferFailed(); // was: "Claim transfer failed"
+    error InvalidPackedLength(); // was: "Invalid packed length"
+    error NoActiveRound(); // was: "No active round"
+    error NotPoster(); // was: "Not poster"
+    error NothingToClaim(); // was: "Nothing to claim"
+    error NothingToDistribute(); // was: "Nothing to distribute"
+    error PeriodNotElapsed(); // was: "Period not elapsed"
+    error RandomAlreadyRevealed(); // was: "Random already revealed"
+    error RandomnessPending(); // was: "Randomness pending"
+    error RoundAlreadyActive(); // was: "Round already active"
+    error SharesExceedTotal(); // was: "Shares exceed 100%"
+    error SharesPending(); // was: "Shares pending"
+    error TokenTransferFailed(); // was: "Token transfer failed"
+    error TooManyHolders(); // was: "Too many holders"
+    error WithdrawFailed(); // was: "Withdraw failed"
+    error ZeroKeyHash(); // was: "Zero keyHash"
+    error ZeroPoster(); // was: "Zero poster"
+    error ZeroSubId(); // was: "Zero subId"
     // ---- round state -------------------------------------------------------
 
     // status: 0 = none, 1 = active (awaiting shares and/or VRF), 2 = paid, 3 = cancelled
@@ -85,9 +106,9 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
         bytes32 _vrfKeyHash,
         address _poster
     ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
-        require(_poster != address(0), "Zero poster");
-        require(_vrfKeyHash != bytes32(0), "Zero keyHash");
-        require(_vrfSubscriptionId != 0, "Zero subId");
+        if (_poster == address(0)) revert ZeroPoster();
+        if (_vrfKeyHash == bytes32(0)) revert ZeroKeyHash();
+        if (_vrfSubscriptionId == 0) revert ZeroSubId();
         vrfSubscriptionId = _vrfSubscriptionId;
         vrfKeyHash = _vrfKeyHash;
         poster = _poster;
@@ -102,7 +123,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     receive() external payable {}
 
     modifier onlyPoster() {
-        require(msg.sender == poster || msg.sender == owner(), "Not poster");
+        if (!(msg.sender == poster || msg.sender == owner())) revert NotPoster();
         _;
     }
 
@@ -111,12 +132,12 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     /// @notice Open a distribution round for the leaderboard window [_timeStart, _timeEnd].
     ///         Snapshots the current balance as the pot and requests VRF randomness.
     function startRound(uint64 _timeStart, uint64 _timeEnd) external onlyPoster whenNotPaused returns (uint256) {
-        require(rounds[roundId].status != 1, "Round already active");
-        require(block.timestamp >= lastRoundTime + period, "Period not elapsed");
+        if (rounds[roundId].status == 1) revert RoundAlreadyActive();
+        if (block.timestamp < lastRoundTime + period) revert PeriodNotElapsed();
         // Only the distributable balance is a pot — funds already owed to
         // holders via claim() must not be handed out a second time.
         uint256 _distributable = address(this).balance - totalClaimable;
-        require(_distributable > 0, "Nothing to distribute");
+        if (_distributable <= 0) revert NothingToDistribute();
 
         roundId += 1;
         lastRoundTime = block.timestamp;
@@ -151,16 +172,16 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     ///         payload at GET /distributor/shares.
     function postShares(uint256 _roundId, bytes calldata _packed) external onlyPoster {
         Round storage r = rounds[_roundId];
-        require(_roundId == roundId && r.status == 1, "No active round");
+        if (!(_roundId == roundId && r.status == 1)) revert NoActiveRound();
         // Shares MUST be locked in before the VRF word is revealed. Otherwise a
         // compromised poster could read the fulfilled `random` and reorder the
         // holder set so `random % n` lands on an address of their choosing,
         // defeating the lottery. Committing first makes the winner index
         // unpredictable at commit time.
-        require(!r.hasRandom, "Random already revealed");
-        require(_packed.length > 0 && _packed.length % 24 == 0, "Invalid packed length");
+        if (!(!r.hasRandom)) revert RandomAlreadyRevealed();
+        if (!(_packed.length > 0 && _packed.length % 24 == 0)) revert InvalidPackedLength();
         uint256 _count = _packed.length / 24;
-        require(_count <= MAX_HOLDERS, "Too many holders");
+        if (_count > MAX_HOLDERS) revert TooManyHolders();
 
         // Sum of shares must not exceed 2^32 (100%). If it did, early holders in
         // the loop would be over-paid and later holders/the winner starved when
@@ -172,7 +193,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
             uint32 _share = uint32(bytes4(_packed[_off:_off + 4]));
             _sum += _share;
         }
-        require(_sum <= uint256(type(uint32).max) + 1, "Shares exceed 100%");
+        if (!(_sum <= uint256(type(uint32).max) + 1)) revert SharesExceedTotal();
 
         r.shares = _packed;
         emit SharesPosted(_roundId, _count);
@@ -193,9 +214,9 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     ///         Anyone can call — all inputs are already committed on-chain.
     function distribute(uint256 _roundId) external whenNotPaused {
         Round storage r = rounds[_roundId];
-        require(_roundId == roundId && r.status == 1, "No active round");
-        require(r.hasRandom, "Randomness pending");
-        require(r.shares.length > 0, "Shares pending");
+        if (!(_roundId == roundId && r.status == 1)) revert NoActiveRound();
+        if (!r.hasRandom) revert RandomnessPending();
+        if (r.shares.length <= 0) revert SharesPending();
         r.status = 2;
 
         (address[] memory _holders, uint32[] memory _shares) = _unpackShares(r.shares);
@@ -229,7 +250,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     ///         the contract and is included in the next round's snapshot.
     function cancelRound() external onlyPoster {
         Round storage r = rounds[roundId];
-        require(r.status == 1, "No active round");
+        if (r.status != 1) revert NoActiveRound();
         r.status = 3;
         emit RoundCancelled(roundId);
     }
@@ -277,11 +298,11 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     /// @notice Withdraw funds credited to you by a failed payout push.
     function claim() external {
         uint256 _amount = claimable[msg.sender];
-        require(_amount > 0, "Nothing to claim");
+        if (_amount <= 0) revert NothingToClaim();
         claimable[msg.sender] = 0;
         totalClaimable -= _amount;
         (bool _success, ) = payable(msg.sender).call{value: _amount}("");
-        require(_success, "Claim transfer failed");
+        if (!_success) revert ClaimTransferFailed();
     }
 
     // ---- admin -------------------------------------------------------------
@@ -292,7 +313,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     }
 
     function setPoster(address _poster) external onlyOwner {
-        require(_poster != address(0), "Zero poster");
+        if (_poster == address(0)) revert ZeroPoster();
         poster = _poster;
     }
 
@@ -301,7 +322,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     }
 
     function setPercents(uint256 _forWinner, uint256 _forDistribute) external onlyOwner {
-        require(_forWinner + _forDistribute <= 10000, "Cannot exceed 100%");
+        if (_forWinner + _forDistribute > 10000) revert BpsTooHigh();
         percentForWinner = _forWinner;
         percentForDistribute = _forDistribute;
     }
@@ -330,13 +351,10 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
 
     function emergencyWithdraw(address _to) external onlyOwner whenPaused {
         (bool _success, ) = payable(_to).call{value: address(this).balance}("");
-        require(_success, "Withdraw failed");
+        if (!_success) revert WithdrawFailed();
     }
 
     function withdrawToken(address _token, address _to) external onlyOwner whenPaused {
-        require(
-            IERC20(_token).transfer(_to, IERC20(_token).balanceOf(address(this))),
-            "Token transfer failed"
-        );
+        if (!(IERC20(_token).transfer(_to, IERC20(_token).balanceOf(address(this))))) revert TokenTransferFailed();
     }
 }

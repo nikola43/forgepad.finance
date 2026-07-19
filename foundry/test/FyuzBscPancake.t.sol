@@ -59,8 +59,6 @@ contract FyuzBscPancakeTest is Test {
             V4_DISABLED_SENTINEL,
             PERMIT2,
             deployer,
-            10000,
-            10000,
             deployer
         );
         fyuz = FyuzDeploy.deployFyuz(
@@ -163,7 +161,7 @@ contract FyuzBscPancakeTest is Test {
     /// V4 must be unreachable through createToken.
     function test_v4PoolTypeRejected() public {
         vm.prank(trader);
-        vm.expectRevert(bytes("Only V2 or V3 pool type"));
+        vm.expectRevert(Fyuz.InvalidPoolType.selector);
         fyuz.createToken{value: 0.001 ether}(
             "V4", "V4", 0, 0, 0, 3, block.timestamp + 1
         );
@@ -289,7 +287,6 @@ contract FyuzBscPancakeTest is Test {
             V4_DISABLED_SENTINEL, V4_DISABLED_SENTINEL, V4_DISABLED_SENTINEL,
             PERMIT2,
             dustOwner, // owner (also the leftover sweep target)
-            10000, 10000,
             deployer
         );
         // fyuz2 needs the deployer as its owner to run setup, and must authorize.

@@ -4,10 +4,8 @@
 
 Two tokens were launched on the bonding curve and driven to graduation — one onto **PancakeSwap V2**, one onto **PancakeSwap V3** — capturing price in both **BNB** and **USD** at every step. Full data + charts are in the accompanying spreadsheets:
 
-- `fyuz_graduation_v2.xlsx`
-- `fyuz_graduation_v3.xlsx`
-
-Each has a **Summary** sheet and a **Price Curve** sheet with three charts (price in BNB, price in USD, market cap approaching the $30k target), split into "bonding curve" and "DEX (post-graduation)" series so the transition is visible.
+- `fyuz_graduation_report.xlsx` — single-page workbook: summary (V2 vs V3), both data tables, and per-market charts (price in BNB, price in USD, market cap vs the $30k target), split into "bonding curve" and "DEX (post-graduation)" series so the transition is visible. Prices are stored in ×1e-9 BNB / ×1e-6 USD units so every viewer parses them. Regenerate with `python3 scripts/graduation_report.py` (runs the capture test itself, or pass a saved forge log).
+- `fyuz_graduation_v2.xlsx` / `fyuz_graduation_v3.xlsx` — earlier per-market workbooks, superseded by the single-page report.
 
 ## Results
 
