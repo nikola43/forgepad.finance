@@ -30,7 +30,9 @@ CAST="${CAST:-$HOME/.foundry/bin/cast}"
 : "${POSTER_PRIVATE_KEY:?Set POSTER_PRIVATE_KEY}"
 
 send() { "$CAST" send --rpc-url "$RPC_URL" --private-key "$POSTER_PRIVATE_KEY" --json "$@"; }
-call() { "$CAST" call --rpc-url "$RPC_URL" "$DISTRIBUTOR_ADDRESS" "$@"; }
+# Newer cast annotates numeric results, e.g. `1784501680 [1.784e9]`; strip the
+# ` [..]` suffix so raw values flow cleanly into URLs and arithmetic.
+call() { "$CAST" call --rpc-url "$RPC_URL" "$DISTRIBUTOR_ADDRESS" "$@" | sed 's/ \[[^]]*\]//g'; }
 
 now=$(date +%s)
 round_id=$(call "roundId()(uint256)")
@@ -39,7 +41,13 @@ status=$(call "rounds(uint256)(uint8,uint64,uint64,bool,uint256,uint256,uint256,
 if [ "$status" = "1" ]; then
   echo "Round $round_id already active — resuming it"
 else
-  last_end=$(call "rounds(uint256)(uint8,uint64,uint64,bool,uint256,uint256,uint256,bytes)" "$round_id" | sed -n 3p || echo 0)
+  # Window start = the backend's epoch (end of the last PAID/recorded round, 0 if
+  # none). This is the same value that resets the leaderboard, so the on-chain
+  # window and the off-chain leaderboard stay in lockstep. Deriving it from the
+  # chain's last round instead would let a CANCELLED round push the window forward
+  # with no payout, silently dropping that window's holders.
+  last_end=$(curl -sf "$API_URL/distributor/shares?limit=1" \
+    | python3 -c "import json,sys; print(int(json.load(sys.stdin)['from']))" 2>/dev/null || echo 0)
   period=$(call "period()(uint256)")
   last_time=$(call "lastRoundTime()(uint256)")
   if [ "$now" -lt "$((last_time + period))" ]; then

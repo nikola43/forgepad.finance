@@ -63,9 +63,28 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         }
     };
 
+    // Optional Distributor address. When set, the listener also watches it for
+    // RoundDistributed and records the paid round (which advances the leaderboard
+    // epoch, clearing points/leaderboard). Absent/blank = feature off, indexing
+    // proceeds exactly as before.
+    let distributor_address: Option<Address> = std::env::var("DISTRIBUTOR_ADDRESS")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .and_then(|s| match s.trim().parse::<Address>() {
+            Ok(a) => Some(a),
+            Err(e) => {
+                tracing::error!("Invalid DISTRIBUTOR_ADDRESS {s}: {e}; reset listener disabled");
+                None
+            }
+        });
+    match distributor_address {
+        Some(d) => tracing::info!("Distributor reset listener enabled for {d:#x}"),
+        None => tracing::info!("No DISTRIBUTOR_ADDRESS set; leaderboard reset listener disabled"),
+    }
+
     let mut backoff = 1u64;
     loop {
-        match run_listener_once(&state, &chain, contract_address).await {
+        match run_listener_once(&state, &chain, contract_address, distributor_address).await {
             Ok(()) => {
                 tracing::warn!("Listener loop for {} ended; restarting", chain.network);
                 backoff = 5;
@@ -105,6 +124,7 @@ async fn run_listener_once(
     state: &Arc<AppState>,
     chain: &ChainConfig,
     contract_address: Address,
+    distributor_address: Option<Address>,
 ) -> anyhow::Result<()> {
     // Server-side indexing RPC. This must support large `eth_getLogs` ranges
     // (BSC public dataseed nodes cap the range — typically ~5k blocks — and
@@ -146,7 +166,7 @@ async fn run_listener_once(
     }
 
     // Catch up to head, cursor-safe.
-    last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
+    last_block = catch_up(state, chain, &provider, contract_address, distributor_address, last_block).await?;
     tracing::info!("Chain {} caught up to {}, watching for new blocks", chain.network, last_block);
 
     // WS `newHeads` subscription → sends a nudge on the channel per block. The
@@ -195,7 +215,7 @@ async fn run_listener_once(
             .await
             .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
         if head > last_block {
-            last_block = catch_up(state, chain, &provider, contract_address, last_block).await?;
+            last_block = catch_up(state, chain, &provider, contract_address, distributor_address, last_block).await?;
         }
     }
 }
@@ -207,6 +227,7 @@ async fn catch_up<P: Provider>(
     chain: &ChainConfig,
     provider: &P,
     contract_address: Address,
+    distributor_address: Option<Address>,
     mut last_block: u64,
 ) -> anyhow::Result<u64> {
     // Chunk size bounded by the RPC's getLogs range cap. Archive nodes handle
@@ -238,9 +259,14 @@ async fn catch_up<P: Provider>(
         tracing::info!("Chain {} catching up blocks {} to {}", chain.network, from, end);
 
         let filter = Filter::new()
-            .address(contract_address)
             .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
             .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
+        // Watch the Fyuz contract, plus the Distributor when configured, in one
+        // getLogs so the reset event is indexed on the same cursor-safe path.
+        let filter = match distributor_address {
+            Some(d) => filter.address(vec![contract_address, d]),
+            None => filter.address(contract_address),
+        };
 
         let logs = provider
             .get_logs(&filter)
@@ -318,6 +344,9 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     let buy_tokens_sig = keccak256(b"BuyTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
     let sell_tokens_sig = keccak256(b"SellTokens(address,address,uint256,uint256,uint256,uint256,uint256,uint256)");
     let token_launched_sig = keccak256(b"TokenLaunched(address,uint256)");
+    // Distributor payout: RoundDistributed(uint256 indexed roundId, address indexed
+    // winner, uint256 winnerAmount, uint256 distributedAmount, uint256 holderCount).
+    let round_distributed_sig = keccak256(b"RoundDistributed(uint256,address,uint256,uint256,uint256)");
 
     // log index within its block — used together with tx_hash as the trade's
     // idempotency key so replays/reorgs cannot double-count.
@@ -342,9 +371,126 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
             // king/discover/rewards. Backfill pair via factory lookup if needed.
             process_token_launched(state, &token_address, "", timestamp).await?;
         }
+    } else if *topic == round_distributed_sig {
+        // A payout round settled on-chain. Record it so the leaderboard epoch
+        // advances (points/leaderboard reset to the new window). Idempotent.
+        process_round_distributed_log(state, chain, log).await?;
     }
 
     Ok(())
+}
+
+/// Handle a Distributor `RoundDistributed` event: record the paid round so the
+/// leaderboard scoring window rolls forward (this is what "resets" the
+/// leaderboard and points after every payout). The event only carries the
+/// roundId in its topics, so the round's [timeStart, timeEnd] window is read back
+/// from the contract's `rounds(roundId)` getter. Fully idempotent —
+/// ON CONFLICT DO NOTHING means a reorg/replay of the same log is a no-op.
+async fn process_round_distributed_log(
+    state: &AppState,
+    chain: &ChainConfig,
+    log: &Log,
+) -> anyhow::Result<()> {
+    use diesel::sql_types::{BigInt, Nullable, Text};
+    use diesel_async::RunQueryDsl;
+
+    let topics = log.topics();
+    // topics: [sig, roundId, winner]. roundId is the indexed uint256 in topics[1].
+    let Some(round_topic) = topics.get(1) else {
+        tracing::warn!("RoundDistributed log missing roundId topic; skipping");
+        return Ok(());
+    };
+    let round_id = U256::from_be_slice(round_topic.as_slice());
+    let round_id_i64 = i64::try_from(round_id).unwrap_or(0);
+    if round_id_i64 <= 0 {
+        tracing::warn!("RoundDistributed with non-positive roundId {round_id}; skipping");
+        return Ok(());
+    }
+
+    let distributor = log.inner.address;
+    let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}"));
+
+    // Read the round window from the contract. rounds(uint256) returns
+    // (uint8 status, uint64 timeStart, uint64 timeEnd, bool hasRandom, ...): the
+    // two windows are static words 1 and 2 of the ABI-encoded response.
+    let (time_start, time_end) = match fetch_round_window(chain, distributor, round_id).await {
+        Some(w) => w,
+        None => {
+            tracing::warn!(
+                "RoundDistributed {round_id_i64}: could not read round window from {distributor:#x}; skipping record"
+            );
+            return Ok(());
+        }
+    };
+    if time_end <= time_start {
+        tracing::warn!(
+            "RoundDistributed {round_id_i64}: invalid window [{time_start}, {time_end}]; skipping"
+        );
+        return Ok(());
+    }
+
+    let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+    let inserted = diesel::sql_query(
+        "INSERT INTO distributor_rounds (round_id, time_start, time_end, tx_hash) \
+         VALUES ($1, $2, $3, $4) ON CONFLICT (round_id) DO NOTHING",
+    )
+    .bind::<BigInt, _>(round_id_i64)
+    .bind::<BigInt, _>(time_start)
+    .bind::<BigInt, _>(time_end)
+    .bind::<Nullable<Text>, _>(tx_hash)
+    .execute(&mut conn)
+    .await?;
+
+    if inserted > 0 {
+        tracing::info!(
+            "Distributor round {round_id_i64} recorded (window {time_start}..{time_end}); leaderboard reset"
+        );
+    } else {
+        tracing::debug!("Distributor round {round_id_i64} already recorded; no-op");
+    }
+    Ok(())
+}
+
+/// Read [timeStart, timeEnd] for a round via `rounds(uint256)`. Returns None on
+/// any RPC/parse failure so the caller can skip rather than record a bad window.
+async fn fetch_round_window(
+    chain: &ChainConfig,
+    distributor: Address,
+    round_id: U256,
+) -> Option<(i64, i64)> {
+    // rounds(uint256) selector = keccak("rounds(uint256)")[..4].
+    let selector = &keccak256(b"rounds(uint256)")[..4];
+    let mut call_data = Vec::with_capacity(4 + 32);
+    call_data.extend_from_slice(selector);
+    call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
+    let data = format!("0x{}", hex::encode(&call_data));
+
+    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(&rpc_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_call",
+            "params": [{ "to": format!("{distributor:#x}"), "data": data }, "latest"],
+            "id": 1
+        }))
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+    let hex = resp.get("result")?.as_str()?;
+    let trimmed = hex.trim_start_matches("0x");
+    // Static head: word0 status, word1 timeStart, word2 timeEnd, ... Need at least
+    // 3 words (192 bytes = 384 hex chars) to read both windows.
+    if trimmed.len() < 384 {
+        return None;
+    }
+    let time_start = i64::from_str_radix(&trimmed[64..128], 16).ok()?;
+    let time_end = i64::from_str_radix(&trimmed[128..192], 16).ok()?;
+    Some((time_start, time_end))
 }
 
 async fn process_token_created_log(
