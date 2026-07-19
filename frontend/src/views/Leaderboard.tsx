@@ -94,11 +94,13 @@ export default function Leaderboard() {
                             straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 you keep invested</b>{' '}
                             (buys minus sells), so only real, held positions count — wash trading earns nothing.
                             Each week we pool <b style={{ color: 'var(--citron)' }}>30% of all platform fees</b> and pay it out in{' '}
-                            <b style={{ color: 'var(--citron)' }}>BNB</b> to everyone here, split by your share of points. Trade more,
-                            hold your conviction, and claim a bigger weekly cut.
+                            <b style={{ color: 'var(--citron)' }}>BNB</b>, split by your share of points. Only the{' '}
+                            <b style={{ color: 'var(--citron)' }}>top 100 traders</b> on this board qualify for a cut — so climb and
+                            hold your spot. And every week <b style={{ color: 'var(--citron)' }}>one random qualifying trader wins 10% of
+                            the entire pool</b>, on top of their points share. Trade more, hold your conviction, and claim a bigger weekly cut.
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                            {['1 pt / $1 net invested', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Paid in BNB'].map((chip) => (
+                            {['1 pt / $1 net invested', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Top 100 only', '10% random winner', 'Paid in BNB'].map((chip) => (
                                 <Box
                                     key={chip}
                                     sx={{

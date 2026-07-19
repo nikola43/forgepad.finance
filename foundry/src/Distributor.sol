@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Fyuz leaderboard fee Distributor (BSC)
@@ -28,7 +29,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   4. distribute(id)        — anyone; pays 90% pro-rata + 10% to the winner
 ///   Stuck rounds (VRF outage, bad shares) are cancelled by the poster/owner;
 ///   the pot simply rolls into the next round.
-contract Distributor is VRFConsumerBaseV2Plus, Pausable {
+contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInterface {
 
     // Custom errors (one per former require/revert string).
     error BpsTooHigh(); // was: "Cannot exceed 100%"
@@ -89,6 +90,18 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     uint16 public vrfConfirmations = 3;
     bool public vrfNativePayment = true;
 
+    /// @notice Gates the Chainlink Automation entrypoint (performUpkeep). When
+    ///         true, a registered upkeep auto-calls distribute() the moment a
+    ///         round's shares + VRF word are both in — replacing the backend's
+    ///         10-minute "wait for VRF then distribute" poll. distribute() stays
+    ///         permissionless regardless; this flag only lets the owner park the
+    ///         Automation path (e.g. fall back to the cron) without pausing the
+    ///         whole contract. Chainlink Automation IS supported on BSC, unlike
+    ///         Chainlink Functions — so only this last step is decentralized;
+    ///         startRound/postShares stay backend-driven because postShares
+    ///         carries off-chain leaderboard data no on-chain keeper can fetch.
+    bool public automationEnabled = true;
+
     // ---- events ------------------------------------------------------------
 
     event RoundStarted(uint256 indexed roundId, uint256 pot, uint64 timeStart, uint64 timeEnd, uint256 vrfRequestId);
@@ -147,22 +160,14 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
         r.timeEnd = _timeEnd;
         r.pot = _distributable;
 
-        uint256 _requestId = s_vrfCoordinator.requestRandomWords(
-            VRFV2PlusClient.RandomWordsRequest({
-                keyHash: vrfKeyHash,
-                subId: vrfSubscriptionId,
-                requestConfirmations: vrfConfirmations,
-                callbackGasLimit: vrfGasLimit,
-                numWords: 1,
-                extraArgs: VRFV2PlusClient._argsToBytes(
-                    VRFV2PlusClient.ExtraArgsV1({nativePayment: vrfNativePayment})
-                )
-            })
-        );
-        r.vrfRequestId = _requestId;
-        vrfRequests[_requestId] = roundId;
-
-        emit RoundStarted(roundId, r.pot, _timeStart, _timeEnd, _requestId);
+        // VRF is requested in postShares (once the shares are committed), NOT here.
+        // Requesting it here created a race: a fast fulfillment could set hasRandom
+        // before postShares landed, and postShares then reverted RandomAlreadyRevealed,
+        // freezing the round until a manual cancel. Deferring the request removes the
+        // race entirely AND strengthens the original guarantee — the winner index is
+        // provably unpredictable at commit time because the randomness does not even
+        // exist as a request until after the holder set is locked in.
+        emit RoundStarted(roundId, r.pot, _timeStart, _timeEnd, 0);
         return roundId;
     }
 
@@ -173,12 +178,11 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     function postShares(uint256 _roundId, bytes calldata _packed) external onlyPoster {
         Round storage r = rounds[_roundId];
         if (!(_roundId == roundId && r.status == 1)) revert NoActiveRound();
-        // Shares MUST be locked in before the VRF word is revealed. Otherwise a
-        // compromised poster could read the fulfilled `random` and reorder the
-        // holder set so `random % n` lands on an address of their choosing,
-        // defeating the lottery. Committing first makes the winner index
-        // unpredictable at commit time.
-        if (!(!r.hasRandom)) revert RandomAlreadyRevealed();
+        // The VRF request goes out at the END of this call, so a first postShares
+        // can never race a fulfillment. Once requested (vrfRequestId set), reposting
+        // is rejected: reshaping the holder set after randomness is in flight is
+        // exactly the attack the commit-before-reveal ordering exists to prevent.
+        if (r.vrfRequestId != 0) revert RandomAlreadyRevealed();
         if (!(_packed.length > 0 && _packed.length % 24 == 0)) revert InvalidPackedLength();
         uint256 _count = _packed.length / 24;
         if (_count > MAX_HOLDERS) revert TooManyHolders();
@@ -196,6 +200,25 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
         if (!(_sum <= uint256(type(uint32).max) + 1)) revert SharesExceedTotal();
 
         r.shares = _packed;
+
+        // Shares are now committed — request randomness. Fulfillment can only ever
+        // arrive after this point, so distribute()'s inputs are always ordered
+        // (shares first, random second) and postShares has no race to lose.
+        uint256 _requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: vrfKeyHash,
+                subId: vrfSubscriptionId,
+                requestConfirmations: vrfConfirmations,
+                callbackGasLimit: vrfGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: vrfNativePayment})
+                )
+            })
+        );
+        r.vrfRequestId = _requestId;
+        vrfRequests[_requestId] = _roundId;
+
         emit SharesPosted(_roundId, _count);
     }
 
@@ -213,6 +236,44 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     /// @notice Pay the round out once both the shares and the randomness are in.
     ///         Anyone can call — all inputs are already committed on-chain.
     function distribute(uint256 _roundId) external whenNotPaused {
+        _distribute(_roundId);
+    }
+
+    // ---- Chainlink Automation ----------------------------------------------
+
+    /// @notice Automation simulation hook. Reports the active round as ready
+    ///         once its shares and VRF word are both committed. Off-chain only
+    ///         (view) — the keeper network calls this for free to decide whether
+    ///         to submit performUpkeep.
+    function checkUpkeep(bytes calldata)
+        external
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory performData)
+    {
+        if (paused() || !automationEnabled) return (false, "");
+        uint256 _rid = roundId;
+        Round storage r = rounds[_rid];
+        if (r.status == 1 && r.hasRandom && r.shares.length > 0) {
+            return (true, abi.encode(_rid));
+        }
+        return (false, "");
+    }
+
+    /// @notice Automation execution hook — pays out the round the keeper flagged.
+    ///         performData is UNTRUSTED (malicious/racing keepers, stale state):
+    ///         the round id is only a hint and _distribute re-checks every
+    ///         precondition, reverting if the round isn't actually payable.
+    function performUpkeep(bytes calldata performData) external override whenNotPaused {
+        if (!automationEnabled) revert NoActiveRound();
+        uint256 _roundId = abi.decode(performData, (uint256));
+        _distribute(_roundId);
+    }
+
+    /// Shared payout core for both the public distribute() and Automation's
+    /// performUpkeep(). Re-validates all preconditions so it is safe to reach
+    /// from any untrusted caller.
+    function _distribute(uint256 _roundId) internal {
         Round storage r = rounds[_roundId];
         if (!(_roundId == roundId && r.status == 1)) revert NoActiveRound();
         if (!r.hasRandom) revert RandomnessPending();
@@ -339,6 +400,13 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
         if (_gasLimit > 0) vrfGasLimit = _gasLimit;
         if (_confirmations > 0) vrfConfirmations = _confirmations;
         vrfNativePayment = _nativePayment;
+    }
+
+    /// @notice Enable/disable the Chainlink Automation entrypoint. Disabling
+    ///         falls back to the backend cron / any manual distribute() caller
+    ///         without pausing the contract.
+    function setAutomationEnabled(bool _enabled) external onlyOwner {
+        automationEnabled = _enabled;
     }
 
     function pause() external onlyOwner {
