@@ -56,7 +56,6 @@ contract MigrationPricesTest is Test {
             vm.envOr("V4_POS_MGR", 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e),
             PERMIT2,
             address(this),
-            address(this),
             10000,
             10000,
             address(this)

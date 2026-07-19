@@ -82,7 +82,8 @@ pub struct UserProfileResponse {
     pub referral_count: i64,
     pub points: i32,
     // Trading rewards — same net-volume model as the leaderboard:
-    // trading_points = max(0, USD bought - USD sold); reward_eth = points * 0.000006.
+    // trading_points = max(0, USD bought - USD sold); reward_eth = points * rate
+    // (see point_reward_rate).
     pub trading_points: f64,
     pub trading_volume_usd: f64,
     pub reward_eth: f64,
@@ -376,9 +377,19 @@ pub async fn create_user(
 // Points = net USD invested = max(0, USD bought - USD sold). Net volume rewards
 // only the capital that stays in, so wash trading (buy $X then sell $X) nets ~0
 // points instead of being profitable, and exiting a position burns the points
-// it earned. Each point is worth 0.000006 ETH (reward_eth = points * 0.000006),
-// distributed manually.
+// it earned. Each point is worth POINT_REWARD_BNB (default 0.00001 BNB ≈ 0.57%
+// of net volume at $569/BNB — meaningful but below the 1% protocol fee, so
+// farming points always costs more than it pays), distributed manually.
 // ---------------------------------------------------------------------------
+
+/// BNB paid per leaderboard/bonus point. Env-tunable so the rate can track BNB
+/// price and observed churn without a rebuild.
+pub fn point_reward_rate() -> f64 {
+    std::env::var("POINT_REWARD_BNB")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.00001)
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -422,24 +433,31 @@ pub async fn get_leaderboard(
         trades: i64,
     }
 
+    // The leaderboard "clears" after every Distributor payout: only activity
+    // since the last paid round's time_end counts (0 before the first round).
+    let epoch = crate::handlers::distributor::epoch_start(&state).await?;
+
     // points = max(0, buy_volume_usd - sell_volume_usd) (net USD invested).
     // GREATEST floors at 0 so a net seller never goes negative. HAVING repeats the
     // expression because Postgres can't reference SELECT aliases there.
-    // limit is clamped to an integer, so inlining it is injection-safe.
+    // limit is clamped to an integer and epoch comes from our own DB, so
+    // inlining them is injection-safe.
     // Net-volume trade points + idempotent bonus points from the Rewards Hub
     // (quests/streaks/achievements/referrals) recorded in points_ledger.
-    const POINTS: &str = "GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
+    let points = format!(
+        "GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
          - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
-         + COALESCE((SELECT SUM(pl.amount) FROM points_ledger pl WHERE pl.user_id = u.id), 0)";
+         + COALESCE((SELECT SUM(pl.amount) FROM points_ledger pl WHERE pl.user_id = u.id AND pl.created_at >= to_timestamp({epoch})), 0)"
+    );
     let rows: Vec<Row> = diesel::sql_query(format!(
         "SELECT u.address, u.username, u.avatar, \
          COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
-         {POINTS} as points, \
+         {points} as points, \
          COUNT(t.id) as trades \
          FROM users u \
-         JOIN trades t ON t.swapper_id = u.id \
+         JOIN trades t ON t.swapper_id = u.id AND t.traded_at >= {epoch} \
          GROUP BY u.id, u.address, u.username, u.avatar \
-         HAVING {POINTS} > 0 \
+         HAVING {points} > 0 \
          ORDER BY points DESC \
          LIMIT {limit}"
     ))
@@ -457,7 +475,7 @@ pub async fn get_leaderboard(
             volume_usd: r.volume_usd,
             trades: r.trades,
             points: r.points,
-            reward_eth: r.points * 0.000006,
+            reward_eth: r.points * point_reward_rate(),
         })
         .collect();
 
@@ -617,7 +635,7 @@ pub async fn get_user_profile(
     ))
     .get_result(&mut conn)
     .await?;
-    let reward_eth = agg.points * 0.000006;
+    let reward_eth = agg.points * point_reward_rate();
 
     Ok(Json(UserProfileResponse {
         user: user_resp,

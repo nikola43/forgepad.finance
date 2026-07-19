@@ -123,8 +123,6 @@ contract FyuzLiquidityManager is
 
     IPermit2 permit2;
 
-    address public marginRecipient;
-
     // Set in initialize() — declaration-time values never run behind a proxy.
     uint16 ethAmountPercentToLP; // 10000 = 100%
     uint16 tokenAmountPercentToLP; // 10000 = 100%
@@ -269,7 +267,6 @@ contract FyuzLiquidityManager is
      * @param _universalRouter Universal router address for V4 operations
      * @param _v4PositionManager V4 position manager address
      * @param _permit2 Permit2 contract address for token approvals
-     * @param _marginRecipient Recipient address for margin ETH after adding liquidity
      * @param _owner Initial owner of the contract
      * @param _ethAmountPercentToLP Percent of ETH to use for LP (in basis points)
      * @param _tokenAmountPercentToLP Percent of tokens to use for LP (in basis points)
@@ -287,7 +284,6 @@ contract FyuzLiquidityManager is
         address _universalRouter,
         address _v4PositionManager,
         address _permit2,
-        address _marginRecipient,
         address _owner,
         uint16 _ethAmountPercentToLP,
         uint16 _tokenAmountPercentToLP
@@ -300,7 +296,6 @@ contract FyuzLiquidityManager is
         if (_poolV4Manager == address(0)) revert ZeroAddress();
         if (_universalRouter == address(0)) revert ZeroAddress();
         if (_v4PositionManager == address(0)) revert ZeroAddress();
-        if (_marginRecipient == address(0)) revert ZeroAddress();
 
         routerV2 = IUniswapV2Router02(_routerV2);
         factoryV3 = IUniswapV3Factory(_factoryV3);
@@ -311,7 +306,6 @@ contract FyuzLiquidityManager is
         universalRouter = _universalRouter;
         positionManager = IPositionManager(_v4PositionManager);
         permit2 = IPermit2(_permit2);
-        marginRecipient = _marginRecipient;
         ethAmountPercentToLP = _ethAmountPercentToLP;
         tokenAmountPercentToLP = _tokenAmountPercentToLP;
     }
@@ -559,10 +553,12 @@ contract FyuzLiquidityManager is
             IERC20(token).safeTransfer(address(0xdead), remainingTokens);
         }
 
-        // Transfer any remaining ETH to margin recipient
+        // Sweep any leftover ETH to the owner (treasury). In the target-mcap V2
+        // path the full raise is deposited into the pair above, so this is 0 in
+        // practice — it's only a dust catcher, never a share of the raise.
         uint256 remainingETH = address(this).balance;
         if (remainingETH > 0) {
-            (bool success, ) = marginRecipient.call{value: remainingETH}("");
+            (bool success, ) = owner().call{value: remainingETH}("");
             require(success, "ETH transfer failed");
         }
 
@@ -694,7 +690,7 @@ contract FyuzLiquidityManager is
         uint256 wad = IWETH(routerV2.WETH()).balanceOf(address(this));
         if (wad > 0) {
             IWETH(routerV2.WETH()).withdraw(wad);
-            (bool success, ) = address(marginRecipient).call{value: wad}("");
+            (bool success, ) = owner().call{value: wad}("");
             if (!success) revert TransferFailed();
         }
     }
@@ -867,7 +863,7 @@ contract FyuzLiquidityManager is
         uint256 wad = IWETH(routerV2.WETH()).balanceOf(address(this));
         if (wad > 0) {
             IWETH(routerV2.WETH()).withdraw(wad);
-            (bool success, ) = address(marginRecipient).call{value: wad}("");
+            (bool success, ) = owner().call{value: wad}("");
             if (!success) revert TransferFailed();
         }
     }
@@ -1494,10 +1490,5 @@ contract FyuzLiquidityManager is
     ) external onlyOwner {
         require(caller != address(0), "Zero address");
         authorizedCallers[caller] = authorized;
-    }
-
-    function setMarginRecipient(address _marginRecipient) external onlyOwner {
-        require(_marginRecipient != address(0), "Zero address");
-        marginRecipient = _marginRecipient;
     }
 }

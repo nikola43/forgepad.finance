@@ -21,7 +21,7 @@ use crate::AppState;
 // `trades`/`tokens`/`referrals`/`holders` tables. The only persisted state is the
 // `points_ledger`: discrete point grants keyed by a UNIQUE `ref` so re-evaluation
 // (or a double-claim) never double-grants. Each point is worth the same as a
-// leaderboard point (reward_eth = points * 0.000006).
+// leaderboard point (reward_eth = points * point_reward_rate()).
 // ---------------------------------------------------------------------------
 
 struct QuestDef {
@@ -36,7 +36,7 @@ struct QuestDef {
 const QUESTS: &[QuestDef] = &[
     QuestDef { key: "first_buy", title: "First Buy", description: "Make your first token buy", kind: "oneoff", target: 1.0, points: 5.0 },
     QuestDef { key: "launch_token", title: "Launch a Token", description: "Create your first token", kind: "oneoff", target: 1.0, points: 20.0 },
-    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer a new trader to Fyuz", kind: "oneoff", target: 1.0, points: 25.0 },
+    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer your first trader to Fyuz — and every referred trader keeps earning you +25 automatically", kind: "oneoff", target: 1.0, points: 25.0 },
     QuestDef { key: "daily_trade", title: "Daily Trader", description: "Make at least one trade today", kind: "daily", target: 1.0, points: 3.0 },
     QuestDef { key: "daily_volume", title: "Volume Runner", description: "Trade $10 of volume today", kind: "daily", target: 10.0, points: 10.0 },
 ];
@@ -299,6 +299,27 @@ async fn grant(state: &AppState, uid: i32, source: &str, amount: f64, reference:
     Ok(n)
 }
 
+/// Points granted per referred trader (once they make their first trade).
+const REFERRAL_POINTS: f64 = 25.0;
+
+/// Referees of `uid` who have made at least one trade. Referral points are
+/// gated on real activity so sybil signups earn nothing.
+async fn traded_referees(state: &AppState, uid: i32) -> AppResult<Vec<i32>> {
+    let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
+    #[derive(QueryableByName)]
+    struct T {
+        #[diesel(sql_type = diesel::sql_types::Integer)]
+        referee_id: i32,
+    }
+    let rows: Vec<T> = diesel::sql_query(format!(
+        "SELECT r.referee_id FROM referrals r WHERE r.referrer_id = {uid} \
+         AND EXISTS (SELECT 1 FROM trades t WHERE t.swapper_id = r.referee_id)"
+    ))
+    .load(&mut conn)
+    .await?;
+    Ok(rows.into_iter().map(|t| t.referee_id).collect())
+}
+
 // GET /rewards/:address
 pub async fn get_rewards(
     State(state): State<Arc<AppState>>,
@@ -320,6 +341,13 @@ pub async fn get_rewards(
     // Creator reward: +50 points per token you created that graduated to a DEX.
     for tid in graduated_created_tokens(&state, uid).await? {
         let _ = grant(&state, uid, "creator", 50.0, &format!("creator_grad:{tid}")).await;
+    }
+
+    // Referral reward: +25 points per referred trader, granted the moment
+    // their first trade lands (idempotent — each referee pays out once; a
+    // referee has exactly one referrer, so the ref key can't collide).
+    for rid in traded_referees(&state, uid).await? {
+        let _ = grant(&state, uid, "referral", REFERRAL_POINTS, &format!("referral:{rid}")).await;
     }
 
     let claimed = claimed_quest_refs(&state, uid).await?;

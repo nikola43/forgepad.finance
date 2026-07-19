@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 pub struct AppState {
     pub db: DbPool,
     pub redis: redis::Client,
+    pub redis_conn: redis::aio::ConnectionManager,
     pub ws_tx: broadcast::Sender<WsEvent>,
     pub ws_subs: DashMap<String, HashSet<u64>>,
     pub chains: Vec<ChainConfig>,
@@ -53,6 +54,29 @@ impl AppState {
         chains: Vec<ChainConfig>,
         api_key: String,
     ) -> Arc<Self> {
+        // One shared auto-reconnecting connection. Opening a fresh connection
+        // per request re-resolves the `redis` hostname every call, so any
+        // transient Docker DNS blip surfaced as a user-facing 500 (fail-closed
+        // nonce check). The manager reconnects with backoff internally.
+        //
+        // The INITIAL connect must also survive those DNS blips — this host's
+        // Docker resolver fails intermittently even for healthy services, and a
+        // panic here leaves the container dead. Retry for up to ~60s.
+        let redis_conn = {
+            let mut attempt = 0u32;
+            loop {
+                match redis.get_connection_manager().await {
+                    Ok(conn) => break conn,
+                    Err(e) if attempt < 30 => {
+                        attempt += 1;
+                        tracing::warn!("Redis connect attempt {attempt} failed: {e}; retrying in 2s");
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    }
+                    Err(e) => panic!("Failed to connect to Redis after {attempt} attempts: {e}"),
+                }
+            }
+        };
+
         let (ws_tx, _) = broadcast::channel(1024);
         let upload_dir = std::env::var("UPLOAD_DIR")
             .unwrap_or_else(|_| "./uploads".to_string());
@@ -87,6 +111,7 @@ impl AppState {
         Arc::new(Self {
             db,
             redis,
+            redis_conn,
             ws_tx,
             ws_subs: DashMap::new(),
             chains,

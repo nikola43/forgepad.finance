@@ -2,120 +2,252 @@
 pragma solidity ^0.8.26;
 
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
-import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
-import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-struct RegistrationParams {
-    string name;
-    bytes encryptedEmail;
-    address upkeepContract;
-    uint32 gasLimit;
-    address adminAddress;
-    uint8 triggerType;
-    bytes checkData;
-    bytes triggerConfig;
-    bytes offchainConfig;
-    uint96 amount;
-}
+/// @title Fyuz leaderboard fee Distributor (BSC)
+/// @notice Receives the protocol's 0.2% leaderboard fee stream (BNB) from Fyuz
+///         and periodically distributes it to leaderboard participants:
+///           - 90% pro-rata by leaderboard share (points in the round window)
+///           - 10% to ONE participant picked uniformly by Chainlink VRF —
+///             every participant holds one lottery ticket regardless of size,
+///             which keeps small traders engaged.
+///
+/// @dev Chain reality check: Chainlink Functions does NOT exist on BSC, so the
+///      previous design (DON fetches shares from our API) cannot run here. The
+///      shares are instead posted by an authorized `poster` key operated by the
+///      backend — the SAME trust root as before, since Functions only ever
+///      relayed what our API returned. Winner selection stays trustless via
+///      VRF v2.5 (native-BNB payment; no LINK juggling, no Uniswap LINK buys).
+///
+/// Round lifecycle (driven by the backend round-runner, see scripts/):
+///   1. startRound(from, to)  — snapshots the pot, requests VRF
+///   2. postShares(id, bytes) — packed (address,uint32-share) entries
+///   3. VRF fulfills          — stores the random word
+///   4. distribute(id)        — anyone; pays 90% pro-rata + 10% to the winner
+///   Stuck rounds (VRF outage, bad shares) are cancelled by the poster/owner;
+///   the pot simply rolls into the next round.
+contract Distributor is VRFConsumerBaseV2Plus, Pausable {
+    // ---- round state -------------------------------------------------------
 
-interface IAutomationRegistrarInterface {
-    function registerUpkeep(
-        RegistrationParams calldata requestParams
-    ) external returns (uint256);
-}
-
-interface IUniversalRouter {
-    function execute(bytes calldata commands, bytes[] calldata inputs) external payable;
-}
-
-interface ILink is IERC20 {
-    function transferAndCall(address to, uint256 value, bytes memory data) external returns (bool);
-}
-
-struct Round {
-    uint256 random;
-    uint8 status;   // 0-none or done, 1-pending, 2-fulfilled
-    uint8 requests;
-    uint8 fulfills;   // number of api fulfilled
-    bytes data;
-    uint256 time;
-}
-
-struct SwapOptions {
-    address router;
-    address token;
-    uint8 version;    
-}
-
-struct APIParams {
-    string url;
-    bytes32 donID;
-    address router;
-    uint64 subscriptionId;
-    uint32 gasLimit;
-}
-
-struct VRFParams {
-    uint256 subscriptionId;
-    bytes32 keyHash;
-    address coordinator;
-    uint32 numWords;
-    uint32 gasLimit;
-    uint16 requestConfirmations;
-    bool nativePayment;
-}
-
-contract ApiClient is FunctionsClient {
-    using FunctionsRequest for FunctionsRequest.Request;
-    // using AddressLib for bytes;
-    // using UintLib for uint256;
-
-    string private url;
-    bytes32 private donID;
-    uint64 private subscriptionId;
-    uint32 private gasLimit = 300000;
-
-    string private source =
-        "const [url, from, to, index] = args;"
-        "const res = await Functions.makeHttpRequest({ url, params: { from, to, index, network: 'mainnet' } });"
-        "if (res.error) { throw Error(res.message) }"
-        "return new Uint8Array(res.data.bytes.match(/.{2}/g).map(b => parseInt(b, 16)))";
-
-    constructor(address _router) FunctionsClient(_router) {
+    // status: 0 = none, 1 = active (awaiting shares and/or VRF), 2 = paid, 3 = cancelled
+    struct Round {
+        uint8 status;
+        uint64 timeStart;   // leaderboard window covered by this round (informational,
+        uint64 timeEnd;     // echoed in events so payouts are auditable off-chain)
+        bool hasRandom;
+        uint256 pot;        // balance snapshot at startRound
+        uint256 random;
+        uint256 vrfRequestId;
+        bytes shares;       // packed 24-byte entries: address(20) ++ uint32 share(4)
     }
 
-    function _bytesToShares(
-        bytes memory _data
-    ) internal pure returns (address[] memory, uint32[] memory) {
-        uint256 _length = _data.length;
-        require(_length % 24 == 0, "Invalid packed data length");
+    uint256 public roundId;
+    uint256 public lastRoundTime;
+    mapping(uint256 => Round) public rounds;
+    mapping(uint256 => uint256) private vrfRequests; // requestId -> roundId
 
-        uint256 _count = _length / 24;
+    /// Funds owed to holders whose payout push failed (contract/AA wallets,
+    /// reverting receivers). Withdrawable via claim(). Held OUT of the pot so a
+    /// later round can never re-distribute them.
+    mapping(address => uint256) public claimable;
+    uint256 public totalClaimable;
+
+    // ---- config ------------------------------------------------------------
+
+    uint256 public period = 1 weeks;
+    uint256 public percentForWinner = 1000;     // 10% of the pot, basis points
+    uint256 public percentForDistribute = 9000; // 90% of the pot, basis points
+    /// @notice Backend key allowed to run rounds and post shares.
+    address public poster;
+
+    uint256 public vrfSubscriptionId;
+    bytes32 public vrfKeyHash;
+    uint32 public vrfGasLimit = 200000; // fulfill only stores one word
+    uint16 public vrfConfirmations = 3;
+    bool public vrfNativePayment = true;
+
+    // ---- events ------------------------------------------------------------
+
+    event RoundStarted(uint256 indexed roundId, uint256 pot, uint64 timeStart, uint64 timeEnd, uint256 vrfRequestId);
+    event SharesPosted(uint256 indexed roundId, uint256 holderCount);
+    event RandomFulfilled(uint256 indexed roundId, uint256 random);
+    event RoundDistributed(uint256 indexed roundId, address indexed winner, uint256 winnerAmount, uint256 distributedAmount, uint256 holderCount);
+    event RoundCancelled(uint256 indexed roundId);
+    event TransferFailed(address indexed to, uint256 amount);
+
+    // ---- setup -------------------------------------------------------------
+
+    constructor(
+        address _vrfCoordinator,
+        uint256 _vrfSubscriptionId,
+        bytes32 _vrfKeyHash,
+        address _poster
+    ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
+        require(_poster != address(0), "Zero poster");
+        require(_vrfKeyHash != bytes32(0), "Zero keyHash");
+        require(_vrfSubscriptionId != 0, "Zero subId");
+        vrfSubscriptionId = _vrfSubscriptionId;
+        vrfKeyHash = _vrfKeyHash;
+        poster = _poster;
+    }
+
+    /// Max holders per round — must match the top-N the backend posts. Bounds
+    /// the distribute() loop so a bad/oversized shares payload can't push the
+    /// round past the block gas limit and freeze the pot.
+    uint256 public constant MAX_HOLDERS = 100;
+
+    /// @notice Fyuz streams the 0.2% leaderboard fee here on every trade.
+    receive() external payable {}
+
+    modifier onlyPoster() {
+        require(msg.sender == poster || msg.sender == owner(), "Not poster");
+        _;
+    }
+
+    // ---- round lifecycle ---------------------------------------------------
+
+    /// @notice Open a distribution round for the leaderboard window [_timeStart, _timeEnd].
+    ///         Snapshots the current balance as the pot and requests VRF randomness.
+    function startRound(uint64 _timeStart, uint64 _timeEnd) external onlyPoster whenNotPaused returns (uint256) {
+        require(rounds[roundId].status != 1, "Round already active");
+        require(block.timestamp >= lastRoundTime + period, "Period not elapsed");
+        // Only the distributable balance is a pot — funds already owed to
+        // holders via claim() must not be handed out a second time.
+        uint256 _distributable = address(this).balance - totalClaimable;
+        require(_distributable > 0, "Nothing to distribute");
+
+        roundId += 1;
+        lastRoundTime = block.timestamp;
+        Round storage r = rounds[roundId];
+        r.status = 1;
+        r.timeStart = _timeStart;
+        r.timeEnd = _timeEnd;
+        r.pot = _distributable;
+
+        uint256 _requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: vrfKeyHash,
+                subId: vrfSubscriptionId,
+                requestConfirmations: vrfConfirmations,
+                callbackGasLimit: vrfGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: vrfNativePayment})
+                )
+            })
+        );
+        r.vrfRequestId = _requestId;
+        vrfRequests[_requestId] = roundId;
+
+        emit RoundStarted(roundId, r.pot, _timeStart, _timeEnd, _requestId);
+        return roundId;
+    }
+
+    /// @notice Post the leaderboard shares for the active round. Packed 24-byte
+    ///         entries: 20-byte address ++ big-endian uint32 share, where a share
+    ///         is the holder's fraction of 2^32. The backend serves the exact
+    ///         payload at GET /distributor/shares.
+    function postShares(uint256 _roundId, bytes calldata _packed) external onlyPoster {
+        Round storage r = rounds[_roundId];
+        require(_roundId == roundId && r.status == 1, "No active round");
+        // Shares MUST be locked in before the VRF word is revealed. Otherwise a
+        // compromised poster could read the fulfilled `random` and reorder the
+        // holder set so `random % n` lands on an address of their choosing,
+        // defeating the lottery. Committing first makes the winner index
+        // unpredictable at commit time.
+        require(!r.hasRandom, "Random already revealed");
+        require(_packed.length > 0 && _packed.length % 24 == 0, "Invalid packed length");
+        uint256 _count = _packed.length / 24;
+        require(_count <= MAX_HOLDERS, "Too many holders");
+
+        // Sum of shares must not exceed 2^32 (100%). If it did, early holders in
+        // the loop would be over-paid and later holders/the winner starved when
+        // the balance runs out. Rejecting here catches an honest backend bug too.
+        uint256 _sum;
+        for (uint256 i = 0; i < _count; i++) {
+            // share is the 4 bytes after each 20-byte address
+            uint256 _off = i * 24 + 20;
+            uint32 _share = uint32(bytes4(_packed[_off:_off + 4]));
+            _sum += _share;
+        }
+        require(_sum <= uint256(type(uint32).max) + 1, "Shares exceed 100%");
+
+        r.shares = _packed;
+        emit SharesPosted(_roundId, _count);
+    }
+
+    function fulfillRandomWords(uint256 _requestId, uint256[] calldata _randomWords) internal override {
+        uint256 _rid = vrfRequests[_requestId];
+        Round storage r = rounds[_rid];
+        // Stale fulfillments (cancelled/paid rounds) are ignored, not reverted —
+        // reverting would burn the VRF payment for nothing.
+        if (_rid == 0 || r.status != 1) return;
+        r.random = _randomWords[0];
+        r.hasRandom = true;
+        emit RandomFulfilled(_rid, _randomWords[0]);
+    }
+
+    /// @notice Pay the round out once both the shares and the randomness are in.
+    ///         Anyone can call — all inputs are already committed on-chain.
+    function distribute(uint256 _roundId) external whenNotPaused {
+        Round storage r = rounds[_roundId];
+        require(_roundId == roundId && r.status == 1, "No active round");
+        require(r.hasRandom, "Randomness pending");
+        require(r.shares.length > 0, "Shares pending");
+        r.status = 2;
+
+        (address[] memory _holders, uint32[] memory _shares) = _unpackShares(r.shares);
+
+        // The pot was snapshotted at startRound; fees keep streaming in during
+        // the round and stay for the NEXT round. Cap at the distributable
+        // balance in case an emergencyWithdraw shrank it, and never dip into
+        // funds already owed via claim().
+        uint256 _pot = r.pot;
+        uint256 _distributable = address(this).balance - totalClaimable;
+        if (_pot > _distributable) _pot = _distributable;
+
+        uint256 _winnerAmount = (_pot * percentForWinner) / 10000;
+        uint256 _distributeAmount = (_pot * percentForDistribute) / 10000;
+
+        uint256 _paid;
+        for (uint256 i = 0; i < _holders.length; i++) {
+            uint256 _amount = (_distributeAmount * uint256(_shares[i])) / (uint256(type(uint32).max) + 1);
+            _paid += _payOrCredit(_holders[i], _amount);
+        }
+
+        // One uniform lottery ticket per participant — small traders have the
+        // same shot at the 10% bonus as whales.
+        address _winner = _holders[r.random % _holders.length];
+        _paid += _payOrCredit(_winner, _winnerAmount);
+
+        emit RoundDistributed(_roundId, _winner, _winnerAmount, _paid, _holders.length);
+    }
+
+    /// @notice Void a stuck round (VRF outage, wrong shares). The pot stays in
+    ///         the contract and is included in the next round's snapshot.
+    function cancelRound() external onlyPoster {
+        Round storage r = rounds[roundId];
+        require(r.status == 1, "No active round");
+        r.status = 3;
+        emit RoundCancelled(roundId);
+    }
+
+    // ---- internals ---------------------------------------------------------
+
+    function _unpackShares(bytes memory _data) internal pure returns (address[] memory, uint32[] memory) {
+        uint256 _count = _data.length / 24;
         address[] memory _holders = new address[](_count);
         uint32[] memory _shares = new uint32[](_count);
         assembly {
             let _dataPtr := add(_data, 20)
             let _holderPtr := add(_holders, 32)
             let _sharePtr := add(_shares, 32)
-
-            for {
-                let i := 0
-            } lt(i, _count) {
-                i := add(i, 1)
-            } {
-                let _addr := and(
-                    mload(_dataPtr),
-                    0xffffffffffffffffffffffffffffffffffffffff
-                )
+            for { let i := 0 } lt(i, _count) { i := add(i, 1) } {
+                let _addr := and(mload(_dataPtr), 0xffffffffffffffffffffffffffffffffffffffff)
                 _dataPtr := add(_dataPtr, 4)
-                let _share := and(
-                    mload(_dataPtr),
-                    0xffffffff
-                )
+                let _share := and(mload(_dataPtr), 0xffffffff)
                 _dataPtr := add(_dataPtr, 20)
                 mstore(_holderPtr, _addr)
                 mstore(_sharePtr, _share)
@@ -126,481 +258,85 @@ contract ApiClient is FunctionsClient {
         return (_holders, _shares);
     }
 
-    function _uintToString(uint256 value) internal pure returns (string memory) {
-        if (value == 0) {
-            return "0";
+    /// Pay `_to` directly, or credit `claimable` if the push fails. Returns the
+    /// amount accounted for (paid or credited) so distribute() can track it.
+    /// Push-then-credit keeps distribute() non-blocking: a holder that reverts,
+    /// runs out of the gas stipend (contract/AA wallets), or is address(0)
+    /// never stalls the round — their funds wait in claimable for withdraw().
+    function _payOrCredit(address _to, uint256 _amount) internal returns (uint256) {
+        if (_amount == 0 || _to == address(0)) return 0;
+        (bool _success, ) = payable(_to).call{value: _amount, gas: 30000}("");
+        if (!_success) {
+            claimable[_to] += _amount;
+            totalClaimable += _amount;
+            emit TransferFailed(_to, _amount);
         }
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        temp = value;
-        for (uint256 i = digits; i > 0; i--) {
-            buffer[i - 1] = bytes1(uint8(48 + (temp % 10)));
-            temp /= 10;
-        }
-        return string(buffer);
+        return _amount;
     }
 
-    function requestAPI(
-        uint256 _timeStart,
-        uint256 _timeEnd,
-        uint256 _index
-    ) internal returns (uint256 requestId) {
-        FunctionsRequest.Request memory request;
-        string[] memory _args = new string[](4);
-        _args[0] = url;
-        _args[1] = _uintToString(_timeStart);
-        _args[2] = _uintToString(_timeEnd);
-        _args[3] = _uintToString(_index);
-        request.setArgs(_args);
-        request.initializeRequestForInlineJavaScript(source);
-        bytes32 _requestId = _sendRequest(
-            request.encodeCBOR(),
-            subscriptionId,
-            gasLimit,
-            donID
-        );
-        return uint256(_requestId);
+    /// @notice Withdraw funds credited to you by a failed payout push.
+    function claim() external {
+        uint256 _amount = claimable[msg.sender];
+        require(_amount > 0, "Nothing to claim");
+        claimable[msg.sender] = 0;
+        totalClaimable -= _amount;
+        (bool _success, ) = payable(msg.sender).call{value: _amount}("");
+        require(_success, "Claim transfer failed");
     }
 
-    function fulfillRequest(
-        bytes32 _requestId,
-        bytes memory _response,
-        bytes memory _error
-    ) internal override {
-        if (_error.length > 0) {
-            fulfillAPI(uint256(_requestId), bytes(""));
-        } else {
-            fulfillAPI(uint256(_requestId), _response);
-        }
+    // ---- admin -------------------------------------------------------------
+
+    /// @notice Top up the VRF subscription with BNB (v2.5 native payment).
+    function fundVRF() external payable onlyOwner {
+        s_vrfCoordinator.fundSubscriptionWithNative{value: msg.value}(vrfSubscriptionId);
     }
 
-    function errorAPI(uint256, string memory) internal virtual {
+    function setPoster(address _poster) external onlyOwner {
+        require(_poster != address(0), "Zero poster");
+        poster = _poster;
     }
 
-    function fulfillAPI(uint256, bytes memory) internal virtual {
-    }
-
-    function updateParams(
-        string memory _url,
-        bytes32 _donID,
-        uint64 _subscriptionId,
-        uint32 _gasLimit
-    ) internal {
-        if (bytes(_url).length > 0)
-            url = _url;
-        if (uint256(_donID) > 0)
-            donID = _donID;
-        if (_subscriptionId > 0)
-            subscriptionId = _subscriptionId;
-        if (_gasLimit > 0)
-            gasLimit = _gasLimit;
-    }
-
-    function updateSource(string memory _source) internal {
-        source = _source;
-    }
-
-    function fundAPI(ILink _link, uint256 _amount) internal {
-        _link.transferAndCall(
-            address(i_router), 
-            _amount, 
-            abi.encode(subscriptionId)
-        );
-    }
-}
-
-contract RandomClient is VRFConsumerBaseV2Plus {
-    uint256 private subscriptionId;
-    bytes32 private keyHash =
-        0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
-    uint16 private requestConfirmations = 3;
-    uint32 private numWords = 1;
-    uint32 private gasLimit = 100000;
-    bool private nativePayment = false;
-
-    constructor(address _coordinator) VRFConsumerBaseV2Plus(_coordinator) {
-    }
-
-    function requestVRF() internal returns (uint256) {
-        return
-            s_vrfCoordinator.requestRandomWords(
-                VRFV2PlusClient.RandomWordsRequest({
-                    keyHash: keyHash,
-                    subId: subscriptionId,
-                    requestConfirmations: requestConfirmations,
-                    callbackGasLimit: gasLimit,
-                    numWords: numWords,
-                    extraArgs: VRFV2PlusClient._argsToBytes(
-                        VRFV2PlusClient.ExtraArgsV1({nativePayment: nativePayment})
-                    )
-                })
-            );
-    }
-
-    function fulfillRandomWords(
-        uint256 _requestId,
-        uint256[] calldata _randomWords
-    ) internal override {
-        fulfillVRF(_requestId, _randomWords[0]);
-    }
-
-    function fulfillVRF(uint256, uint256) internal virtual {
-    }
-
-    function updateParams(
-        uint256 _subscriptionId,
-        bytes32 _keyHash,
-        uint16 _requestConfirmations,
-        uint32 _numWords,
-        uint32 _gasLimit,
-        bool _nativePayment
-    ) internal {
-        if (_subscriptionId > 0)
-            subscriptionId = _subscriptionId;
-        if (uint256(_keyHash) > 0)
-            keyHash = _keyHash;
-        if (_requestConfirmations > 0)
-            requestConfirmations = _requestConfirmations;
-        if (_numWords > 0)
-            numWords = _numWords;
-        if (_gasLimit > 0)
-            gasLimit = _gasLimit;
-        nativePayment = _nativePayment;
-    }
-
-    function fundVRF(ILink _link, uint256 _amount) internal {
-        _link.transferAndCall(
-            address(s_vrfCoordinator), 
-            _amount, 
-            abi.encode(subscriptionId)
-        );
-    }
-}
-
-contract Distributor is
-    AutomationCompatibleInterface,
-    RandomClient,
-    ApiClient,
-    Pausable
-{
-    address constant WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
-    uint256 private periodId;
-    uint256 public period = 15 minutes; // 1 weeks;
-    uint256 public startTime;
-    uint256 public roundId;
-    uint256 public upkeepID;
-    address private upkeepRegistry;
-    address private upkeepRegistrar;
-    IUniversalRouter private universalRouter;
-    ILink private link;
-    mapping(uint256 => Round) public rounds;
-    mapping(uint256 => uint256) private vrfRequests;
-    mapping(uint256 => uint256) private apiRequests;
-    
-    uint256 public percentForDistribute = 9000; // 90%
-    uint256 public percentForFund = 500; // 5%
-    uint256 private ratioAPI = 5000;
-    uint256 private ratioVRF = 1000;
-
-    constructor(
-        address _universalRouter, 
-        address _link, 
-        address _upkeepRegistry, 
-        address _upkeepRegistrar, 
-        address _vrfCoordinator, 
-        address _apiRouter
-    ) RandomClient(_vrfCoordinator) ApiClient(_apiRouter) { 
-        universalRouter = IUniversalRouter(_universalRouter);
-        link = ILink(_link);
-        upkeepRegistry = _upkeepRegistry;
-        upkeepRegistrar = _upkeepRegistrar;
-        _pause();
-    }
-
-    receive() external payable {
-    }
-
-    function buyLink(uint256 _amount) internal returns (uint256) {
-        uint256 _balance = link.balanceOf(address(this));
-        // {
-        //     address[] memory _path = new address[](2);
-        //     _path[0] = WETH;
-        //     _path[1] = address(link);
-        //     bytes[] memory _inputs = new bytes[](4);
-        //     _inputs[0] = abi.encode(
-        //         address(0x2),
-        //         _amount
-        //     );
-        //     _inputs[1] = abi.encode(
-        //         address(this),
-        //         0,
-        //         uint256(0),
-        //         _path,
-        //         false
-        //     );
-        //     _inputs[2] = abi.encode(
-        //         address(this),
-        //         _amount,
-        //         uint256(0),
-        //         abi.encodePacked(WETH, uint24(3000), address(link)),
-        //         false
-        //     );
-        //     _inputs[3] = abi.encode(
-        //         address(this),
-        //         0
-        //     );
-        //     try universalRouter.execute{ value: _amount }(
-        //         abi.encodePacked(bytes1(0x0b), bytes1(0x88), bytes1(0x80), bytes1(0x0c)), _inputs                
-        //     ) {
-        //         _balance = link.balanceOf(address(this)) - _balance;
-        //         if (_balance > 0)
-        //             return _balance;
-        //     } catch {
-        //     }
-        // }
-        {
-            bytes[] memory _inputs = new bytes[](2);
-            _inputs[0] = abi.encode(
-                address(0x2),
-                _amount
-            );
-            _inputs[1] = abi.encode(
-                address(this),
-                _amount,
-                uint256(0),
-                abi.encodePacked(WETH, uint24(3000), address(link)),
-                false
-            );
-            try universalRouter.execute{ value: _amount }(
-                abi.encodePacked(bytes1(0x0b), bytes1(0x0)), _inputs                
-            ) {
-                _balance = link.balanceOf(address(this)) - _balance;
-                if (_balance > 0)
-                    return _balance;
-            } catch {
-            }
-        }
-        return 0;
-    }
-
-    function fund() internal {
-        uint256 _balance = buyLink(address(this).balance * percentForFund / 10000);
-        uint256 _amountAPI = _balance * uint256(ratioAPI) / 10000;
-        uint256 _amountVRF = _balance * uint256(ratioVRF) / 10000;
-        fundAPI(link, _amountAPI);
-        fundVRF(link, _amountVRF);
-        link.transferAndCall(
-            upkeepRegistry, 
-            _balance - _amountAPI - _amountVRF, 
-            abi.encode(upkeepID)
-        );
-    }
-
-    function startUpkeep(uint256 _startTime) public payable onlyOwner {
-        uint256 _balance = buyLink(msg.value);
-        if (_balance > 0) {
-            RegistrationParams memory _params = RegistrationParams({
-                name: "Ethism Upkeeper",
-                encryptedEmail: bytes(""),
-                upkeepContract: address(this),
-                gasLimit: 5000000,
-                adminAddress: msg.sender,
-                triggerType: 0,
-                checkData: bytes(""),
-                triggerConfig: bytes(""),
-                offchainConfig: bytes(""),
-                amount: uint96(_balance)
-            });
-            link.approve(upkeepRegistrar, _balance);
-            upkeepID = IAutomationRegistrarInterface(upkeepRegistrar).registerUpkeep(_params);
-            restartUpkeep(_startTime);
-        }
-    }
-
-    function checkUpkeep(
-        bytes calldata
-    )
-        external
-        view
-        override
-        whenNotPaused
-        returns (bool upkeepNeeded, bytes memory performData)
-    {
-        if (startTime == 0 || address(this).balance == 0) {
-            upkeepNeeded = false;
-        } else {
-            Round memory round = rounds[roundId];
-            if (round.status == 0) {
-                uint256 _periodId = (block.timestamp - startTime) / period;
-                upkeepNeeded = _periodId > periodId;
-            } else if (round.status == 1) {
-                upkeepNeeded = round.time + period < block.timestamp; // timeout
-            } else if (round.status == 2) {
-                upkeepNeeded = round.random > 0;
-            }
-            if (upkeepNeeded)
-                performData = abi.encodePacked(round.status);
-        }
-    }
-
-    function performUpkeep(
-        bytes calldata performData
-    ) external override whenNotPaused {
-        uint8 action = uint8(performData[0]);
-        if (action != rounds[roundId].status)
-            return;
-        if (action == 0) {
-            uint256 _periodId = (block.timestamp - startTime) / period;
-            if (_periodId > periodId) {
-                fund();
-                roundId += 1;
-                periodId = _periodId;
-                Round storage round = rounds[roundId];
-                round.status = 1;
-                round.time = block.timestamp;
-                uint256 _requestId = requestVRF();
-                vrfRequests[_requestId] = roundId;
-                for (uint256 i = 0; i < 5; i++) {
-                    uint256 _timeEnd = startTime + periodId * period;
-                    _requestId = requestAPI(
-                        0, // _timeEnd - period,
-                        _timeEnd,
-                        i
-                    );
-                    apiRequests[_requestId] = roundId;
-                    round.requests += 1;
-                }
-            }
-        } else if (action == 1) {
-            Round storage round = rounds[roundId];
-            if (round.time + period < block.timestamp) {
-                round.status = 0;
-            }
-        } else if (action == 2) {
-            Round storage round = rounds[roundId];
-            uint256 balance = address(this).balance;
-            if (balance > 0) {
-                (address[] memory _holders, uint32[] memory _shares) = _bytesToShares(round.data);
-                if (_holders.length > 0) {
-                    uint256 amountForDistribute = (balance * percentForDistribute) / 10000;
-                    for (uint256 i = 0; i < _holders.length; i++) {
-                        uint256 _amount = amountForDistribute * uint256(_shares[i]) / (uint256(type(uint32).max) + 1);
-                        if (transfer(_holders[i], _amount)) {
-                            balance -= _amount;
-                        }
-                        // Skip failed transfers instead of corrupting balance
-                    }
-                    address winner = _holders[round.random % _holders.length];
-                    transfer(winner, balance);
-                }
-            }
-            round.status = 0;
-        }
-    }
-
-    function restartUpkeep(
-        uint256 _startTime
-    ) public onlyOwner {
-        startTime = _startTime == 0 ? block.timestamp : _startTime;
-        _unpause();
-    }
-
-    function fulfillAPI(
-        uint256 _requestId,
-        bytes memory _response
-    ) internal override {
-        require(apiRequests[_requestId] == roundId && rounds[roundId].status == 1, "Invalid api request");
-        Round storage round = rounds[roundId];
-        round.fulfills += 1;
-        if (_response.length > 0)
-            round.data = abi.encodePacked(round.data, _response);
-        if (round.fulfills == round.requests || _response.length == 0)
-            round.status = 2;
-    }
-
-    function fulfillVRF(
-        uint256 _requestId,
-        uint256 _random
-    ) internal override {
-        Round storage round = rounds[roundId];
-        require(vrfRequests[_requestId] == roundId, "Invalid vrf request");
-        if (_random == 0)
-            _random = 1000;
-        round.random = _random;
-    }
-
-    function transfer(address _to, uint256 _amount) internal returns (bool) {
-        if (_amount == 0) return false;
-        (bool success, ) = payable(_to).call{value: _amount}("");
-        return success;
-    }
-
-    function updatePeriod(uint256 _period) public onlyOwner {
+    function setPeriod(uint256 _period) external onlyOwner {
         period = _period;
     }
 
-    function updatePercentForDistribute(uint256 _percent) public onlyOwner {
-        require(_percent <= 10000, "Cannot exceed 100%");
-        percentForDistribute = _percent;
+    function setPercents(uint256 _forWinner, uint256 _forDistribute) external onlyOwner {
+        require(_forWinner + _forDistribute <= 10000, "Cannot exceed 100%");
+        percentForWinner = _forWinner;
+        percentForDistribute = _forDistribute;
     }
 
-    function updatePercentForFund(uint256 _percent) public onlyOwner {
-        require(_percent <= 10000, "Cannot exceed 100%");
-        percentForFund = _percent;
-    }
-
-    function updateFundParams(
-        uint256 _ratioAPI, uint256 _ratioVRF
-    ) public onlyOwner {
-        ratioAPI = _ratioAPI;
-        ratioVRF = _ratioVRF;
-    }
-
-    function assignAPI(
-        string memory _url,
-        uint64 _subscriptionId,
-        bytes32 _donID,
-        uint32 _gasLimit
-    ) public onlyOwner {
-        ApiClient.updateParams(_url, _donID, _subscriptionId, _gasLimit);
-    }
-
-    function assignVRF(
+    function setVRFConfig(
         uint256 _subscriptionId,
         bytes32 _keyHash,
-        uint16 _requestConfirmations,
-        uint32 _numWords,
         uint32 _gasLimit,
+        uint16 _confirmations,
         bool _nativePayment
-    ) public onlyOwner {
-        RandomClient.updateParams(_subscriptionId, _keyHash, _requestConfirmations, _numWords, _gasLimit, _nativePayment);
+    ) external onlyOwner {
+        if (_subscriptionId > 0) vrfSubscriptionId = _subscriptionId;
+        if (uint256(_keyHash) > 0) vrfKeyHash = _keyHash;
+        if (_gasLimit > 0) vrfGasLimit = _gasLimit;
+        if (_confirmations > 0) vrfConfirmations = _confirmations;
+        vrfNativePayment = _nativePayment;
     }
 
-    function updateScript(string memory _src) public onlyOwner {
-        ApiClient.updateSource(_src);
-    }
-
-    function emergencyWithdraw(address _to) external onlyOwner whenPaused {
-        transfer(_to, address(this).balance);
-    }
-
-    function withdrawToken(
-        address _token,
-        address _to
-    ) external onlyOwner whenPaused {
-        IERC20(_token).transfer(_to, IERC20(_token).balanceOf(address(this)));
-    }
-
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function emergencyWithdraw(address _to) external onlyOwner whenPaused {
+        (bool _success, ) = payable(_to).call{value: address(this).balance}("");
+        require(_success, "Withdraw failed");
+    }
+
+    function withdrawToken(address _token, address _to) external onlyOwner whenPaused {
+        require(
+            IERC20(_token).transfer(_to, IERC20(_token).balanceOf(address(this))),
+            "Token transfer failed"
+        );
     }
 }

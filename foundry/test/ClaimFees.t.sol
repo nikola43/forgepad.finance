@@ -208,7 +208,6 @@ contract ClaimFeesTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            address(this),
             10000,
             10000,
             address(this)

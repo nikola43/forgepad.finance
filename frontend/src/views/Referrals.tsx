@@ -41,7 +41,27 @@ export default function Referrals() {
                     <GroupAddIcon sx={{ fontSize: 26 }} /> Referrals
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Invite friends with your link. When they join and trade, you climb the referral board and earn bonus points.
+                    Invite friends with your link — every friend who joins and trades earns you +25 points, and points push you up the leaderboard.
+                </Typography>
+            </Box>
+
+            {/* How it works */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 1.5, mb: 3 }}>
+                {[
+                    { step: '1', title: 'Share your link', text: 'Copy your personal referral link below and send it to friends or post it on X.' },
+                    { step: '2', title: 'They join through it', text: 'When someone opens your link and connects their wallet, they’re registered as your referral — permanently.' },
+                    { step: '3', title: 'You earn points', text: 'The moment each referral makes their first trade, you get +25 points. 10 friends = +250 points, 100 friends = +2,500.' },
+                ].map((s) => (
+                    <Box key={s.step} sx={{ p: 2, borderRadius: '14px', border: '1px solid var(--border)', background: 'rgba(234,230,218,0.02)' }}>
+                        <Typography fontSize={12} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)" mb={0.5}>STEP {s.step}</Typography>
+                        <Typography fontSize={14} fontWeight={700} color="var(--bone)" mb={0.5}>{s.title}</Typography>
+                        <Typography fontSize={12.5} color="var(--muted)">{s.text}</Typography>
+                    </Box>
+                ))}
+            </Box>
+            <Box sx={{ p: 1.75, mb: 3, borderRadius: '12px', border: '1px solid rgba(191,209,67,0.2)', background: 'rgba(191,209,67,0.04)' }}>
+                <Typography fontSize={12.5} color="var(--muted)">
+                    <b style={{ color: 'var(--citron)' }}>Why it matters:</b> referral points are added to your season score alongside your trading volume — the more friends you bring, the higher you rank on the leaderboard and the bigger your share of the season prize pot. There&apos;s no limit: every active referral keeps counting.
                 </Typography>
             </Box>
 

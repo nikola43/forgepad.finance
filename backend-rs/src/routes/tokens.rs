@@ -17,5 +17,9 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/upload", post(handlers::tokens::upload_logo))
         .route("/generate-image", post(handlers::tokens::generate_image))
+        .route(
+            "/generate-image/{jobId}",
+            get(handlers::tokens::generate_image_status),
+        )
         .with_state(state)
 }

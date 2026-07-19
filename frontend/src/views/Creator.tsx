@@ -30,7 +30,7 @@ export default function Creator() {
                     <BarChartIcon sx={{ fontSize: 26 }} /> Promoter Dashboard
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Performance of the bouts you&apos;ve booked. Fees are the 1% platform fee your tokens generated — and each champion made earns you +50 bonus points.
+                    Performance of the tokens you&apos;ve created. Fees are the 1% platform fee collected on your tokens&apos; trades — and every token that graduates to the DEX earns you +50 bonus points.
                 </Typography>
             </Box>
 
@@ -43,10 +43,10 @@ export default function Creator() {
             ) : (
                 <>
                     <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
-                        <Stat label="Bouts booked" value={`${dashboard.tokenCount}`} />
-                        <Stat label="Champions made" value={`${dashboard.graduatedCount}`} />
-                        <Stat label="Total volume" value={`$${priceFormatter(dashboard.totalVolumeUsd, 2)}`} />
-                        <Stat label="Fees generated" value={`$${priceFormatter(dashboard.totalFeesUsd, 2)}`} />
+                        <Stat label="Tokens created" value={`${dashboard.tokenCount}`} />
+                        <Stat label="Graduated to DEX" value={`${dashboard.graduatedCount}`} />
+                        <Stat label="Trading volume" value={`$${priceFormatter(dashboard.totalVolumeUsd, 2)}`} />
+                        <Stat label="Fees collected" value={`$${priceFormatter(dashboard.totalFeesUsd, 2)}`} />
                     </Box>
 
                     <Box sx={{ display: 'grid', gap: 1.5 }}>
@@ -65,7 +65,7 @@ export default function Creator() {
                                         </Typography>
                                     </Box>
                                     {t.launched
-                                        ? <Typography fontSize={12} color="var(--tangerine)" fontWeight={700} flexShrink={0} display="flex" alignItems="center" gap={0.4}><SchoolIcon sx={{ fontSize: 15 }} /> Champion</Typography>
+                                        ? <Typography fontSize={12} color="var(--tangerine)" fontWeight={700} flexShrink={0} display="flex" alignItems="center" gap={0.4}><SchoolIcon sx={{ fontSize: 15 }} /> Graduated</Typography>
                                         : <Typography fontSize={12} color="var(--citron)" fontWeight={700} flexShrink={0} fontFamily="var(--font-data)">{t.progressPct.toFixed(1)}%</Typography>}
                                 </Box>
                                 {!t.launched && (

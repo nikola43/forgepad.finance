@@ -68,7 +68,6 @@ contract FyuzUpgradeTest is Test {
             V4_POS_MGR,
             PERMIT2_ADDR,
             address(this),
-            address(this),
             10000,
             10000,
             address(this)
@@ -128,7 +127,6 @@ contract FyuzUpgradeTest is Test {
     function test_Upgrade02_LiquidityManagerInitializerDefaults() public view {
         assertEq(liquidityManager.owner(), address(this));
         assertEq(address(liquidityManager.routerV2()), V2_ROUTER);
-        assertEq(liquidityManager.marginRecipient(), address(this));
         assertTrue(liquidityManager.authorizedCallers(address(fyuz)));
     }
 
@@ -154,7 +152,6 @@ contract FyuzUpgradeTest is Test {
             UNIVERSAL_ROUTER,
             V4_POS_MGR,
             PERMIT2_ADDR,
-            address(this),
             address(this),
             10000,
             10000
@@ -322,7 +319,6 @@ contract FyuzUpgradeTest is Test {
         );
         assertEq(address(liquidityManager.routerV2()), V2_ROUTER, "router survives");
         assertEq(liquidityManager.owner(), address(this), "owner survives");
-        assertEq(liquidityManager.marginRecipient(), address(this));
     }
 
     receive() external payable {}

@@ -64,7 +64,6 @@ contract DeployFyuz is Script {
             V4_POS_MGR,
             PERMIT2_ADDR,
             deployer,
-            deployer,
             10000,
             10000,
             deployer

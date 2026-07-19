@@ -235,14 +235,23 @@ contract Fyuz is
     event LiquidityManagerChanged(address newManager);
     event LiquidityManagerChangeCancelled();
 
+    /// @notice Treasury's share of the platform fee, in bps of 10000. The
+    ///         remainder goes to the leaderboard (distributorAddress). Default
+    ///         6250 = 62.5%, which turns an 80bps platform fee into 0.5%
+    ///         treasury + 0.3% leaderboard. Owner-tunable via
+    ///         setPlatformTreasuryShareBps so the split can be retuned without
+    ///         an upgrade. Appended here (not among the other fee vars) to keep
+    ///         the upgradeable storage layout append-only.
+    uint256 public platformTreasuryShareBps;
+
     // ==================== UPGRADE GAP ====================
     /// @dev Reserved storage so future upgrades can append state without colliding
     ///      with any child contract's slots. Decrement this when adding a variable.
     ///      The OZ *Upgradeable bases use ERC-7201 namespaced storage and need no gap
     ///      of their own.
     // 50 -> 48: fallbackRouterV2 takes one slot, fallbackStable + fallbackStableDecimals
-    // pack into a second.
-    uint256[48] private __gap;
+    // pack into a second. 48 -> 47: platformTreasuryShareBps appended above.
+    uint256[47] private __gap;
 
     receive() external payable {}
 
@@ -284,6 +293,7 @@ contract Fyuz is
         priceStalenessThreshold = 3600;
         PLATFORM_BUY_FEE_BPS = 100;
         PLATFORM_SELL_FEE_BPS = 100;
+        platformTreasuryShareBps = 6250; // 62.5% → 0.5% treasury / 0.3% leaderboard at 80bps
         platformLPFee = 0.1 ether;
         MAX_BUY_PERCENT = DIVISOR;
         MAX_SELL_PERCENT = DIVISOR;
@@ -1056,18 +1066,29 @@ contract Fyuz is
         }
     }
 
-    /// @dev Split the per-trade platform fee 3:1 — treasury (feeAddress) gets
-    ///      3/4, leaderboard (distributorAddress) gets 1/4. With the 80bps
-    ///      platform fee this realizes the protocol split of 0.6% treasury +
-    ///      0.2% leaderboard per buy/sell; the token creator's 0.2% is paid
-    ///      separately in _payTokenOwnerFee. The remainder (fee - treasuryCut)
-    ///      goes to the leaderboard so no wei is lost to rounding. Tolerant of a
-    ///      misconfigured recipient so a bad address never bricks trading.
+    /// @dev Split the per-trade platform fee between treasury (feeAddress) and
+    ///      leaderboard (distributorAddress) by platformTreasuryShareBps. At the
+    ///      default 6250 (62.5%) with an 80bps platform fee this realizes 0.5%
+    ///      treasury + 0.3% leaderboard per buy/sell; the token creator's 0.2%
+    ///      is paid separately in _payTokenOwnerFee. The leaderboard takes the
+    ///      remainder (fee - treasuryCut) so no wei is lost to rounding.
+    ///      Tolerant of a misconfigured recipient so a bad address never bricks
+    ///      trading.
     function _payPlatformFee(uint256 fee) private {
         if (fee == 0) return;
-        uint256 treasuryCut = (fee * 3) / 4; // 0.6% of the 0.8% platform fee
+        uint256 treasuryCut = (fee * platformTreasuryShareBps) / DIVISOR;
         if (treasuryCut > 0) _transferETHTolerant(feeAddress, treasuryCut);
-        _transferETHTolerant(distributorAddress, fee - treasuryCut); // 0.2%
+        _transferETHTolerant(distributorAddress, fee - treasuryCut);
+    }
+
+    /// @notice Retune the treasury vs leaderboard split of the platform fee,
+    ///         in bps of 10000 (e.g. 6250 = 62.5% treasury / 37.5% leaderboard).
+    ///         The creator fee (TOKEN_OWNER_FEE_BPS) and the total platform fee
+    ///         (PLATFORM_BUY/SELL_FEE_BPS) are set separately, so all three
+    ///         destinations are independently tunable without an upgrade.
+    function setPlatformTreasuryShareBps(uint256 bps) external onlyOwner {
+        require(bps <= DIVISOR, "Share cannot exceed 100%");
+        platformTreasuryShareBps = bps;
     }
 
     // ==================== ADMIN FUNCTIONS ====================

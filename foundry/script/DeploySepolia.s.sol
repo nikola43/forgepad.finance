@@ -59,7 +59,6 @@ contract DeployFyuzSepolia is Script {
             UNIVERSAL_ROUTER,
             V4_POSITION_MANAGER,
             PERMIT2,
-            deployer, // _marginRecipient (leftover ETH at graduation)
             deployer, // _owner
             10000, // 100% ETH to LP
             10000, // 100% tokens to LP

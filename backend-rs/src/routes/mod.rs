@@ -13,6 +13,7 @@ pub mod analytics;
 pub mod chats;
 pub mod creator;
 pub mod discover;
+pub mod distributor;
 pub mod kings;
 pub mod paper;
 pub mod portfolio;
@@ -45,6 +46,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .nest("/tier", tier::router(state.clone()))
         .nest("/portfolio", portfolio::router(state.clone()))
         .nest("/discover", discover::router(state.clone()))
+        .nest("/distributor", distributor::router(state.clone()))
         .nest("/analytics", analytics::router(state.clone()))
         .nest("/wallet", wallet::router(state.clone()))
         .nest("/stream", stream::router(state.clone()))

@@ -31,8 +31,7 @@ contract OverchargeReproTest is Test {
         address DATA_FEED = vm.envOr("DATA_FEED", 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
         lm = FyuzDeploy.deployLiquidityManager(
-            V2_ROUTER, V3_FACTORY, V3_POS, V4_MGR, UNIV, V4_POS, PERMIT2,
-            address(this), address(this), 10000, 10000,
+            V2_ROUTER, V3_FACTORY, V3_POS, V4_MGR, UNIV, V4_POS, PERMIT2, address(this), 10000, 10000,
             address(this)
         );
         fyuz = FyuzDeploy.deployFyuz(

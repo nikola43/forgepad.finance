@@ -137,40 +137,31 @@ async fn touch_and_count_viewers(state: &AppState, address: &str, identity: &str
     let key = viewers_key(address);
     let now = chrono::Utc::now().timestamp();
     let cutoff = now - VIEWER_TTL_SECS;
-    match state.redis.get_multiplexed_async_connection().await {
-        Ok(mut conn) => {
-            let _: Result<(), redis::RedisError> = redis::pipe()
-                .cmd("ZADD").arg(&key).arg(now).arg(identity).ignore()
-                .cmd("ZREMRANGEBYSCORE").arg(&key).arg("-inf").arg(cutoff).ignore()
-                .cmd("EXPIRE").arg(&key).arg(VIEWER_TTL_SECS * 2).ignore()
-                .query_async(&mut conn)
-                .await;
-            redis::cmd("ZCARD").arg(&key).query_async(&mut conn).await.unwrap_or(0)
-        }
-        Err(_) => 0,
-    }
+    let mut conn = state.redis_conn.clone();
+    let _: Result<(), redis::RedisError> = redis::pipe()
+        .cmd("ZADD").arg(&key).arg(now).arg(identity).ignore()
+        .cmd("ZREMRANGEBYSCORE").arg(&key).arg("-inf").arg(cutoff).ignore()
+        .cmd("EXPIRE").arg(&key).arg(VIEWER_TTL_SECS * 2).ignore()
+        .query_async(&mut conn)
+        .await;
+    redis::cmd("ZCARD").arg(&key).query_async(&mut conn).await.unwrap_or(0)
 }
 
 /// Count fresh viewers without recording a heartbeat (for the status/badge poll).
 async fn count_viewers(state: &AppState, address: &str) -> i64 {
     let key = viewers_key(address);
     let cutoff = chrono::Utc::now().timestamp() - VIEWER_TTL_SECS;
-    match state.redis.get_multiplexed_async_connection().await {
-        Ok(mut conn) => {
-            let _: Result<(), redis::RedisError> = redis::cmd("ZREMRANGEBYSCORE")
-                .arg(&key).arg("-inf").arg(cutoff)
-                .query_async(&mut conn).await;
-            redis::cmd("ZCARD").arg(&key).query_async(&mut conn).await.unwrap_or(0)
-        }
-        Err(_) => 0,
-    }
+    let mut conn = state.redis_conn.clone();
+    let _: Result<(), redis::RedisError> = redis::cmd("ZREMRANGEBYSCORE")
+        .arg(&key).arg("-inf").arg(cutoff)
+        .query_async(&mut conn).await;
+    redis::cmd("ZCARD").arg(&key).query_async(&mut conn).await.unwrap_or(0)
 }
 
 async fn clear_viewers(state: &AppState, address: &str) {
-    if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
-        let _: Result<(), redis::RedisError> =
-            redis::cmd("DEL").arg(viewers_key(address)).query_async(&mut conn).await;
-    }
+    let mut conn = state.redis_conn.clone();
+    let _: Result<(), redis::RedisError> =
+        redis::cmd("DEL").arg(viewers_key(address)).query_async(&mut conn).await;
 }
 
 // ---- responses ------------------------------------------------------------

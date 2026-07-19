@@ -3,6 +3,7 @@ pub mod analytics;
 pub mod chats;
 pub mod creator;
 pub mod discover;
+pub mod distributor;
 pub mod kings;
 pub mod paper;
 pub mod portfolio;

@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: forgepad
       POSTGRES_USER: postgres
@@ -20,6 +21,7 @@ services:
       - ./backend-rs/migrations/2026-07-14-000000_add_direct_pool_type/up.sql:/docker-entrypoint-initdb.d/02-add-direct-pool-type.sql
       - ./backend-rs/migrations/2026-07-17-000000_add_image_style/up.sql:/docker-entrypoint-initdb.d/03-add-image-style.sql
       - ./backend-rs/migrations/2026-07-17-100000_referral_referee_unique/up.sql:/docker-entrypoint-initdb.d/04-referral-referee-unique.sql
+      - ./backend-rs/migrations/2026-07-19-000000_add_distributor_rounds/up.sql:/docker-entrypoint-initdb.d/05-distributor-rounds.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
@@ -28,6 +30,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6380:6379"
     healthcheck:
@@ -40,6 +43,9 @@ services:
     build:
       context: ./backend-rs
       dockerfile: Dockerfile
+    # This host's Docker DNS flakes intermittently; a startup panic (e.g. the
+    # Redis connect) must not leave the API permanently down.
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/forgepad
       REDIS_URL: redis://redis:6379
@@ -75,9 +81,22 @@ services:
       # :3000 = npm-dev frontend, :3002 = the dockerised frontend service below.
       CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,https://fyuz.host-ia.online,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8080"
       # Fusion image generation: "openai" (default) needs OPENAI_API_KEY and fails
-      # loudly without it; localnet.sh sets "mock" so the flow works offline.
+      # loudly without it; "local" runs stable-diffusion.cpp on this host's CPU
+      # against the GGUF below (slow — minutes per image — but free/offline);
+      # localnet.sh sets "mock" so the flow works offline.
       IMAGE_GEN_PROVIDER: ${IMAGE_GEN_PROVIDER:-openai}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # The "openai" provider works against any OpenAI-compatible images API
+      # (Together AI, DeepInfra, …) — point base+model at it and put that
+      # service's key in OPENAI_API_KEY.
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      # BNB paid per leaderboard/bonus point (~0.57% of net volume at $569/BNB;
+      # must stay below the 1% protocol fee or point farming becomes profitable).
+      POINT_REWARD_BNB: ${POINT_REWARD_BNB:-0.00001}
+      SD_MODEL_PATH: ${SD_MODEL_PATH:-/models/sd_turbo-f16-q8_0.gguf}
+      SD_THREADS: ${SD_THREADS:-2}
+      SD_STEPS: ${SD_STEPS:-4}
       API_KEY: hola
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: ${UPLOAD_BASE_URL:-https://api.fyuz.fun/uploads}
@@ -101,6 +120,8 @@ services:
       - "5002:5001"
     volumes:
       - uploads:/app/uploads
+      # GGUF weights for IMAGE_GEN_PROVIDER=local (kept on the host, gitignored).
+      - ./models:/models:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,6 +133,7 @@ services:
   # subdomain (e.g. livekit.fyuz.fun) and enable TURN in livekit/livekit.yaml.
   livekit:
     image: livekit/livekit-server:latest
+    restart: unless-stopped
     command: --config /etc/livekit/livekit.yaml
     environment:
       # Overrides `keys:` in the config file — no secret committed.
@@ -126,6 +148,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -146,6 +169,7 @@ services:
   # the cloudflared tunnel points here and this injects /forgepad/.
   s3-proxy:
     image: nginx:alpine
+    restart: unless-stopped
     ports:
       - "9002:80"
     volumes:
@@ -181,6 +205,7 @@ services:
         NEXT_PUBLIC_BSC_RPC_URL: ${BSC_PUBLIC_RPC_URL:-${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}}
         NEXT_PUBLIC_BSC_CHAIN_ID: ${CHAIN_ID:-56}
         NEXT_PUBLIC_BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://bscscan.com}
+    restart: unless-stopped
     ports:
       # 3001 is taken by another app on this host (crm-hostia-api).
       - "3002:80"

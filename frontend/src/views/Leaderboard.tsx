@@ -67,7 +67,7 @@ export default function Leaderboard() {
                     <EmojiEventsIcon sx={{ fontSize: 26 }} /> The Rankings
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Points = net USD invested (buys − sells). Each point is worth 0.000006 BNB in rewards.
+                    Points = net USD invested (buys − sells) plus bonus points from quests and referrals. Each point is worth 0.00001 BNB in rewards.
                 </Typography>
             </Box>
 

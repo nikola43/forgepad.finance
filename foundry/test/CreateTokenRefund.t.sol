@@ -26,7 +26,7 @@ contract CreateTokenRefundTest is Test {
     address internal user;
     uint256 internal fee;
 
-    // This contract is the configured marginRecipient, so it must accept ETH.
+    // This contract is the LM owner (leftover-BNB sweep target), so it must accept ETH.
     receive() external payable {}
 
     function setUp() public {
@@ -42,7 +42,6 @@ contract CreateTokenRefundTest is Test {
             vm.envOr("UNIVERSAL_ROUTER", 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af),
             vm.envOr("V4_POS_MGR", 0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e),
             PERMIT2_ADDR,
-            address(this),
             address(this),
             10000,
             10000,

@@ -41,8 +41,8 @@ contract FyuzBscPancakeTest is Test {
     address deployer = address(this);
     address trader = address(0xBEEF);
 
-    /// This contract is the feeAddress/distributor/marginRecipient, so it must
-    /// be able to receive BNB or every createToken reverts on the fee transfer.
+    /// This contract is the feeAddress/distributor/owner, so it must be able to
+    /// receive BNB or every createToken reverts on the fee transfer.
     receive() external payable {}
 
     function setUp() public {
@@ -58,7 +58,6 @@ contract FyuzBscPancakeTest is Test {
             V4_DISABLED_SENTINEL,
             V4_DISABLED_SENTINEL,
             PERMIT2,
-            deployer,
             deployer,
             10000,
             10000,
@@ -97,9 +96,9 @@ contract FyuzBscPancakeTest is Test {
         emit log_named_uint("opening virtual mcap (USD, 1e18)", live);
     }
 
-    /// Protocol fee split per buy (1% total): treasury 0.6% + leaderboard 0.2%
-    /// (the 0.8% platform fee, split 3:1 by _payPlatformFee) + creator 0.2%.
-    function test_ProtocolFeeSplit_060_020_020() public {
+    /// Protocol fee split per buy (1% total): treasury 0.5% + leaderboard 0.3%
+    /// (the 0.8% platform fee, split 5:3 by _payPlatformFee) + creator 0.2%.
+    function test_ProtocolFeeSplit_050_030_020() public {
         address treasury = address(0x1111);
         address leaderboard = address(0x2222);
         address buyer = address(0x3333);
@@ -107,8 +106,9 @@ contract FyuzBscPancakeTest is Test {
 
         fyuz.setFeeAddress(treasury);
         fyuz.setDistributorAddress(leaderboard);
-        fyuz.setPlatformBuyFeeBps(80); // 0.6% treasury + 0.2% leaderboard
+        fyuz.setPlatformBuyFeeBps(80); // 0.5% treasury + 0.3% leaderboard
         fyuz.setTokenOwnerFeeBps(20); // 0.2% creator
+        fyuz.setPlatformTreasuryShareBps(6250); // 0.5% treasury / 0.3% leaderboard
 
         vm.prank(trader); // trader becomes pool.owner => the creator
         address token = fyuz.createToken{value: 0.001 ether}(
@@ -119,15 +119,13 @@ contract FyuzBscPancakeTest is Test {
         uint256 lb0 = leaderboard.balance;
         uint256 cr0 = trader.balance; // creator == trader
 
-        uint256 buyAmt = 0.01 ether; // fees divide evenly at 80/20 bps
+        uint256 buyAmt = 0.01 ether; // fees divide evenly at these bps
         vm.prank(buyer);
         fyuz.swapExactETHForTokens{value: buyAmt}(token, buyAmt, 0, block.timestamp + 1);
 
-        assertEq(treasury.balance - tre0, (buyAmt * 60) / 10000, "treasury 0.6%");
-        assertEq(leaderboard.balance - lb0, (buyAmt * 20) / 10000, "leaderboard 0.2%");
+        assertEq(treasury.balance - tre0, (buyAmt * 50) / 10000, "treasury 0.5%");
+        assertEq(leaderboard.balance - lb0, (buyAmt * 30) / 10000, "leaderboard 0.3%");
         assertEq(trader.balance - cr0, (buyAmt * 20) / 10000, "creator 0.2%");
-        // treasury : leaderboard must be exactly 3 : 1
-        assertEq(treasury.balance - tre0, 3 * (leaderboard.balance - lb0), "3:1 split");
     }
 
     /// The curve must actually be ABLE to reach the graduation target on BSC.
@@ -270,5 +268,68 @@ contract FyuzBscPancakeTest is Test {
     function _launched(address token) internal view returns (bool) {
         (, , , , , , , bool launched) = fyuz.tokenPools(token);
         return launched;
+    }
+
+    /// Measures exactly how much of a V2 graduation's raised BNB is diverted to
+    /// marginRecipient vs. seeded into the locked pool. Deploys a fresh instance
+    /// with an ISOLATED marginRecipient (the shared setUp uses `deployer`, which
+    /// also gets fees, so it can't be measured cleanly there).
+    ///
+    /// Proves the raise is not diverted: after removing the mutable
+    /// marginRecipient, any V2-graduation leftover BNB sweeps to owner() and is
+    /// only dust. Uses an ISOLATED owner (dustOwner) so its balance measures the
+    /// leftover exactly. Settles the pre-mainnet audit question (was it ~half
+    /// the raise?): asserts the sweep is under 1% of the graduation BNB.
+    function test_graduationLeavesNoMargin() public {
+        address dustOwner = address(0x9999); // lm owner — receives any leftover
+        address feeSink = address(0x1111);
+
+        FyuzLiquidityManager lm2 = FyuzDeploy.deployLiquidityManager(
+            V2_ROUTER, V3_FACTORY, V3_POSITION_MANAGER,
+            V4_DISABLED_SENTINEL, V4_DISABLED_SENTINEL, V4_DISABLED_SENTINEL,
+            PERMIT2,
+            dustOwner, // owner (also the leftover sweep target)
+            10000, 10000,
+            deployer
+        );
+        // fyuz2 needs the deployer as its owner to run setup, and must authorize.
+        Fyuz fyuz2 = FyuzDeploy.deployFyuz(DATA_FEED, address(lm2), feeSink, feeSink, deployer);
+        vm.prank(dustOwner);
+        lm2.setAuthorizedCaller(address(fyuz2), true);
+        fyuz2.setPlatformBuyFeeBps(80);
+        fyuz2.setPlatformSellFeeBps(80);
+        fyuz2.setTokenOwnerFeeBps(20);
+        fyuz2.setPlatformTreasuryShareBps(6250);
+        fyuz2.setMaxBuyPercent(10000);
+        fyuz2.setMaxSellPercent(10000);
+        fyuz2.setPriceStalenessThreshold(3600);
+
+        vm.startPrank(trader);
+        address token = fyuz2.createToken{value: 0.001 ether}(
+            "Margin", "MRGN", 0, 0, 0, 1, block.timestamp + 1
+        );
+        (, , , , , , , bool launched) = fyuz2.tokenPools(token);
+        for (uint256 i = 0; i < 500 && !launched; i++) {
+            uint256 buyAmt = 0.5 ether;
+            uint256 fee = fyuz2.getFirstBuyFee(token);
+            if (trader.balance <= buyAmt + fee) break;
+            fyuz2.swapExactETHForTokens{value: buyAmt + fee}(token, buyAmt, 0, block.timestamp + 1);
+            (, , , , , , , launched) = fyuz2.tokenPools(token);
+        }
+        vm.stopPrank();
+        assertTrue(launched, "token never graduated");
+
+        address pair = IUniswapV2Factory(V2_FACTORY).getPair(token, WBNB);
+        uint256 pairBNB = IERC20(WBNB).balanceOf(pair); // BNB locked as liquidity
+        uint256 leftoverBNB = dustOwner.balance;        // BNB swept to owner
+        uint256 graduationBNB = pairBNB + leftoverBNB;  // total real BNB at graduation
+
+        emit log_named_decimal_uint("BNB seeded into locked pool", pairBNB, 18);
+        emit log_named_decimal_uint("BNB swept to owner (leftover)", leftoverBNB, 18);
+        uint256 leftoverBps = graduationBNB == 0 ? 0 : (leftoverBNB * 10000) / graduationBNB;
+        emit log_named_uint("leftover share (bps of graduation BNB)", leftoverBps);
+
+        // The raise must go into the pool, not out: leftover under 1%.
+        assertLt(leftoverBps, 100, "graduation diverted a large share of the raise");
     }
 }

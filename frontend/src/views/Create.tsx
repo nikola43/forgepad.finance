@@ -259,6 +259,7 @@ export default function Create() {
   const [createdTokenData, setCreatedTokenData] = React.useState<any>(null);
   const [waitingForDeploy, setWaitingForDeploy] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
+  const [genProgress, setGenProgress] = React.useState(0);
   // Redirect bookkeeping: keep the create button loading until the backend
   // confirms the deployment, then navigate straight to the token page.
   const awaitingDeployRef = React.useRef(false);
@@ -441,9 +442,7 @@ export default function Create() {
     // preview is (usually) ready by the time the user reviews their buy amount.
     if (!avatar || !String(avatar).startsWith("http")) {
       generateFusionImage().catch((err: any) => {
-        // No Regenerate button and the confirm button stays disabled without an
-        // image — tell the user the retry path.
-        toast.error(`${err?.response?.data?.error || err?.message || "Image generation failed"} — close and reopen to retry`);
+        toast.error(`${err?.response?.data?.error || err?.message || "Image generation failed"} — tap Retry on the image`);
       });
     }
   };
@@ -474,14 +473,36 @@ export default function Create() {
           signature,
         }
       );
-      if (!data?.url) throw Error("No image returned");
+      if (!data?.jobId) throw Error("No job id returned");
       // The style actually used (backend picks a random one when the field is
       // blank) — persisted with the token so it can show on the token page.
       styleUsedRef.current = data.style || description.trim();
-      setAvatar(data.url);
-      return data.url as string;
+      // Generation runs as a backend job; poll it for progress until it
+      // resolves. The local CPU provider takes minutes, hence the generous
+      // ceiling. 3s cadence stays well inside the per-IP rate limit.
+      setGenProgress(5);
+      const startedAt = Date.now();
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (Date.now() - startedAt > 600_000) {
+          throw Error("Image generation timed out — please retry");
+        }
+        const { data: job } = await axios.get(
+          `${API_ENDPOINT}/tokens/generate-image/${data.jobId}`
+        );
+        if (job?.status === "failed") {
+          throw Error(job?.error || "Image generation failed");
+        }
+        setGenProgress(Number(job?.progress) || 0);
+        if (job?.status === "done" && job?.url) {
+          if (job.style) styleUsedRef.current = job.style;
+          setAvatar(job.url);
+          return job.url as string;
+        }
+      }
     } finally {
       setGenerating(false);
+      setGenProgress(0);
     }
   };
 
@@ -1013,11 +1034,33 @@ export default function Create() {
             >
               {avatar && String(avatar).startsWith("http") ? (
                 <img src={avatar} alt="fused character" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: generating ? 0.4 : 1 }} />
+              ) : generating ? (
+                <Box display="flex" flexDirection="column" alignItems="center" gap="6px">
+                  <Box className="fyuz-loader"><span className="fyuz-loader__disc fyuz-loader__disc--a" /><span className="fyuz-loader__disc fyuz-loader__disc--b" /></Box>
+                  <Typography fontSize={12} fontFamily="var(--font-data)" color="rgba(234,230,218,0.7)">
+                    {genProgress}%
+                  </Typography>
+                </Box>
               ) : (
-                <Box className="fyuz-loader"><span className="fyuz-loader__disc fyuz-loader__disc--a" /><span className="fyuz-loader__disc fyuz-loader__disc--b" /></Box>
+                <Button
+                  size="small"
+                  color="secondary"
+                  onClick={() => {
+                    generateFusionImage().catch((err: any) => {
+                      toast.error(err?.response?.data?.error || err?.message || "Image generation failed");
+                    });
+                  }}
+                >
+                  Retry
+                </Button>
               )}
               {generating && avatar && String(avatar).startsWith("http") && (
-                <CircularProgress size={28} sx={{ position: "absolute", color: "var(--citron)" }} />
+                <CircularProgress
+                  size={28}
+                  variant={genProgress > 0 ? "determinate" : "indeterminate"}
+                  value={genProgress}
+                  sx={{ position: "absolute", color: "var(--citron)" }}
+                />
               )}
             </Box>
           </Box>
@@ -1122,7 +1165,7 @@ export default function Create() {
                 ? "Confirming on-chain..."
                 : "Creating token..."
               : generating
-                ? "Fusing image..."
+                ? `Fusing image... ${genProgress > 0 ? `${genProgress}%` : ""}`.trim()
                 : "Book the bout"}
           </Button>
         </DialogActions>

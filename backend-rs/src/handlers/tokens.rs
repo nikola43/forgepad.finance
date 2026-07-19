@@ -871,19 +871,42 @@ pub struct GenerateImageBody {
     pub signature: String,
 }
 
+/// Write an image-generation job's state to Redis. 15 min TTL — jobs are
+/// polled immediately and never revisited after they resolve.
+async fn set_image_job(
+    state: &AppState,
+    job_id: &str,
+    value: &serde_json::Value,
+) -> Result<(), redis::RedisError> {
+    let mut conn = state.redis_conn.clone();
+    redis::cmd("SET")
+        .arg(format!("img_job:{job_id}"))
+        .arg(value.to_string())
+        .arg("EX")
+        .arg(900)
+        .query_async(&mut conn)
+        .await
+}
+
 /// POST /tokens/generate-image
 ///
 /// Fyuz's create flow: instead of uploading a logo, the creator names two
 /// characters. The backend generates a single fused character image (OpenAI
-/// gpt-image-1), stores it on our own S3, and returns the URL — so the browser
-/// never sees the OpenAI key and the image is served from our bucket, not a
-/// short-lived provider URL.
+/// gpt-image-1), stores it on our own S3 — so the browser never sees the
+/// OpenAI key and the image is served from our bucket, not a short-lived
+/// provider URL.
+///
+/// ASYNC JOB: gpt-image-1 takes 30-60s, long enough that proxies and impatient
+/// clients drop the request. This endpoint validates, enqueues the work on a
+/// background task, and returns a `jobId` immediately; the client polls
+/// GET /tokens/generate-image/{jobId} for progress and the final URL.
 ///
 /// Auth: this is a PAID path (each call spends OpenAI credits), so it requires a
 /// fresh, single-use wallet signature — NOT a shared api-key. The old api-key
 /// gate used a constant that had to be shipped to the browser, making the paid
 /// endpoint anonymously reachable. A per-call signature ties every generation to
 /// a real wallet and is replay-protected; the per-IP rate limiter bounds volume.
+/// The status poll is unauthenticated but keyed by an unguessable UUID.
 pub async fn generate_image(
     State(state): State<Arc<AppState>>,
     Json(body): Json<GenerateImageBody>,
@@ -910,21 +933,136 @@ pub async fn generate_image(
     }
 
     let style = crate::services::image_gen::resolve_style(body.style.as_deref());
-    let img =
-        crate::services::image_gen::generate_fusion(c1, c2, body.name.as_deref(), &style.clause)
-            .await
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Image generation failed: {e}")))?;
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let style_label = style.label.clone();
 
-    let (url, key) = store_image_bytes(&state, &img.bytes, img.ext, img.content_type).await?;
+    // Seed the job BEFORE returning the id so the first poll can never 404.
+    // Fail-closed if Redis is down: better to refuse than to hand out a job id
+    // whose progress can never be tracked.
+    set_image_job(
+        &state,
+        &job_id,
+        &serde_json::json!({ "status": "queued", "progress": 0, "style": style_label }),
+    )
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Job store unavailable: {e}")))?;
+
+    {
+        let state = state.clone();
+        let job_id = job_id.clone();
+        let c1 = c1.to_string();
+        let c2 = c2.to_string();
+        let name = body.name.clone();
+        tokio::spawn(async move {
+            let _ = set_image_job(
+                &state,
+                &job_id,
+                &serde_json::json!({ "status": "generating", "progress": 10, "style": style.label }),
+            )
+            .await;
+
+            let gen = crate::services::image_gen::generate_fusion(
+                &c1,
+                &c2,
+                name.as_deref(),
+                &style.clause,
+            );
+            tokio::pin!(gen);
+            // The provider reports nothing until it finishes, so nudge progress
+            // on a timer (10 → 80) to give the poller visible movement. Paced
+            // for the slowest provider (local CPU: minutes) — reaches 80 after
+            // ~3.5 min; OpenAI (~30-60s) finishes around a third of the way.
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(3));
+            ticker.tick().await; // consume the immediate first tick
+            let mut progress = 10u32;
+            let img = loop {
+                tokio::select! {
+                    res = &mut gen => break res,
+                    _ = ticker.tick() => {
+                        if progress < 80 {
+                            progress += 1;
+                            let _ = set_image_job(
+                                &state,
+                                &job_id,
+                                &serde_json::json!({ "status": "generating", "progress": progress, "style": style.label }),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            };
+
+            let result = match img {
+                Ok(img) => {
+                    let _ = set_image_job(
+                        &state,
+                        &job_id,
+                        &serde_json::json!({ "status": "uploading", "progress": 90, "style": style.label }),
+                    )
+                    .await;
+                    store_image_bytes(&state, &img.bytes, img.ext, img.content_type)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{e}"))
+                }
+                Err(e) => Err(anyhow::anyhow!("Image generation failed: {e}")),
+            };
+
+            let final_state = match result {
+                Ok((url, key)) => serde_json::json!({
+                    "status": "done",
+                    "progress": 100,
+                    "url": url,
+                    "key": key,
+                    // The style actually used (canonical label when curated/
+                    // auto-picked) so the client can persist it with the token.
+                    "style": style.label,
+                }),
+                Err(e) => {
+                    tracing::error!("Image job {job_id} failed: {e}");
+                    serde_json::json!({ "status": "failed", "error": e.to_string(), "style": style.label })
+                }
+            };
+            let _ = set_image_job(&state, &job_id, &final_state).await;
+        });
+    }
 
     Ok(Json(serde_json::json!({
         "success": true,
-        "url": url,
-        "key": key,
-        // The style actually used (canonical label when curated/auto-picked) so
-        // the client can persist it with the token.
-        "style": style.label,
+        "jobId": job_id,
+        "style": style_label,
     })))
+}
+
+/// GET /tokens/generate-image/{jobId}
+///
+/// Poll an image-generation job. Returns the raw job state:
+/// `{status: queued|generating|uploading|done|failed, progress, url?, key?, error?, style}`.
+/// 404 once the job expires (15 min) or was never created.
+pub async fn generate_image_status(
+    State(state): State<Arc<AppState>>,
+    Path(job_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    // Job ids are our own UUIDs — reject anything else before it becomes a
+    // Redis key fragment.
+    if job_id.len() > 64
+        || !job_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        return Err(AppError::BadRequest("Invalid job id".to_string()));
+    }
+
+    let mut conn = state.redis_conn.clone();
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(format!("img_job:{job_id}"))
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Job store unavailable: {e}")))?;
+
+    let raw = raw.ok_or_else(|| AppError::NotFound("Job not found or expired".to_string()))?;
+    let job: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Corrupt job state: {e}")))?;
+    Ok(Json(job))
 }
 
 // ---------------------------------------------------------------------------

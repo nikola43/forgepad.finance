@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
     Avatar, Box, Button, CircularProgress, IconButton, Tab, Tabs,
@@ -36,6 +36,7 @@ import { ProfileSkeleton, ListSkeleton } from "@/components/Skeleton"
 import EmptyStateComponent from "@/components/EmptyState"
 import { useUserProfile } from "@/hooks/user"
 import { useRewards } from "@/hooks/rewards"
+import { useReferralSummary } from "@/hooks/referrals"
 import { useHandlers } from "@/hooks/token"
 import { useMainContext } from "@/context"
 import { API_ENDPOINT } from "@/config"
@@ -265,6 +266,8 @@ export default function Profile() {
 
     const { profile, reloadProfile } = useUserProfile(profileAddress)
     const { rewards: profileRewards } = useRewards(profileAddress)
+    const { summary: referralSummary } = useReferralSummary(profileAddress)
+    const router = useRouter()
 
     const [tab, setTab] = useState(0)
     const [editing, setEditing] = useState(false)
@@ -623,7 +626,7 @@ export default function Profile() {
                         <Typography fontSize={20} fontWeight={700} color="var(--bone)" fontFamily="var(--font-display)">
                             {profile?.tokens?.length ?? 0}
                         </Typography>
-                        <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Bouts Booked</Typography>
+                        <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Tokens Created</Typography>
                     </StatBox>
                     <StatBox className="animate-fade-in" clickable={1} onClick={() => setTab(1)} sx={{
                         transition: 'all 0.2s ease',
@@ -657,6 +660,18 @@ export default function Profile() {
                             {profile?.followeeCount ?? profile?.followees?.length ?? 0}
                         </Typography>
                         <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Following</Typography>
+                    </StatBox>
+                    <StatBox
+                        className="animate-fade-in"
+                        clickable={isOwnProfile ? 1 : 0}
+                        onClick={isOwnProfile ? () => router.push('/referrals') : undefined}
+                        title={isOwnProfile ? 'Open your referral link — every referred trader earns you +25 points' : undefined}
+                        sx={isOwnProfile ? { transition: 'all 0.2s ease', '&:hover': { borderColor: 'rgba(191,209,67,0.3)' } } : undefined}
+                    >
+                        <Typography fontSize={20} fontWeight={700} color="var(--bone)" fontFamily="var(--font-display)">
+                            {referralSummary?.referralCount ?? 0}
+                        </Typography>
+                        <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">Referrals</Typography>
                     </StatBox>
                     <StatBox className="animate-fade-in" clickable={0}>
                         <Typography fontSize={20} fontWeight={700} color="#BFD143" fontFamily="var(--font-data)">

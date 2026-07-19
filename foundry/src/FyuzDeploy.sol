@@ -22,7 +22,6 @@ library FyuzDeploy {
         address universalRouter,
         address v4PositionManager,
         address permit2,
-        address marginRecipient,
         address owner,
         uint16 ethAmountPercentToLP,
         uint16 tokenAmountPercentToLP,
@@ -39,7 +38,6 @@ library FyuzDeploy {
                 universalRouter,
                 v4PositionManager,
                 permit2,
-                marginRecipient,
                 owner,
                 ethAmountPercentToLP,
                 tokenAmountPercentToLP

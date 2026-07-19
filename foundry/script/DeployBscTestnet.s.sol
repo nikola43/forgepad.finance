@@ -103,7 +103,6 @@ contract DeployFyuzBscTestnet is Script {
             V4_DISABLED_SENTINEL, // _universalRouter  (stored, never called)
             V4_DISABLED_SENTINEL, // _v4PositionManager(V4 gated off in Fyuz)
             PERMIT2,
-            deployer, // _marginRecipient (leftover tBNB at graduation)
             deployer, // _owner
             10000, // 100% BNB to LP
             10000, // 100% tokens to LP

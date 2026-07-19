@@ -161,16 +161,7 @@ pub async fn verify_signed_action(
     let key = format!("sig_nonce:{}", hex::encode(hasher.finalize()));
     let ttl_secs = (SIGNATURE_MAX_AGE_MS / 1000) + 60;
 
-    let mut conn = state
-        .redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| {
-            tracing::error!("Redis unavailable for nonce check (fail-closed): {e}");
-            AppError::Internal(anyhow::anyhow!(
-                "Anti-replay store unavailable; try again shortly"
-            ))
-        })?;
+    let mut conn = state.redis_conn.clone();
 
     // SET key 1 NX EX ttl -> Some on first use, None if it already exists.
     let res: Option<String> = redis::cmd("SET")

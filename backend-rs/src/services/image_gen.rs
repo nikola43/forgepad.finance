@@ -136,12 +136,90 @@ pub async fn generate_fusion(
     match provider.as_str() {
         "mock" => generate_mock(character1, character2, style_clause).await,
         "openai" => generate_openai(character1, character2, name, style_clause).await,
+        "local" => generate_local(character1, character2, name, style_clause).await,
         other => Err(anyhow!("Unknown IMAGE_GEN_PROVIDER: {other}")),
     }
 }
 
-/// OpenAI Images API — gpt-image-1. The model always returns base64 (no url
-/// option), so we decode b64_json into PNG bytes.
+/// Local CPU generation via stable-diffusion.cpp (the `sd` CLI baked into the
+/// backend image), tuned for SD-Turbo-class models: few steps, cfg 1.0, 512px.
+///
+/// Serialized through a global permit: this host has 2 vCPUs and ~4 GB of
+/// headroom, so a second concurrent generation would OOM-fight the model
+/// (~2 GB resident) and double both jobs' latency. Queued jobs simply wait —
+/// the job poller keeps reporting progress to the client meanwhile.
+async fn generate_local(
+    character1: &str,
+    character2: &str,
+    name: Option<&str>,
+    style_clause: &str,
+) -> Result<GeneratedImage> {
+    static PERMIT: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+    let _permit = PERMIT.acquire().await.expect("semaphore is never closed");
+
+    let model = std::env::var("SD_MODEL_PATH")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .context("SD_MODEL_PATH is not set — cannot generate token image locally")?;
+    let bin = std::env::var("SD_BIN").unwrap_or_else(|_| "sd".to_string());
+    let steps = std::env::var("SD_STEPS").unwrap_or_else(|_| "4".to_string());
+    let threads = std::env::var("SD_THREADS").unwrap_or_else(|_| "2".to_string());
+    let size = std::env::var("SD_SIZE").unwrap_or_else(|_| "512".to_string());
+
+    // CLIP reads 77 tokens per chunk and turbo models follow the leading
+    // tokens best; fusion_prompt already puts the fusion sentence before the
+    // paragraph-length style clause, which is the right order here too.
+    let prompt = fusion_prompt(character1, character2, name, style_clause);
+
+    let out = std::env::temp_dir().join(format!("sd-{}.png", uuid::Uuid::new_v4()));
+    let out_path = out.to_str().context("temp path is not valid UTF-8")?.to_string();
+
+    let run = tokio::process::Command::new(&bin)
+        .args([
+            "-m", &model,
+            "-p", &prompt,
+            "--steps", &steps,
+            "--cfg-scale", "1.0",
+            "-W", &size,
+            "-H", &size,
+            "-t", &threads,
+            "--seed", "-1",
+            "-o", &out_path,
+        ])
+        .output();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(900), run)
+        .await
+        .map_err(|_| anyhow!("local image generation timed out after 15 minutes"))?
+        .context("failed to run sd (stable-diffusion.cpp)")?;
+
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        let tail = stderr.lines().rev().take(5).collect::<Vec<_>>();
+        let tail = tail.into_iter().rev().collect::<Vec<_>>().join(" | ");
+        return Err(anyhow!("sd exited with {}: {tail}", result.status));
+    }
+
+    let bytes = tokio::fs::read(&out)
+        .await
+        .context("sd reported success but produced no output image")?;
+    let _ = tokio::fs::remove_file(&out).await;
+    Ok(GeneratedImage {
+        bytes,
+        ext: "png",
+        content_type: "image/png",
+    })
+}
+
+/// OpenAI-compatible Images API. Works against real OpenAI (gpt-image-1) and
+/// against compatible serverless providers (Together AI, DeepInfra, …) serving
+/// open models like FLUX schnell — select via OPENAI_API_BASE +
+/// OPENAI_IMAGE_MODEL. Provider quirks handled here:
+///   - real OpenAI: always returns b64_json; accepts the proprietary
+///     "moderation" param (needed — fusions name real public figures).
+///   - compatible providers: default to returning a URL, so we request
+///     b64_json explicitly and still accept a URL response as fallback;
+///     unknown params like "moderation" can be rejected, so it's only sent
+///     to api.openai.com.
 async fn generate_openai(
     character1: &str,
     character2: &str,
@@ -156,6 +234,7 @@ async fn generate_openai(
         .unwrap_or_else(|_| "https://api.openai.com/v1".to_string());
     let model =
         std::env::var("OPENAI_IMAGE_MODEL").unwrap_or_else(|_| "gpt-image-1".to_string());
+    let is_real_openai = base.contains("api.openai.com");
 
     let prompt = fusion_prompt(character1, character2, name, style_clause);
 
@@ -167,18 +246,23 @@ async fn generate_openai(
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
+    let mut req_body = json!({
+        "model": model,
+        "prompt": prompt,
+        "n": 1,
+        "size": "1024x1024",
+    });
+    if is_real_openai {
+        // Fusions name real public figures; default moderation rejects most
+        // of those outright. "low" is the documented relaxed tier.
+        req_body["moderation"] = json!("low");
+    } else {
+        req_body["response_format"] = json!("b64_json");
+    }
     let resp = client
         .post(format!("{base}/images/generations"))
         .bearer_auth(&api_key)
-        .json(&json!({
-            "model": model,
-            "prompt": prompt,
-            "n": 1,
-            "size": "1024x1024",
-            // Fusions name real public figures; default moderation rejects most
-            // of those outright. "low" is the documented relaxed tier.
-            "moderation": "low",
-        }))
+        .json(&req_body)
         .send()
         .await
         .context("OpenAI image request failed")?;
@@ -200,16 +284,32 @@ async fn generate_openai(
         return Err(anyhow!("OpenAI image generation failed ({status}): {msg}"));
     }
 
-    let b64 = body
+    let first = body
         .get("data")
         .and_then(|d| d.get(0))
-        .and_then(|d| d.get("b64_json"))
-        .and_then(|b| b.as_str())
-        .context("OpenAI image response missing data[0].b64_json")?;
+        .context("image response missing data[0]")?;
 
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(b64)
-        .context("Failed to decode base64 image from OpenAI")?;
+    let bytes = if let Some(b64) = first.get("b64_json").and_then(|b| b.as_str()) {
+        base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .context("Failed to decode base64 image")?
+    } else if let Some(url) = first.get("url").and_then(|u| u.as_str()) {
+        // Some compatible providers return a short-lived URL even when
+        // b64_json was requested — fetch it before it expires.
+        client
+            .get(url)
+            .send()
+            .await
+            .context("failed to fetch generated image url")?
+            .error_for_status()
+            .context("generated image url returned an error")?
+            .bytes()
+            .await
+            .context("generated image url had no body")?
+            .to_vec()
+    } else {
+        return Err(anyhow!("image response has neither b64_json nor url"));
+    };
 
     Ok(GeneratedImage {
         bytes,

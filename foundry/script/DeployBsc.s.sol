@@ -80,25 +80,52 @@ contract DeployFyuzBsc is Script {
     // dynamically, so 8 decimals is handled.
     address constant DATA_FEED = 0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE;
 
+    // Definitive protocol treasury — receives the 0.5% treasury fee stream.
+    address constant TREASURY = 0xFD84d752ca76C0C74EF13902ed388f2f9530E8B1;
+
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         require(pk != 0, "Set PRIVATE_KEY env var");
+        // The hardcoded addresses below (router, factory, price feed) are BSC
+        // MAINNET. Guard the chain so a mis-set RPC can't deploy this config to
+        // the wrong network.
+        require(block.chainid == 56, "DeployBsc targets BSC mainnet (56)");
         address deployer = vm.addr(pk);
 
         // Robinhood's DISTRIBUTOR is a contract deployed on Robinhood Chain; it
         // does not exist on BSC, so it must not be copied over. Fyuz.initialize
         // rejects a zero distributor, and distributorAddress receives ETH
         // (_transferETHTolerant) on every fee split — default it to the deployer
-        // and override once a real Distributor is deployed to BSC.
-        address distributor = vm.envOr("DISTRIBUTOR", deployer);
+        // The 0.3% leaderboard stream MUST reach the deployed Distributor
+        // contract — deploy it first and pass its address. No silent fallback
+        // to the deployer, which would quietly divert the leaderboard rewards.
+        address distributor = vm.envAddress("DISTRIBUTOR");
+        require(distributor != address(0) && distributor != deployer, "Set DISTRIBUTOR to the deployed Distributor");
+
+        // Gnosis Safe multisig that receives ALL admin power: both ProxyAdmins
+        // (upgrade authority), both contract owners, the treasury fee stream,
+        // and the graduation margin. No timelock (per deploy decision) — the
+        // multisig threshold is the only guard on upgrades, so use a high one.
+        address multisig = vm.envAddress("MULTISIG");
+        require(multisig != address(0), "Set MULTISIG (Gnosis Safe) env var");
+        require(multisig != deployer, "MULTISIG must not be the deployer EOA");
+        // Treasury for the 0.5% fee stream and the graduation margin. Defaults
+        // to the definitive TREASURY constant; overridable via env for testing.
+        address treasury = vm.envOr("TREASURY", TREASURY);
+        require(treasury != address(0), "treasury unset");
 
         console.log("Deployer:", deployer);
+        console.log("Multisig:", multisig);
+        console.log("Treasury:", treasury);
         console.log("Balance :", deployer.balance / 1e18, "BNB");
         console.log("ChainId :", block.chainid);
 
         vm.startBroadcast(pk);
 
         // V2 + V3 wired to PancakeSwap; V4 slots take the disabled sentinel.
+        // ProxyAdmin owner = multisig immediately (the upgrade key never needs
+        // to be the deployer). Contract owner = deployer for now so this script
+        // can finish setup, then handed to the multisig at the end.
         FyuzLiquidityManager lm = FyuzDeploy.deployLiquidityManager(
             V2_ROUTER,
             V3_FACTORY,
@@ -107,29 +134,33 @@ contract DeployFyuzBsc is Script {
             V4_DISABLED_SENTINEL, // _universalRouter  (stored, never called)
             V4_DISABLED_SENTINEL, // _v4PositionManager(V4 gated off in Fyuz)
             PERMIT2,
-            deployer, // _marginRecipient (leftover BNB at graduation)
-            deployer, // _owner
+            deployer, // _owner (transferred to multisig at end of run)
             10000, // 100% BNB to LP
             10000, // 100% tokens to LP
-            deployer
+            multisig // _proxyAdminOwner (upgrade authority)
         );
         console.log("FyuzLiquidityManager:", address(lm));
 
         Fyuz fyuz = FyuzDeploy.deployFyuz(
             DATA_FEED,
             address(lm),
-            deployer, // _feeAddress
-            distributor, // _distributorAddress
-            deployer
+            treasury, // _feeAddress (0.6% treasury stream)
+            distributor, // _distributorAddress (0.2% leaderboard stream)
+            multisig // _proxyAdminOwner (upgrade authority)
         );
         console.log("Fyuz:", address(fyuz));
 
         // Authorize Fyuz to drive the liquidity manager at graduation.
         lm.setAuthorizedCaller(address(fyuz), true);
 
-        // 1% buy / 1% sell (100 bps), full buy/sell size allowed.
-        fyuz.setPlatformBuyFeeBps(100);
-        fyuz.setPlatformSellFeeBps(100);
+        // Definitive fee model: 1% total per trade = 0.5% treasury + 0.3%
+        // leaderboard + 0.2% creator. The platform bps is 80, split 5:3 by
+        // _payPlatformFee (80 * 5/8 = 50 → 0.5% treasury, 80 * 3/8 = 30 → 0.3%
+        // leaderboard); the creator's 0.2% is the separate 20 token-owner bps.
+        fyuz.setPlatformBuyFeeBps(80);
+        fyuz.setPlatformSellFeeBps(80);
+        fyuz.setTokenOwnerFeeBps(20);
+        fyuz.setPlatformTreasuryShareBps(6250); // 62.5% → 0.5% treasury / 0.3% leaderboard
         fyuz.setMaxBuyPercent(10000);
         fyuz.setMaxSellPercent(10000);
 
@@ -142,7 +173,28 @@ contract DeployFyuzBsc is Script {
         // than relying on the initializer default so the intent is auditable.
         fyuz.setPriceStalenessThreshold(3600);
 
+        // Hand both contract owners to the multisig now that setup is done.
+        // (ProxyAdmin owners were already the multisig from construction.)
+        lm.transferOwnership(multisig);
+        fyuz.transferOwnership(multisig);
+
         vm.stopBroadcast();
+
+        // Post-deploy assertions — fail the run rather than ship a misconfig.
+        require(fyuz.owner() == multisig, "Fyuz owner != multisig");
+        require(lm.owner() == multisig, "LM owner != multisig");
+        require(_proxyAdmin(address(fyuz)) != address(0), "Fyuz ProxyAdmin unset");
+        // Note: ProxyAdmin owner is the multisig (set at construction); verify
+        // off-chain that ProxyAdmin(_proxyAdmin(fyuz)).owner() == multisig.
+        require(fyuz.feeAddress() == treasury, "feeAddress != treasury");
+        require(fyuz.distributorAddress() == distributor, "distributor mismatch");
+        require(fyuz.PLATFORM_BUY_FEE_BPS() == 80, "buy fee != 80");
+        require(fyuz.PLATFORM_SELL_FEE_BPS() == 80, "sell fee != 80");
+        require(fyuz.TOKEN_OWNER_FEE_BPS() == 20, "creator fee != 20");
+        require(fyuz.platformTreasuryShareBps() == 6250, "treasury share != 6250");
+        require(fyuz.priceStalenessThreshold() == 3600, "staleness != 3600");
+        // The deployer EOA must retain zero on-chain power after this run.
+        require(fyuz.owner() != deployer && lm.owner() != deployer, "deployer still owner");
 
         console.log("");
         console.log("=================================================");
