@@ -80,17 +80,24 @@ services:
       PORT: "5001"
       # :3000 = npm-dev frontend, :3002 = the dockerised frontend service below.
       CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,https://fyuz.host-ia.online,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8080"
-      # Fusion image generation: "openai" (default) needs OPENAI_API_KEY and fails
-      # loudly without it; "local" runs stable-diffusion.cpp on this host's CPU
-      # against the GGUF below (slow — minutes per image — but free/offline);
-      # localnet.sh sets "mock" so the flow works offline.
+      # Fusion image generation: "openai" (default) drives any OpenAI-compatible
+      # Images API and fails loudly without OPENAI_API_KEY; "local" runs
+      # stable-diffusion.cpp on this host's CPU against the GGUF below (slow —
+      # minutes per image — but free/offline); localnet.sh sets "mock" so the
+      # flow works offline.
       IMAGE_GEN_PROVIDER: ${IMAGE_GEN_PROVIDER:-openai}
+      # Default provider is Together AI's gpt-image-1.5. OPENAI_API_KEY holds the
+      # bearer token for whichever base is set — put your Together API key here.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # The "openai" provider works against any OpenAI-compatible images API
-      # (Together AI, DeepInfra, …) — point base+model at it and put that
-      # service's key in OPENAI_API_KEY.
-      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
-      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.together.xyz/v1}
+      # Model for text-only fusions (no reference photo found).
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-openai/gpt-image-1.5}
+      # Model used when Wikipedia reference portraits ARE found (blends real
+      # faces via reference_images — far better likeness).
+      OPENAI_IMAGE_MODEL_REF: ${OPENAI_IMAGE_MODEL_REF:-openai/gpt-image-1.5}
+      # Square output edge in px. Leave OPENAI_IMAGE_STEPS unset for gpt-image-1.5
+      # (it rejects "steps"); set ~28 only for models like gpt-image-2.
+      OPENAI_IMAGE_SIZE: ${OPENAI_IMAGE_SIZE:-1024}
       # BNB paid per leaderboard/bonus point (~0.57% of net volume at $569/BNB;
       # must stay below the 1% protocol fee or point farming becomes profitable).
       POINT_REWARD_BNB: ${POINT_REWARD_BNB:-0.00001}

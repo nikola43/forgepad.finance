@@ -53,7 +53,7 @@ import { socket } from "@/utils/socket";
 
 // Minimum opening buy per launch, in USD, converted to BNB at confirm time via
 // the contract's Chainlink feed. 0 = no mandatory buy (opening buy optional).
-const MIN_CREATE_BUY_USD = 0;
+const MIN_CREATE_BUY_USD = 10;
 
 // Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`
@@ -1010,7 +1010,7 @@ export default function Create() {
         aria-describedby="alert-dialog-slide-description"
       >
         <DialogTitle>
-          {isDirectLaunch ? "Make a match" : "Buy now"}
+          {isDirectLaunch ? "Make a match" : "Create Token"}
           <IconButton aria-label="close" onClick={handleClose}>
             <CloseIcon />
           </IconButton>
@@ -1166,7 +1166,7 @@ export default function Create() {
                 : "Creating token..."
               : generating
                 ? `Fusing image... ${genProgress > 0 ? `${genProgress}%` : ""}`.trim()
-                : "Book the bout"}
+                : "Let's go"}
           </Button>
         </DialogActions>
         {
