@@ -19,7 +19,7 @@ runs = 256
 
 # Fork configuration
 [rpc_endpoints]
-bsc = "https://bsc-rpc.publicnode.com"
+bsc = "https://bsc-dataseed.bnbchain.org"
 bsc_backup = "https://bsc-dataseed1.defibit.io"
 bsc_testnet = "https://bsc-testnet-rpc.publicnode.com"
 sepolia = "https://ethereum-sepolia-rpc.publicnode.com"

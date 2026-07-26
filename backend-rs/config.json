@@ -1,0 +1,34 @@
+{
+  "chains": [
+    {
+      "name": "BNB Smart Chain",
+      "network": "bsc",
+      "chainId": 56,
+      "currency": "BNB",
+      "rpcUrl": "https://bsc-dataseed.bnbchain.org",
+      "wsUrl": "wss://bsc-ws-node.nariox.org",
+      "explorerUrl": "https://bscscan.com",
+      "contractAddress": "0xF6B950BB390E046B5e778Cf840Fc800F33E8898b",
+      "virtualEthAmount": 8.25,
+      "virtualTokenAmount": 1073000000.0,
+      "totalSupply": 1000000000.0,
+      "targetMarketCap": 30000.0,
+      "pools": ["pancakeswap:v2", "pancakeswap:v3"]
+    },
+    {
+      "name": "Robinhood Chain",
+      "network": "robinhood",
+      "chainId": 4663,
+      "currency": "ETH",
+      "rpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+      "wsUrl": "wss://feed.mainnet.chain.robinhood.com",
+      "explorerUrl": "https://robinhoodchain.blockscout.com",
+      "contractAddress": "0x750F04fE9A9a13Df768B5F6C94bfCf98A34fe96B",
+      "virtualEthAmount": 8.25,
+      "virtualTokenAmount": 1073000000.0,
+      "totalSupply": 1000000000.0,
+      "targetMarketCap": 30000.0,
+      "pools": ["uniswap:v2", "uniswap:v3"]
+    }
+  ]
+}

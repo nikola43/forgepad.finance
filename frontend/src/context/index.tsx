@@ -17,72 +17,34 @@ import axios from "axios";
 import { ethers } from "ethers";
 import { SWRConfig } from "swr";
 import Loading from "@/components/loading";
-import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
 import {
-  solana,
-  bitcoin,
-  base,
   bsc,
-  bscTestnet,
   defineChain,
 } from "@reown/appkit/networks";
 import { projectId } from "@/config";
 import { WagmiProvider } from "wagmi";
 
-// BNB Smart Chain (BNB gas token). Built from appkit's ready-made `bsc` network
-// so the canonical metadata (name, BNB nativeCurrency, BscScan, multicall3)
-// comes from upstream; we override the RPC/explorer so they can point at a
-// private node, and the chain id so a localnet can run beside real BSC.
-// 56 = real BSC mainnet, 97 = the canonical BSC testnet, any other id = a local
-// anvil fork. A localnet MUST override the id: an anvil BSC fork still reports
-// whatever chain id it was started with, and if that id is 56 the wallet matches
-// it to its own built-in BSC network and silently routes transactions to MAINNET
-// instead of the fork. A distinct id keeps real funds out of reach.
-const bscChainId = Number(process.env.NEXT_PUBLIC_BSC_CHAIN_ID ?? 56);
-const isBscTestnet = bscChainId === 97;
-const isLocalnet = bscChainId !== 56 && !isBscTestnet;
+const robinhoodChainId = Number(process.env.NEXT_PUBLIC_ROBINHOOD_CHAIN_ID ?? 4663);
+const robinhoodRpcUrl = process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com";
+const robinhoodExplorerUrl = process.env.NEXT_PUBLIC_ROBINHOOD_EXPLORER_URL || "https://robinhoodchain.blockscout.com";
 
-// Build on the matching upstream network so canonical metadata (BNB currency,
-// explorer, multicall3) is correct for the target chain.
-const baseChain = isBscTestnet ? bscTestnet : bsc;
-
-const bscRpcUrl =
-  process.env.NEXT_PUBLIC_BSC_RPC_URL ||
-  (isBscTestnet
-    ? "https://bsc-testnet-rpc.publicnode.com"
-    : "https://bsc-dataseed.bnbchain.org");
-const bscExplorerUrl =
-  process.env.NEXT_PUBLIC_BSC_EXPLORER_URL ||
-  (isBscTestnet ? "https://testnet.bscscan.com" : "https://bscscan.com");
-
-const ethNetwork = defineChain({
-  ...baseChain,
-  id: bscChainId,
-  name: isBscTestnet
-    ? "BNB Smart Chain Testnet"
-    : isLocalnet
-      ? `BNB Smart Chain (localnet ${bscChainId})`
-      : bsc.name,
-  // The upstream export is a plain viem chain; defineChain needs the CAIP fields
-  // added on top.
+const robinhoodNetwork = defineChain({
+  id: robinhoodChainId,
+  name: "Robinhood Chain",
   chainNamespace: "eip155",
-  caipNetworkId: `eip155:${bscChainId}`,
+  caipNetworkId: `eip155:${robinhoodChainId}`,
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
   rpcUrls: {
-    ...baseChain.rpcUrls,
-    default: { http: [bscRpcUrl] },
+    default: { http: [robinhoodRpcUrl] },
   },
   blockExplorers: {
-    ...baseChain.blockExplorers,
-    default: {
-      ...baseChain.blockExplorers?.default,
-      name: baseChain.blockExplorers?.default?.name ?? "BscScan",
-      url: bscExplorerUrl,
-    },
+    default: { name: "Robinhood Explorer", url: robinhoodExplorerUrl },
   },
-  // Real BSC/testnet have a real explorer + multicall3; a local fork has neither
-  // of its own, but the inherited multicall3 address exists in forked state.
-  testnet: isLocalnet || isBscTestnet,
+  testnet: false,
 });
 
 const theme = createTheme({
@@ -154,15 +116,12 @@ interface MainContextProps {
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [ethNetwork],
-  // networks: [localhost, mainnet, base, bsc, solana]
+  networks: [bsc, robinhoodNetwork],
 });
-const ethersAdapter = new EthersAdapter();
-const solanaAdapter = new SolanaAdapter();
 const appKit = createAppKit({
-  adapters: [wagmiAdapter, solanaAdapter],
+  adapters: [wagmiAdapter],
   projectId,
-  networks: [ethNetwork],
+  networks: [bsc, robinhoodNetwork],
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
   themeMode: "dark",
@@ -173,7 +132,7 @@ const appKit = createAppKit({
   // },
   enableReconnect: true,
   enableWalletGuide: false,
-  defaultAccountTypes: { eip155: "eoa", solana: "eoa" },
+  defaultAccountTypes: { eip155: "eoa" },
   themeVariables: {
     "--w3m-accent": "#BFD143",
     "--w3m-font-family": "'Space Grotesk', Helvetica, Arial, sans-serif",

@@ -63,17 +63,19 @@ pub async fn start_listener(state: Arc<AppState>, chain: ChainConfig) {
         }
     };
 
-    // Optional Distributor address. When set, the listener also watches it for
-    // RoundDistributed and records the paid round (which advances the leaderboard
-    // epoch, clearing points/leaderboard). Absent/blank = feature off, indexing
-    // proceeds exactly as before.
-    let distributor_address: Option<Address> = std::env::var("DISTRIBUTOR_ADDRESS")
+    // Optional Distributor address per chain. Reads from:
+    //   1. <NETWORK>_DISTRIBUTOR_ADDRESS env var (e.g. BSC_DISTRIBUTOR_ADDRESS)
+    //   2. DISTRIBUTOR_ADDRESS env var (global fallback)
+    //   3. None → feature off, indexing proceeds exactly as before.
+    let net_upper = chain.network.to_uppercase();
+    let distributor_address: Option<Address> = std::env::var(format!("{net_upper}_DISTRIBUTOR_ADDRESS"))
+        .or_else(|_| std::env::var("DISTRIBUTOR_ADDRESS"))
         .ok()
         .filter(|s| !s.trim().is_empty())
         .and_then(|s| match s.trim().parse::<Address>() {
             Ok(a) => Some(a),
             Err(e) => {
-                tracing::error!("Invalid DISTRIBUTOR_ADDRESS {s}: {e}; reset listener disabled");
+                tracing::error!("Invalid DISTRIBUTOR_ADDRESS for {}: {e}; reset listener disabled", chain.network);
                 None
             }
         });
@@ -134,7 +136,10 @@ async fn run_listener_once(
     // browser-facing endpoint exposed via /config, which only needs to be
     // reachable + CORS-enabled from browsers. Matches the eth_call helpers, which
     // already prefer ETH_RPC_URL.
-    let indexer_rpc = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let net_upper = chain.network.to_uppercase();
+    let indexer_rpc = std::env::var(format!("{net_upper}_RPC_URL"))
+        .or_else(|_| std::env::var("ETH_RPC_URL".to_string()))
+        .unwrap_or_else(|_| chain.rpc_url.clone());
     let url = indexer_rpc
         .parse()
         .map_err(|e| anyhow::anyhow!("invalid indexer rpc {indexer_rpc}: {e}"))?;
@@ -465,7 +470,7 @@ async fn fetch_round_window(
     call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
     let data = format!("0x{}", hex::encode(&call_data));
 
-    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let rpc_url = chain.rpc_url.clone();
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
         .post(&rpc_url)
@@ -553,7 +558,7 @@ async fn fetch_pool_type(chain: &ChainConfig, token_address: &str) -> Option<cra
         "0xc3d2c3c1000000000000000000000000{}",
         token_address.strip_prefix("0x").unwrap_or(token_address)
     );
-    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let rpc_url = chain.rpc_url.clone();
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
         .post(&rpc_url)
@@ -681,8 +686,7 @@ async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
     // Read the native-token (BNB on BSC) price from the Fyuz contract's
     // getETHPriceByUSD() (reads the Chainlink feed on-chain; on BSC that feed
     // slot is wired to BNB/USD, so this returns BNB/USD despite the ETH naming).
-    let rpc_url = std::env::var("ETH_RPC_URL")
-        .unwrap_or_else(|_| chain.rpc_url.clone());
+    let rpc_url = chain.rpc_url.clone();
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
         .post(&rpc_url)
@@ -710,7 +714,7 @@ async fn fetch_eth_price(chain: &ChainConfig) -> Option<f64> {
 /// on-chain creator of a token rather than trusting the unauthenticated staging
 /// request. Returns None on any RPC/parse failure (caller falls back gracefully).
 async fn fetch_tx_sender(chain: &ChainConfig, tx_hash: &str) -> Option<String> {
-    let rpc_url = std::env::var("ETH_RPC_URL").unwrap_or_else(|_| chain.rpc_url.clone());
+    let rpc_url = chain.rpc_url.clone();
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
         .post(&rpc_url)

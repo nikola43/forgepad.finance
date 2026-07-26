@@ -204,7 +204,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-ff3f4d54247f143a5f879f9a104d8662}
+        NEXT_PUBLIC_PROJECT_ID: ${NEXT_PUBLIC_PROJECT_ID:-b419d851ce6dd9d448bcb52ac83ec1f1}
         NEXT_PUBLIC_LOCAL_MODE: ${NEXT_PUBLIC_LOCAL_MODE:-false}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.fyuz.fun}
         # Browser-facing RPC/chain id — on a localnet these must be the host-reachable

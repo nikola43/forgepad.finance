@@ -1,7 +1,7 @@
 export const isDevEnv = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true"
 
 // Get projectId from https://cloud.reown.com
-export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || "d12f34d58e09877ad612f47b1f0b8001"
+export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || "b419d851ce6dd9d448bcb52ac83ec1f1"
 
 if (!projectId) {
   throw new Error('Project ID is not defined')

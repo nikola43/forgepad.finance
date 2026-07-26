@@ -37,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Chain configs
     let chain_configs = chains::default_chains();
+    tracing::info!("Loaded {} chain(s): {}", chain_configs.len(), chain_configs.iter().map(|c| format!("{}({})", c.name, c.chain_id)).collect::<Vec<_>>().join(", "));
 
     // API key (fail-closed: refuse to start without it). `.expect` only catches
     // an ABSENT var; an empty API_KEY= would otherwise make every api-key-gated
