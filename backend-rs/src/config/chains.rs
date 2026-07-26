@@ -12,7 +12,10 @@ pub struct ChainConfig {
     pub ws_url: Option<String>,
     pub explorer_url: String,
     pub contract_address: String,
-    #[serde(skip)]
+    // Serialized to the frontend via /config; the create/token pages build
+    // ethers Contracts from chain.abi. skip_deserializing keeps abi optional on
+    // input (nothing deserializes a ChainConfig back in) while still emitting it.
+    #[serde(skip_deserializing)]
     pub abi: serde_json::Value,
     pub virtual_eth_amount: f64,
     pub virtual_token_amount: f64,
