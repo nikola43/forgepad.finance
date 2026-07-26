@@ -21,7 +21,7 @@ import {
   bsc,
   defineChain,
 } from "@reown/appkit/networks";
-import { projectId } from "@/config";
+import { projectId, FYUZ_WEBSITE_URL } from "@/config";
 import { WagmiProvider } from "wagmi";
 
 const robinhoodChainId = Number(process.env.NEXT_PUBLIC_ROBINHOOD_CHAIN_ID ?? 4663);
@@ -124,6 +124,11 @@ const appKit = createAppKit({
   networks: [bsc, robinhoodNetwork],
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
+  // BSC has a built-in AppKit icon; the custom Robinhood chain needs its logo
+  // supplied explicitly (served from the frontend's public/networks assets).
+  chainImages: {
+    [robinhoodChainId]: `${FYUZ_WEBSITE_URL}/networks/robinhood.svg`,
+  },
   themeMode: "dark",
   // features: {
   //   email: false,
