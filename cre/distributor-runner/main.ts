@@ -34,7 +34,11 @@ export type Config = {
   gasLimit: string;
 };
 
-const posterAbi = parseAbi(["function ready() view returns (bool)"]);
+/// 0 = nothing to do, 1 = start a round (needs the shares API), 2 = pay it out.
+const posterAbi = parseAbi(["function work() view returns (uint8)"]);
+const WORK_NONE = 0;
+const WORK_START_ROUND = 1;
+const WORK_DISTRIBUTE = 2;
 
 type Shares = { from: number; to: number; packed: Hex };
 
@@ -61,48 +65,68 @@ export const onCronTrigger = (runtime: Runtime<Config>): string => {
   if (!selector) throw new Error(`unsupported chain: ${cfg.chainName}`);
   const evm = new EVMClient(selector);
 
-  // 1. Free on-chain read: only pay for a report when a round is actually due
-  //    (period elapsed, pot funded, no round in flight).
-  const readyReply = evm
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: cfg.receiver,
-        data: encodeFunctionData({ abi: posterAbi, functionName: "ready" }),
+  const readWork = (): number => {
+    const reply = evm
+      .callContract(runtime, {
+        call: encodeCallMsg({
+          from: zeroAddress,
+          to: cfg.receiver,
+          data: encodeFunctionData({ abi: posterAbi, functionName: "work" }),
+        }),
+        blockNumber: LATEST_BLOCK_NUMBER,
+      })
+      .result();
+    return Number(
+      decodeFunctionResult({
+        abi: posterAbi,
+        functionName: "work",
+        data: bytesToHex(reply.data),
       }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result();
-  const isReady = decodeFunctionResult({
-    abi: posterAbi,
-    functionName: "ready",
-    data: bytesToHex(readyReply.data),
-  });
-  if (!isReady) {
-    runtime.log("round not due — skipping");
+    );
+  };
+
+  // 1. Free on-chain read: only pay for a report when there is actually work.
+  //    The weekly cron fires on a window of ticks, so most of them stop here.
+  const work = readWork();
+  if (work === WORK_NONE) {
+    runtime.log("nothing to do — skipping");
     return "not due";
   }
 
-  // 2. Top-100 leaderboard shares for the window [backend epoch, now].
-  const to = Math.floor(runtime.now().getTime() / 1000);
-  const url = `${cfg.apiUrl}/distributor/shares?to=${to}&limit=100`;
-  const http = new HTTPClient();
-  const sharesJson = http
-    .sendRequest(runtime, fetchShares, consensusIdenticalAggregation())(url)
-    .result();
-  const shares = JSON.parse(sharesJson) as Shares;
-  if (!shares.packed || shares.packed === "0x") {
-    runtime.log("no eligible holders — skipping");
-    return "no holders";
+  // 2. Payout tick: the round's shares and VRF word are both committed on-chain,
+  //    so no API call and no consensus round is needed — the payload is ignored
+  //    by onReport, which re-derives the job from chain state.
+  //    (This replaces Chainlink Automation, which sunsets 2026-07-31.)
+  let payload: Hex;
+  let what: string;
+  if (work === WORK_DISTRIBUTE) {
+    payload = encodeAbiParameters(
+      [{ type: "uint64" }, { type: "uint64" }, { type: "bytes" }],
+      [0n, 0n, "0x"],
+    );
+    what = "distribute";
+  } else {
+    // 3. New round: top-100 leaderboard shares for the window [backend epoch, now].
+    const to = Math.floor(runtime.now().getTime() / 1000);
+    const url = `${cfg.apiUrl}/distributor/shares?to=${to}&limit=100`;
+    const http = new HTTPClient();
+    const sharesJson = http
+      .sendRequest(runtime, fetchShares, consensusIdenticalAggregation())(url)
+      .result();
+    const shares = JSON.parse(sharesJson) as Shares;
+    if (!shares.packed || shares.packed === "0x") {
+      runtime.log("no eligible holders — skipping");
+      return "no holders";
+    }
+    payload = encodeAbiParameters(
+      [{ type: "uint64" }, { type: "uint64" }, { type: "bytes" }],
+      [BigInt(shares.from), BigInt(shares.to), shares.packed],
+    );
+    what = `round for window ${shares.from}-${shares.to}`;
   }
 
-  // 3. Deliver abi.encode(from, to, packed) to CREPoster.onReport, which
-  //    drives startRound + postShares; Chainlink Automation then distributes
-  //    once VRF lands.
-  const payload = encodeAbiParameters(
-    [{ type: "uint64" }, { type: "uint64" }, { type: "bytes" }],
-    [BigInt(shares.from), BigInt(shares.to), shares.packed],
-  );
+  // 4. Deliver the report to CREPoster.onReport: startRound + postShares on a
+  //    WORK_START_ROUND tick, distribute() on a WORK_DISTRIBUTE one.
   const report = runtime.report(prepareReportRequest(payload)).result();
   const write = evm
     .writeReport(runtime, {
@@ -117,7 +141,17 @@ export const onCronTrigger = (runtime: Runtime<Config>): string => {
     );
   }
   const tx = write.txHash ? bytesToHex(write.txHash) : "unknown";
-  runtime.log(`round driven for window ${shares.from}-${shares.to}, tx ${tx}`);
+  // txStatus only says the FORWARDER tx succeeded. KeystoneForwarder swallows
+  // receiver reverts, so an out-of-gas / paused / rejected onReport looks exactly
+  // like a delivered round. work() moving off the job we just did is the only
+  // proof it landed; if it is unchanged, fail loudly instead of re-sending (and
+  // re-paying for) the same doomed report on every tick of the window.
+  if (readWork() === work) {
+    throw new Error(
+      `report delivered (tx ${tx}) but ${what} did not happen — onReport reverted (gas limit ${cfg.gasLimit}? paused? shares rejected?)`,
+    );
+  }
+  runtime.log(`${what} driven, tx ${tx}`);
   return tx;
 };
 

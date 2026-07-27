@@ -35,14 +35,14 @@
 #   anvil --fork-url https://bsc-testnet-rpc.publicnode.com --port 8545
 staging-settings:
   rpcs:
-    - chain-name: binance_smart_chain-testnet
+    - chain-name: binance_smart_chain-mainnet
       url: http://localhost:8545
 
 # ==========================================================================
 production-settings:
   rpcs:
-    - chain-name: binance_smart_chain-testnet
-      url: https://bsc-testnet.rpc.sentio.xyz
+    - chain-name: binance_smart_chain-mainnet
+      url: https://bsc-dataseed.bnbchain.org
     # Workflow Registry chain — required by `cre workflow deploy`
     - chain-name: ethereum-mainnet
       url: https://ethereum-rpc.publicnode.com

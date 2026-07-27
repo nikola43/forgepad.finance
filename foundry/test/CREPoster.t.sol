@@ -76,6 +76,53 @@ contract CREPosterTest is Test {
         assertEq(distributor.roundId(), 1);
     }
 
+    // CRE drives the whole round: one tick starts it, a later tick (after VRF
+    // lands) pays it out. This replaces Chainlink Automation, which sunsets
+    // 2026-07-31.
+    function test_OnReport_SecondTickDistributes() public {
+        (bool ok, ) = address(distributor).call{value: 1 ether}("");
+        assertTrue(ok);
+        assertEq(poster.work(), poster.WORK_START_ROUND());
+
+        vm.prank(forwarder);
+        poster.onReport("", report());
+        assertEq(poster.work(), poster.WORK_NONE(), "waiting on VRF - nothing to do");
+
+        // a tick while VRF is still pending must not pay for a report
+        vm.prank(forwarder);
+        poster.onReport("", report());
+        assertEq(distributor.roundId(), 1, "no second round opened");
+
+        (, , , , , , uint256 reqId, ) = distributor.rounds(1);
+        coordinator.fulfillRandomWords(reqId, address(distributor));
+        assertEq(poster.work(), poster.WORK_DISTRIBUTE(), "payout is now the job");
+
+        // the payout tick ignores the report payload entirely
+        uint256 aliceBefore = alice.balance;
+        vm.prank(forwarder);
+        poster.onReport("", abi.encode(uint64(0), uint64(0), bytes("")));
+
+        (uint8 status, , , , , , , ) = distributor.rounds(1);
+        assertEq(status, 2, "round paid by CRE");
+        assertGt(alice.balance, aliceBefore, "holder got paid");
+        assertEq(poster.work(), poster.WORK_NONE(), "period must elapse before the next round");
+    }
+
+    // A paused Distributor rejects startRound, so ready() must say "not due".
+    // Otherwise the workflow pays for a report every tick and onReport reverts
+    // invisibly behind the forwarder.
+    function test_Ready_FalseWhileDistributorPaused() public {
+        (bool ok, ) = address(distributor).call{value: 1 ether}("");
+        assertTrue(ok);
+        assertTrue(poster.ready());
+
+        distributor.pause();
+        assertFalse(poster.ready(), "paused distributor is never ready");
+
+        distributor.unpause();
+        assertTrue(poster.ready());
+    }
+
     function test_OnReport_IgnoresEmptyShares() public {
         (bool ok, ) = address(distributor).call{value: 1 ether}("");
         assertTrue(ok);

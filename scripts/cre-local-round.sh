@@ -63,7 +63,17 @@ if ! curl -sf -m 2 "http://localhost:5002/distributor/shares?limit=1" > /dev/nul
   STUB_PID=$!
 fi
 
-# 3. deploy CREPoster on the fork and wire it up
+# 3. hot-swap the fork's Distributor to the CURRENT source. The testnet address
+#    still runs an older build; without this the fork tests bytecode nobody is
+#    about to deploy (and the new CREPoster.ready() would revert calling
+#    distributable()). Code-only swap — no storage layout change — so the VRF
+#    subscription, poster and pot on the fork all survive.
+"$FORGE" build --root "$DIR/foundry" > /dev/null
+NEW_CODE=$(jq -r '.deployedBytecode.object' "$DIR/foundry/out/Distributor.sol/Distributor.json")
+"$CAST" rpc anvil_setCode "$DISTRIBUTOR" "$NEW_CODE" --rpc-url $RPC > /dev/null
+echo "Distributor hot-swapped to current source ($(( ${#NEW_CODE} / 2 - 1 )) bytes)"
+
+# 4. deploy CREPoster on the fork and wire it up
 POSTER=$("$FORGE" create src/CREPoster.sol:CREPoster --root "$DIR/foundry" \
   --rpc-url $RPC --private-key $KEY --broadcast \
   --constructor-args $DISTRIBUTOR $PROD_FORWARDER 2> /dev/null \
@@ -77,6 +87,7 @@ python3 -c "import json;p='$DIR/cre/distributor-runner/config.staging.json';d=js
 
 i=0
 N=${1:-0}
+# 5. round loop: simulate -> report -> startRound+postShares -> VRF -> distribute
 while :; do
   pot=$("$CAST" balance --rpc-url $RPC "$DISTRIBUTOR")
   [ "$pot" = "0" ] && send "$DISTRIBUTOR" --value 1ether --private-key $KEY \

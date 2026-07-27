@@ -82,7 +82,10 @@ pub async fn get_shares(
     if to <= from {
         return Err(AppError::BadRequest("`to` must be after `from`".to_string()));
     }
-    let limit = params.limit.unwrap_or(100).clamp(1, 200);
+    // Hard-capped at the contract's MAX_HOLDERS: a bigger payload makes
+    // postShares revert TooManyHolders, which through the CRE forwarder is a
+    // silent no-round.
+    let limit = params.limit.unwrap_or(100).clamp(1, 100);
 
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
 
@@ -114,7 +117,7 @@ pub async fn get_shares(
            GROUP BY user_id \
          ) pl ON pl.uid = u.id \
          WHERE GREATEST(COALESCE(tv.net_usd, 0), 0) + COALESCE(pl.pts, 0) > 0 \
-         ORDER BY points DESC \
+         ORDER BY points DESC, u.address ASC \
          LIMIT $3",
     )
     .bind::<BigInt, _>(from)

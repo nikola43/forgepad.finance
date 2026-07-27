@@ -1,7 +1,7 @@
 {
-  "schedule": "0 */5 * * * *",
+  "schedule": "0 */5 10-13 * * 1",
   "apiUrl": "https://api.fyuz.fun",
-  "chainName": "binance_smart_chain-testnet",
-  "receiver": "0x85e034001C360AA207fB06c390B953eAa5B7b964",
-  "gasLimit": "2000000"
+  "chainName": "binance_smart_chain-mainnet",
+  "receiver": "0x980ff7370835FAc49Cf5af4Bf11476C6Bd3b0183",
+  "gasLimit": "8000000"
 }

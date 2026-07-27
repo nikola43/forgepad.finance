@@ -8,6 +8,21 @@ import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VR
 /// Holder that cannot receive BNB — exercises the skip-failed-transfer path.
 contract RejectingReceiver {}
 
+/// Holder whose fallback costs more than the 30k push stipend but succeeds when
+/// called with normal gas — i.e. the realistic claim() customer (Safes, AA
+/// wallets), as opposed to a receiver that can never be paid at all.
+contract GasHungryReceiver {
+    uint256 public sink;
+
+    receive() external payable {
+        uint256 x = sink;
+        for (uint256 i = 0; i < 500; i++) {
+            x = uint256(keccak256(abi.encode(x, i)));
+        }
+        sink = x;
+    }
+}
+
 contract DistributorTest is Test {
     VRFCoordinatorV2_5Mock coordinator;
     Distributor distributor;
@@ -324,85 +339,117 @@ contract DistributorTest is Test {
         distributor.claim();
     }
 
-    // ---- Chainlink Automation ---------------------------------------------
+    // A cancelled round paid nobody, so it must not burn the period: before the
+    // fix a VRF outage cost holders the outage plus a full extra week.
+    function test_CancelRound_DoesNotConsumeThePeriod() public {
+        fundPot(1 ether);
+        uint256 rid = startRound();
+        postShares(rid, packedShares3());
+        vm.prank(poster);
+        distributor.cancelRound();
 
-    // checkUpkeep is false until BOTH shares and the VRF word are in, then true;
-    // performUpkeep distributes exactly as a manual distribute() would.
-    function test_Automation_DistributesWhenReady() public {
+        // immediately re-openable, no warp
+        uint256 rid2 = startRound();
+        assertEq(rid2, rid + 1, "next round opens straight away");
+        assertEq(roundStatus(rid2), 1);
+    }
+
+    // emergencyWithdraw must not take money already credited to holders by a
+    // failed payout push: doing so stole their funds AND left totalClaimable
+    // above the balance, underflow-bricking every later round.
+    function test_EmergencyWithdraw_LeavesClaimableBehind() public {
+        address hungry = address(new GasHungryReceiver());
         fundPot(10 ether);
         uint256 rid = startRound();
+        postShares(rid, abi.encodePacked(hungry, uint32(HALF), bob, uint32(HALF)));
+        fulfill(rid, 1); // bob wins
+        distributor.distribute(rid);
+        assertEq(distributor.totalClaimable(), 4.5 ether, "push exceeded the 30k stipend");
 
-        // no shares, no random yet -> not ready
-        (bool needed, ) = distributor.checkUpkeep("");
-        assertFalse(needed, "not ready before shares/random");
+        distributor.pause();
+        distributor.emergencyWithdraw(rando);
+        distributor.unpause();
+
+        assertEq(rando.balance, distributor.distributable() + 0, "took only the free balance");
+        assertEq(address(distributor).balance, 4.5 ether, "claimable funds stay put");
+        assertEq(distributor.distributable(), 0);
+
+        // the credited holder can still be made whole
+        uint256 before = hungry.balance;
+        vm.prank(hungry);
+        distributor.claim();
+        assertEq(hungry.balance - before, 4.5 ether);
+        assertEq(distributor.totalClaimable(), 0);
+
+        // and the contract is not bricked: the next round runs normally
+        fundPot(2 ether);
+        vm.warp(block.timestamp + 8 days);
+        (, , , , uint256 pot2, , , ) = _startAndRead();
+        assertEq(pot2, 2 ether);
+    }
+
+    // distributable() clamps instead of underflowing, so no balance/owed state
+    // can permanently freeze startRound.
+    function test_Distributable_ClampsWhenBalanceBelowOwed() public {
+        assertEq(distributor.distributable(), 0);
+        fundPot(1 ether);
+        assertEq(distributor.distributable(), 1 ether);
+    }
+
+    // ---- payout readiness (CRE-driven; Automation v2.1 sunsets 2026-07-31) ----
+
+    // isPayable is false until BOTH shares and the VRF word are in, then true
+    // until the round is paid. It is what CREPoster.work() keys off.
+    function test_IsPayable_TracksRoundReadiness() public {
+        fundPot(10 ether);
+        uint256 rid = startRound();
+        assertFalse(distributor.isPayable(rid), "not payable before shares/random");
 
         postShares(rid, packedShares3());
-        (needed, ) = distributor.checkUpkeep("");
-        assertFalse(needed, "not ready before random");
+        assertFalse(distributor.isPayable(rid), "not payable before random");
 
         fulfill(rid, 7); // 7 % 3 == 1 -> bob wins
-        bytes memory performData;
-        (needed, performData) = distributor.checkUpkeep("");
-        assertTrue(needed, "ready once shares + random are in");
-        assertEq(abi.decode(performData, (uint256)), rid, "performData carries the round id");
+        assertTrue(distributor.isPayable(rid), "payable once shares + random are in");
 
-        // a keeper (any caller) performs the upkeep -> round pays out
-        distributor.performUpkeep(performData);
-        assertEq(roundStatus(rid), 2, "round paid via Automation");
+        // any caller finishes it — CRE's forwarder, a cron, a human
+        vm.prank(rando);
+        distributor.distribute(rid);
+        assertEq(roundStatus(rid), 2, "round paid");
         assertEq(alice.balance, 4.5 ether);
         assertEq(bob.balance, 2.25 ether + 1 ether);
         assertEq(carol.balance, 2.25 ether);
-
-        // nothing left to do
-        (needed, ) = distributor.checkUpkeep("");
-        assertFalse(needed, "round already paid");
+        assertFalse(distributor.isPayable(rid), "nothing left to do");
     }
 
-    // Disabling the Automation flag parks checkUpkeep and blocks performUpkeep,
-    // without pausing — manual distribute() still works.
-    function test_Automation_DisabledFlag() public {
+    function test_IsPayable_FalseWhenPausedOrStaleRound() public {
         fundPot(10 ether);
         uint256 rid = startRound();
         postShares(rid, packedShares3());
         fulfill(rid, 0);
 
-        distributor.setAutomationEnabled(false);
-        (bool needed, ) = distributor.checkUpkeep("");
-        assertFalse(needed, "checkUpkeep parked when disabled");
-
-        vm.expectRevert(Distributor.NoActiveRound.selector);
-        distributor.performUpkeep(abi.encode(rid));
-
-        // manual path unaffected
-        distributor.distribute(rid);
-        assertEq(roundStatus(rid), 2, "manual distribute still works");
-    }
-
-    // performData is untrusted: a bogus round id reverts instead of paying.
-    function test_Automation_PerformUpkeep_RevertsOnStaleRound() public {
-        fundPot(10 ether);
-        uint256 rid = startRound();
-        postShares(rid, packedShares3());
-        fulfill(rid, 0);
-
-        // wrong round id (99) is only a hint — _distribute rejects it
-        vm.expectRevert(Distributor.NoActiveRound.selector);
-        distributor.performUpkeep(abi.encode(uint256(99)));
-
-        // correct id still works
-        distributor.performUpkeep(abi.encode(rid));
-        assertEq(roundStatus(rid), 2);
-    }
-
-    function test_Automation_CheckUpkeep_FalseWhenPaused() public {
-        fundPot(10 ether);
-        uint256 rid = startRound();
-        postShares(rid, packedShares3());
-        fulfill(rid, 0);
+        assertFalse(distributor.isPayable(99), "stale round id is never payable");
 
         distributor.pause();
-        (bool needed, ) = distributor.checkUpkeep("");
-        assertFalse(needed, "no upkeep while paused");
+        assertFalse(distributor.isPayable(rid), "not payable while paused");
+        distributor.unpause();
+        assertTrue(distributor.isPayable(rid));
+    }
+
+    // distribute() re-checks everything, so an untrusted caller cannot pay a
+    // round that is not genuinely payable.
+    function test_Distribute_RejectsStaleRoundFromAnyCaller() public {
+        fundPot(10 ether);
+        uint256 rid = startRound();
+        postShares(rid, packedShares3());
+        fulfill(rid, 0);
+
+        vm.prank(rando);
+        vm.expectRevert(Distributor.NoActiveRound.selector);
+        distributor.distribute(99);
+
+        vm.prank(rando);
+        distributor.distribute(rid);
+        assertEq(roundStatus(rid), 2);
     }
 
     function _startAndRead() internal returns (uint8, uint64, uint64, bool, uint256, uint256, uint256, bytes memory) {

@@ -17,16 +17,26 @@ interface IReceiver is IERC165 {
 ///         a signed report; this contract (set as the Distributor's poster)
 ///         drives startRound + postShares in one tx, so an active round always
 ///         means "shares committed, waiting on VRF" — no resume path needed.
-///         distribute() itself stays with Chainlink Automation.
+///
+///         CRE drives the payout too. Chainlink Automation used to call
+///         distribute() once VRF landed, but Automation v2.1 sunsets 2026-07-31,
+///         so a later tick of the same workflow finishes the round instead:
+///         work() tells the workflow which of the two jobs is outstanding.
 ///
 ///         Report payload: abi.encode(uint64 timeStart, uint64 timeEnd, bytes packed)
 ///         where packed is the Distributor's 24-byte address++share format.
+///         For a payout tick the payload is ignored — the chain state decides.
 contract CREPoster is IReceiver {
     error NotForwarder();
     error NotOwner();
 
     event RoundDriven(uint256 indexed roundId, uint256 holderCount);
+    event RoundPaid(uint256 indexed roundId);
     event ForwarderSet(address indexed forwarder, bool allowed);
+
+    uint8 public constant WORK_NONE = 0;
+    uint8 public constant WORK_START_ROUND = 1;
+    uint8 public constant WORK_DISTRIBUTE = 2;
 
     Distributor public immutable distributor;
     address public owner;
@@ -56,24 +66,50 @@ contract CREPoster is IReceiver {
         owner = _owner;
     }
 
-    /// @notice True when a new round is due. The CRE workflow reads this first
-    ///         so it only submits a report (and pays gas) when there is work.
-    ///         onReport re-checks it, so a stale or duplicate report is a no-op.
+    /// @notice What this tick should do, if anything. The CRE workflow reads it
+    ///         first so it only submits a report (and pays gas) when there is
+    ///         work — and so it knows whether it needs the shares API at all.
+    ///         onReport re-derives it, so a stale or duplicate report is a no-op.
+    /// @return WORK_NONE, WORK_START_ROUND or WORK_DISTRIBUTE.
+    function work() public view returns (uint8) {
+        // A paused Distributor rejects both jobs. Without this the workflow saw
+        // "due", paid for a report every tick, and onReport reverted — invisibly,
+        // because the forwarder swallows receiver reverts.
+        if (distributor.paused()) return WORK_NONE;
+        uint256 _rid = distributor.roundId();
+        // Shares + VRF are both in: finish the round before opening another.
+        if (distributor.isPayable(_rid)) return WORK_DISTRIBUTE;
+        (uint8 _status, , , , , , , ) = distributor.rounds(_rid);
+        if (_status == 1) return WORK_NONE; // in flight, still waiting on VRF
+        if (block.timestamp < distributor.lastRoundTime() + distributor.period()) return WORK_NONE;
+        return distributor.distributable() > 0 ? WORK_START_ROUND : WORK_NONE;
+    }
+
+    /// @notice True when a NEW round is due (WORK_START_ROUND).
     function ready() public view returns (bool) {
-        (uint8 _status, , , , , , , ) = distributor.rounds(distributor.roundId());
-        if (_status == 1) return false; // round in flight; Automation finishes it
-        if (block.timestamp < distributor.lastRoundTime() + distributor.period()) return false;
-        return address(distributor).balance > distributor.totalClaimable();
+        return work() == WORK_START_ROUND;
     }
 
     /// @inheritdoc IReceiver
     function onReport(bytes calldata, bytes calldata report) external {
         if (!forwarders[msg.sender]) revert NotForwarder();
+        uint8 _work = work();
+
+        if (_work == WORK_DISTRIBUTE) {
+            // Payout tick: the report payload is irrelevant, every input was
+            // committed on-chain rounds ago. Distributor.distribute re-checks.
+            uint256 _rid = distributor.roundId();
+            distributor.distribute(_rid);
+            emit RoundPaid(_rid);
+            return;
+        }
+        if (_work != WORK_START_ROUND) return; // stale/duplicate — ignore
+
         (uint64 _from, uint64 _to, bytes memory _packed) = abi.decode(report, (uint64, uint64, bytes));
-        if (!ready() || _packed.length == 0) return; // stale/duplicate/empty — ignore
-        uint256 _rid = distributor.startRound(_from, _to);
-        distributor.postShares(_rid, _packed);
-        emit RoundDriven(_rid, _packed.length / 24);
+        if (_packed.length == 0) return; // empty leaderboard — nothing to pay
+        uint256 _newRid = distributor.startRound(_from, _to);
+        distributor.postShares(_newRid, _packed);
+        emit RoundDriven(_newRid, _packed.length / 24);
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {

@@ -3,5 +3,5 @@
   "apiUrl": "http://localhost:5002",
   "chainName": "binance_smart_chain-testnet",
   "receiver": "0x9c3022d92f1CA6e212f13e6B96fC982258f1584D",
-  "gasLimit": "2000000"
+  "gasLimit": "8000000"
 }

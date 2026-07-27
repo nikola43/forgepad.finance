@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
-import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Fyuz leaderboard fee Distributor (BSC)
@@ -29,7 +28,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   4. distribute(id)        — anyone; pays 90% pro-rata + 10% to the winner
 ///   Stuck rounds (VRF outage, bad shares) are cancelled by the poster/owner;
 ///   the pot simply rolls into the next round.
-contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInterface {
+///
+/// @dev Steps 1, 2 and 4 are all driven by the CRE workflow through CREPoster
+///      (see cre/distributor-runner). Chainlink Automation used to run step 4,
+///      but Automation v2.1 sunsets 2026-07-31, so that entrypoint is gone —
+///      distribute() is permissionless anyway, so any keeper, cron or human can
+///      finish a round if CRE is down.
+contract Distributor is VRFConsumerBaseV2Plus, Pausable {
 
     // Custom errors (one per former require/revert string).
     error BpsTooHigh(); // was: "Cannot exceed 100%"
@@ -90,18 +95,6 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
     uint16 public vrfConfirmations = 3;
     bool public vrfNativePayment = true;
 
-    /// @notice Gates the Chainlink Automation entrypoint (performUpkeep). When
-    ///         true, a registered upkeep auto-calls distribute() the moment a
-    ///         round's shares + VRF word are both in — replacing the backend's
-    ///         10-minute "wait for VRF then distribute" poll. distribute() stays
-    ///         permissionless regardless; this flag only lets the owner park the
-    ///         Automation path (e.g. fall back to the cron) without pausing the
-    ///         whole contract. Chainlink Automation IS supported on BSC, unlike
-    ///         Chainlink Functions — so only this last step is decentralized;
-    ///         startRound/postShares stay backend-driven because postShares
-    ///         carries off-chain leaderboard data no on-chain keeper can fetch.
-    bool public automationEnabled = true;
-
     // ---- events ------------------------------------------------------------
 
     event RoundStarted(uint256 indexed roundId, uint256 pot, uint64 timeStart, uint64 timeEnd, uint256 vrfRequestId);
@@ -135,6 +128,20 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
     /// @notice Fyuz streams the 0.2% leaderboard fee here on every trade.
     receive() external payable {}
 
+    /// @notice Balance that may be paid into a round: everything except what is
+    ///         already owed to holders whose payout push failed.
+    /// @dev Clamped rather than `balance - totalClaimable`, which would revert on
+    ///      underflow and brick startRound/distribute for good if the balance
+    ///      ever dipped below what is owed. Nothing should push it there — the
+    ///      only outbound paths are payouts, claim() and emergencyWithdraw(), and
+    ///      all three respect totalClaimable — but a round freezing permanently
+    ///      is too expensive a failure to leave resting on that argument.
+    function distributable() public view returns (uint256) {
+        uint256 _balance = address(this).balance;
+        uint256 _owed = totalClaimable;
+        return _balance > _owed ? _balance - _owed : 0;
+    }
+
     modifier onlyPoster() {
         if (!(msg.sender == poster || msg.sender == owner())) revert NotPoster();
         _;
@@ -149,8 +156,8 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         if (block.timestamp < lastRoundTime + period) revert PeriodNotElapsed();
         // Only the distributable balance is a pot — funds already owed to
         // holders via claim() must not be handed out a second time.
-        uint256 _distributable = address(this).balance - totalClaimable;
-        if (_distributable <= 0) revert NothingToDistribute();
+        uint256 _distributable = distributable();
+        if (_distributable == 0) revert NothingToDistribute();
 
         roundId += 1;
         lastRoundTime = block.timestamp;
@@ -233,47 +240,25 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         emit RandomFulfilled(_rid, _randomWords[0]);
     }
 
+    /// @notice True when `_roundId` has everything it needs to be paid out.
+    ///         Free off-chain read — the CRE workflow polls this to decide
+    ///         whether this tick should drive a distribution.
+    function isPayable(uint256 _roundId) public view returns (bool) {
+        Round storage r = rounds[_roundId];
+        return
+            !paused() &&
+            _roundId == roundId &&
+            r.status == 1 &&
+            r.hasRandom &&
+            r.shares.length > 0;
+    }
+
     /// @notice Pay the round out once both the shares and the randomness are in.
-    ///         Anyone can call — all inputs are already committed on-chain.
+    ///         Anyone can call — all inputs are already committed on-chain, and
+    ///         every precondition is re-checked here, so an untrusted caller
+    ///         (CRE's forwarder, a cron, a human) can only ever pay a round that
+    ///         was genuinely payable.
     function distribute(uint256 _roundId) external whenNotPaused {
-        _distribute(_roundId);
-    }
-
-    // ---- Chainlink Automation ----------------------------------------------
-
-    /// @notice Automation simulation hook. Reports the active round as ready
-    ///         once its shares and VRF word are both committed. Off-chain only
-    ///         (view) — the keeper network calls this for free to decide whether
-    ///         to submit performUpkeep.
-    function checkUpkeep(bytes calldata)
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory performData)
-    {
-        if (paused() || !automationEnabled) return (false, "");
-        uint256 _rid = roundId;
-        Round storage r = rounds[_rid];
-        if (r.status == 1 && r.hasRandom && r.shares.length > 0) {
-            return (true, abi.encode(_rid));
-        }
-        return (false, "");
-    }
-
-    /// @notice Automation execution hook — pays out the round the keeper flagged.
-    ///         performData is UNTRUSTED (malicious/racing keepers, stale state):
-    ///         the round id is only a hint and _distribute re-checks every
-    ///         precondition, reverting if the round isn't actually payable.
-    function performUpkeep(bytes calldata performData) external override whenNotPaused {
-        if (!automationEnabled) revert NoActiveRound();
-        uint256 _roundId = abi.decode(performData, (uint256));
-        _distribute(_roundId);
-    }
-
-    /// Shared payout core for both the public distribute() and Automation's
-    /// performUpkeep(). Re-validates all preconditions so it is safe to reach
-    /// from any untrusted caller.
-    function _distribute(uint256 _roundId) internal {
         Round storage r = rounds[_roundId];
         if (!(_roundId == roundId && r.status == 1)) revert NoActiveRound();
         if (!r.hasRandom) revert RandomnessPending();
@@ -287,7 +272,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         // balance in case an emergencyWithdraw shrank it, and never dip into
         // funds already owed via claim().
         uint256 _pot = r.pot;
-        uint256 _distributable = address(this).balance - totalClaimable;
+        uint256 _distributable = distributable();
         if (_pot > _distributable) _pot = _distributable;
 
         uint256 _winnerAmount = (_pot * percentForWinner) / 10000;
@@ -313,6 +298,11 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         Round storage r = rounds[roundId];
         if (r.status != 1) revert NoActiveRound();
         r.status = 3;
+        // A cancelled round paid nobody, so it must not consume the period.
+        // Leaving lastRoundTime where startRound put it meant a VRF outage cost
+        // holders a full extra period (a week) on top of the outage itself;
+        // clearing it lets the next round open as soon as the poster is ready.
+        lastRoundTime = 0;
         emit RoundCancelled(roundId);
     }
 
@@ -402,13 +392,6 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         vrfNativePayment = _nativePayment;
     }
 
-    /// @notice Enable/disable the Chainlink Automation entrypoint. Disabling
-    ///         falls back to the backend cron / any manual distribute() caller
-    ///         without pausing the contract.
-    function setAutomationEnabled(bool _enabled) external onlyOwner {
-        automationEnabled = _enabled;
-    }
-
     function pause() external onlyOwner {
         _pause();
     }
@@ -417,8 +400,13 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable, AutomationCompatibleInt
         _unpause();
     }
 
+    /// @notice Drain the pot in an emergency. Withdraws the distributable balance
+    ///         only — money already credited to holders by a failed payout push
+    ///         stays behind so claim() keeps working. Taking the whole balance
+    ///         here both stole those funds and left totalClaimable pointing at
+    ///         money that no longer existed.
     function emergencyWithdraw(address _to) external onlyOwner whenPaused {
-        (bool _success, ) = payable(_to).call{value: address(this).balance}("");
+        (bool _success, ) = payable(_to).call{value: distributable()}("");
         if (!_success) revert WithdrawFailed();
     }
 
