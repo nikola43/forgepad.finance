@@ -362,12 +362,13 @@ export default function Create() {
     return undefined;
   }, [character1, character2, coinName, coinTicker, isDirectLaunch, minBuyBnb, initBuyAmount]);
 
-  // Mandatory minimum buy: when the confirm modal opens, read live BNB/USD from
-  // the contract's Chainlink feed (getETHPriceByUSD, 1e18-scaled) and pre-fill
-  // the Spend field with $10 worth of BNB. The error memo above keeps the
-  // confirm button disabled below that amount.
+  // Optional minimum buy: when MIN_CREATE_BUY_USD > 0 and the confirm modal
+  // opens, read live BNB/USD from the contract's Chainlink feed
+  // (getETHPriceByUSD, 1e18-scaled) and pre-fill the Spend field with that much
+  // BNB; the error memo above then keeps the confirm button disabled below it.
   // ponytail: UI-level enforcement only — the contract itself doesn't require it.
   React.useEffect(() => {
+    if (MIN_CREATE_BUY_USD <= 0) return; // no floor: nothing to prefill, skip the RPC
     if (!deployModal || isDirectLaunch || !chain) return;
     (async () => {
       try {
