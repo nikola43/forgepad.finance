@@ -53,7 +53,7 @@ import { socket } from "@/utils/socket";
 
 // Minimum opening buy per launch, in USD, converted to BNB at confirm time via
 // the contract's Chainlink feed. 0 = no mandatory buy (opening buy optional).
-const MIN_CREATE_BUY_USD = 10;
+const MIN_CREATE_BUY_USD = 0;
 
 // Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`
