@@ -145,13 +145,17 @@ async fn run_listener_once(
         .map_err(|e| anyhow::anyhow!("invalid indexer rpc {indexer_rpc}: {e}"))?;
     let provider = ProviderBuilder::new().connect_http(url);
 
-    let mut last_block = load_last_block(state, &chain.network).await?;
-    tracing::info!("Chain {} resuming from block {}", chain.network, last_block);
-
     let head = provider
         .get_block_number()
         .await
         .map_err(|e| anyhow::anyhow!("get_block_number: {e}"))?;
+
+    // Seed a fresh cursor at the chain's configured start_block, or — when it's 0
+    // (forward-only: no historical backfill) — at the current head, so the indexer
+    // just watches new blocks. This survives an indexing_state wipe without trying
+    // an archive backfill the RPC may not support.
+    let mut last_block = load_last_block(state, &chain.network, chain.start_block, head).await?;
+    tracing::info!("Chain {} resuming from block {}", chain.network, last_block);
 
     // Only skip forward on an actual chain reset (cursor ahead of head, e.g. an
     // anvil restart). A large *backward* gap is real history and is backfilled in
@@ -302,7 +306,12 @@ async fn catch_up<P: Provider>(
 ///
 /// Only used when there is no existing cursor; a real cursor always wins, so this
 /// cannot rewind a running indexer.
-async fn load_last_block(state: &AppState, network: &str) -> anyhow::Result<u64> {
+async fn load_last_block(
+    state: &AppState,
+    network: &str,
+    chain_start_block: u64,
+    head: u64,
+) -> anyhow::Result<u64> {
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
     let idx_state: Option<IndexingState> = indexing_state::table
         .filter(indexing_state::network.eq(network))
@@ -314,10 +323,15 @@ async fn load_last_block(state: &AppState, network: &str) -> anyhow::Result<u64>
     match idx_state {
         Some(s) => Ok(s.last_block.max(0) as u64),
         None => {
-            let start_block: i64 = std::env::var("INDEXER_START_BLOCK")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0);
+            // Seed at this chain's configured deployment block so backfill covers
+            // all history. When start_block is 0 (forward-only, e.g. archive-gated
+            // RPCs like publicnode's free tier), seed at head and just watch new
+            // blocks instead of attempting a backfill the RPC would reject.
+            let start_block: i64 = if chain_start_block > 0 {
+                chain_start_block as i64
+            } else {
+                head as i64
+            };
             tracing::info!(
                 "Chain {} has no indexing cursor; seeding at block {}",
                 network,

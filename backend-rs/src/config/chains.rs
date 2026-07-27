@@ -12,6 +12,10 @@ pub struct ChainConfig {
     pub ws_url: Option<String>,
     pub explorer_url: String,
     pub contract_address: String,
+    // Block the Fyuz contract was deployed at — the indexer seeds its cursor here
+    // when there's no indexing_state row yet, so backfill covers all history.
+    #[serde(default)]
+    pub start_block: u64,
     // Serialized to the frontend via /config; the create/token pages build
     // ethers Contracts from chain.abi. skip_deserializing keeps abi optional on
     // input (nothing deserializes a ChainConfig back in) while still emitting it.
@@ -45,6 +49,8 @@ struct ChainEntry {
     ws_url: Option<String>,
     explorer_url: String,
     contract_address: String,
+    #[serde(default)]
+    start_block: u64,
     virtual_eth_amount: f64,
     virtual_token_amount: f64,
     total_supply: f64,
@@ -103,6 +109,11 @@ fn apply_env_overrides(entry: ChainEntry, abi: &serde_json::Value) -> ChainConfi
     let explorer_url = std::env::var(format!("{net}_EXPLORER_URL"))
         .unwrap_or(entry.explorer_url);
 
+    let start_block = std::env::var(format!("{net}_START_BLOCK"))
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(entry.start_block);
+
     ChainConfig {
         name: entry.name,
         network: entry.network,
@@ -112,6 +123,7 @@ fn apply_env_overrides(entry: ChainEntry, abi: &serde_json::Value) -> ChainConfi
         ws_url,
         explorer_url,
         contract_address,
+        start_block,
         abi: abi.clone(),
         virtual_eth_amount: entry.virtual_eth_amount,
         virtual_token_amount: entry.virtual_token_amount,
@@ -147,6 +159,10 @@ fn fallback_env_chains(abi: serde_json::Value) -> Vec<ChainConfig> {
             .unwrap_or_else(|_| "https://bscscan.com".to_string()),
         contract_address: std::env::var("FYUZ_CONTRACT_ADDRESS")
             .expect("FYUZ_CONTRACT_ADDRESS must be set"),
+        start_block: std::env::var("INDEXER_START_BLOCK")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
         abi,
         virtual_eth_amount: 8.25,
         virtual_token_amount: 1_073_000_000.0,
