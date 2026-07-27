@@ -4,10 +4,10 @@ Get from zero to your first trade in five minutes.
 
 ## 1. Connect your wallet
 
-Click **Connect Wallet** in the top bar. Fyuz supports MetaMask, WalletConnect, and every major wallet via Reown AppKit. Make sure your wallet is on **BNB Smart Chain** — Fyuz will prompt you to switch networks if you're somewhere else.
+Click **Connect Wallet** in the top bar. Fyuz supports MetaMask, WalletConnect, and every major wallet via Reown AppKit. Then pick your network: **BNB Smart Chain** (gas in BNB) or **Robinhood Chain** (gas in ETH). Fyuz will prompt you to switch if your wallet is somewhere else.
 
 {% hint style="info" %}
-On testnet you'll need test BNB (tBNB) — grab some free from the [BNB Chain faucet](https://www.bnbchain.org/en/testnet-faucet).
+Tokens live on the chain they were launched on — a fusion created on BNB Smart Chain is traded in BNB, one created on Robinhood Chain is traded in ETH. There is no bridging between them. Leaderboard reward payouts currently run on BNB Smart Chain only.
 {% endhint %}
 
 ## 2. Find a token
@@ -19,7 +19,7 @@ On testnet you'll need test BNB (tBNB) — grab some free from the [BNB Chain fa
 
 ## 3. Buy
 
-Open a token page, enter a BNB amount, hit **Buy**. The bonding curve quotes your price instantly — no order books, no slippage games, no waiting for liquidity. Selling works the same way, in reverse.
+Open a token page, enter an amount in the chain's gas token (BNB or ETH), hit **Buy**. The bonding curve quotes your price instantly — no order books, no slippage games, no waiting for liquidity. Selling works the same way, in reverse.
 
 Your first buy also unlocks the **First Buy** quest (+5 points). Every dollar of net buying earns you a leaderboard point — see [Points & Leaderboard](../earn/points-and-leaderboard.md).
 

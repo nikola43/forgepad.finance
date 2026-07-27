@@ -8,7 +8,7 @@ The main contract: an upgradeable proxy that owns every bonding curve.
 
 * **Token factory** — deploys each fusion token with 1B fixed supply
 * **Bonding curve engine** — deterministic pricing; buys and sells settle in the same transaction
-* **Graduation** — at **$30,000 market cap** (Chainlink BNB/USD feed, staleness-checked), the curve closes and liquidity is seeded into the creator's chosen PancakeSwap pool via a liquidity manager behind a **timelock** (graduation funds can't be redirected instantly, even by the owner)
+* **Graduation** — at **$30,000 market cap** (Chainlink BNB/USD on BSC, ETH/USD on Robinhood, both staleness-checked), the curve closes and liquidity is seeded into the creator's chosen V2/V3 pool via a liquidity manager behind a **timelock** (graduation funds can't be redirected instantly, even by the owner)
 * **Fee splitter** — the 1% trade fee splits in-transaction: 0.6% treasury / 0.2% Distributor / 0.2% creator
 
 ## Distributor (the rewards engine)
@@ -35,16 +35,37 @@ Security properties:
 
 | Service | Used for |
 | --- | --- |
-| **Price Feeds** (BNB/USD) | Measuring the $30K graduation target |
+| **Price Feeds** (BNB/USD on BSC, ETH/USD on Robinhood) | Measuring the $30K graduation target |
 | **VRF v2.5** | The 10% lottery winner — provably fair randomness |
 
 ## Addresses
 
-| Contract | BSC Testnet |
+**BNB Smart Chain (56)**
+
+| Contract | Address |
 | --- | --- |
-| Fyuz (proxy) | `0x24FEBdCc41C804873dbBfE703cD9D2D4b771C236` |
-| Distributor | *deploying — will be updated* |
+| Fyuz (proxy) | `0xF6B950BB390E046B5e778Cf840Fc800F33E8898b` |
+| FyuzLiquidityManager (proxy) | `0xf75cFddBbC4762dBb58E6BADA09c1E01108F3c2a` |
+| Distributor (currently receiving fees) | `0x661a79fBa6b2E3bCDEFAF6A7260bF1826ed90C33` |
+| Distributor (deployed replacement) | `0x5a0DEE7A4074912A16E40230C59E9a7835354845` |
+| CREPoster | `0x980ff7370835FAc49Cf5af4Bf11476C6Bd3b0183` |
+
+The replacement Distributor is deployed and verified but does not receive the fee
+stream until `Fyuz.setDistributorAddress` is executed by the Safe. `Fyuz.distributorAddress()`
+on-chain is always the authoritative answer.
+
+**Robinhood Chain (4663)**
+
+| Contract | Address |
+| --- | --- |
+| Fyuz (proxy) | `0x750F04fE9A9a13Df768B5F6C94bfCf98A34fe96B` |
+| LiquidityManager (proxy) | `0x661a79fBa6b2E3bCDEFAF6A7260bF1826ed90C33` |
+
+There is no Distributor on Robinhood Chain yet, so leaderboard payouts happen on
+BNB Smart Chain only.
+
+**BSC Testnet (97)** — Fyuz `0x24FEBdCc41C804873dbBfE703cD9D2D4b771C236`
 
 {% hint style="info" %}
-Mainnet addresses will be published here at launch. Always verify addresses against this page — never trust addresses from DMs.
+Always verify addresses against this page — never trust addresses from DMs.
 {% endhint %}

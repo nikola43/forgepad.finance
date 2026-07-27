@@ -1,6 +1,7 @@
 # Forgepad.finance - Multi-Chain Token Launchpad
 
-A comprehensive multi-chain token launchpad supporting Ethereum, Base, BSC, and Solana networks with dynamic bonding curves and real-time trading.
+A multi-chain token launchpad running on **BNB Smart Chain** and **Robinhood Chain**, with
+dynamic bonding curves, Chainlink-priced graduation, and real-time trading.
 
 ## 🚀 Recent Improvements & Bug Fixes
 
@@ -48,7 +49,7 @@ forgepad.finance/
 - **API Server**: RESTful API for token management
 - **WebSocket**: Real-time event streaming
 - **Database**: MySQL with Sequelize ORM
-- **Multi-chain Support**: Ethereum, Base, BSC, Solana
+- **Multi-chain Support**: BNB Smart Chain (56), Robinhood Chain (4663)
 
 ### Frontend (Next.js/React)
 - **Multi-chain Wallet**: Support for EVM and Solana wallets
@@ -87,10 +88,8 @@ TWITTER_API_KEY=your_twitter_api_key
 TWITTER_API_SECRET=your_twitter_api_secret
 
 # Network RPCs
-ETHEREUM_RPC_URL=your_ethereum_rpc
-BASE_RPC_URL=your_base_rpc
-BSC_RPC_URL=your_bsc_rpc
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+BSC_RPC_URL=your_bsc_rpc                 # chain 56
+ROBINHOOD_RPC_URL=your_robinhood_rpc     # chain 4663
 ```
 
 #### MBC (.env)
@@ -174,15 +173,54 @@ npm run deploy
 
 ## 🔗 Supported Networks
 
-### EVM Chains
-- **Ethereum Mainnet**: Native ETH trading
-- **Base**: Layer 2 scaling solution
-- **BSC**: Binance Smart Chain with BNB
+Both chains run the same contracts and the same economics: 1B token supply, a
+$30,000 graduation market cap priced off a Chainlink feed, and a 1% trade fee
+(0.5% treasury / 0.3% leaderboard / 0.2% creator).
 
-### Solana
-- **Mainnet Beta**: SPL token support with Meteora DBC
-- **Dynamic Bonding Curves**: Automated price discovery
-- **Real-time Events**: WebSocket-based updates
+| | BNB Smart Chain | Robinhood Chain |
+|---|---|---|
+| Chain ID | 56 | 4663 |
+| Gas token | BNB | ETH |
+| Explorer | [bscscan.com](https://bscscan.com) | [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com) |
+| DEX at graduation | PancakeSwap V2 / V3 | V2 / V3 (`0x89e5DB8B…`, `0x1f7d7550…`) |
+| Chainlink feed | BNB/USD | ETH/USD |
+| Feed staleness window | 1 hour | 24 hours — an Arbitrum Orbit L2, so feed timestamps originate on L1 and lag |
+
+### Deployed contracts
+
+**BNB Smart Chain (56)**
+
+| Contract | Address |
+|---|---|
+| Fyuz (proxy) | `0xF6B950BB390E046B5e778Cf840Fc800F33E8898b` |
+| FyuzLiquidityManager (proxy) | `0xf75cFddBbC4762dBb58E6BADA09c1E01108F3c2a` |
+| Distributor (live) | `0x661a79fBa6b2E3bCDEFAF6A7260bF1826ed90C33` |
+| Distributor (deployed, not yet receiving fees) | `0x5a0DEE7A4074912A16E40230C59E9a7835354845` |
+| CREPoster | `0x980ff7370835FAc49Cf5af4Bf11476C6Bd3b0183` |
+
+`Fyuz.distributorAddress()` still points at the first Distributor. The
+replacement above is deployed, verified and wired to CREPoster, but only starts
+receiving the fee stream once the Safe calls `setDistributorAddress` — check
+`Fyuz.distributorAddress()` on-chain for the authoritative answer.
+
+**Robinhood Chain (4663)**
+
+| Contract | Address |
+|---|---|
+| Fyuz (proxy) | `0x750F04fE9A9a13Df768B5F6C94bfCf98A34fe96B` |
+| LiquidityManager (proxy) | `0x661a79fBa6b2E3bCDEFAF6A7260bF1826ed90C33` |
+
+Both Fyuz proxies and their ProxyAdmins are owned by the same Gnosis Safe.
+
+**Leaderboard payouts are BNB Smart Chain only for now.** The 0.3% leaderboard
+fee stream on Robinhood Chain currently goes to an EOA because no Distributor is
+deployed there; on BSC it reaches the Distributor above, which pays 90% pro-rata
+to the top 100 and 10% to one Chainlink-VRF-picked participant per round.
+Rounds are driven end-to-end by a Chainlink CRE workflow (`cre/`) — Chainlink
+Automation is not used, as v2.1 sunsets 2026-07-31.
+
+`mbc/` holds a legacy Solana (Meteora DBC) package. It is not wired into the
+Rust backend and is not part of either deployment.
 
 ## 🚨 Security Considerations
 

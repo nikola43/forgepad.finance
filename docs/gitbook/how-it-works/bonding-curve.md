@@ -13,7 +13,7 @@ Every Fyuz token (except direct launches) starts life on a bonding curve — an 
 When a token's market cap reaches **$30,000** (measured in USD via a Chainlink price feed, at roughly 83% of the curve), it **graduates**:
 
 1. Trading on the curve stops.
-2. The curve's BNB and remaining tokens are seeded into a **PancakeSwap pool** (the version the creator chose at launch).
+2. The curve's gas token (BNB on BSC, ETH on Robinhood) and remaining tokens are seeded into a **DEX pool** (the version the creator chose at launch — PancakeSwap on BSC).
 3. From then on it's a normal DEX token — trade it anywhere.
 
 Graduation is the win condition. Graduated tokens get the 🎓 badge, their creator earns +50 bonus points, and anyone who held through graduation unlocks the **Graduate** achievement (+15 points).

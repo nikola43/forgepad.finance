@@ -22,11 +22,15 @@ For the technically curious: what Fyuz is actually made of.
     tokens, points)  replay)
                            │
 ┌──────────────────────────▼──────────────────────────┐
-│  BNB Smart Chain                                    │
+│  BNB Smart Chain (56)      │  Robinhood Chain (4663)│
 │  · Fyuz — bonding curves, fees, graduation          │
-│  · Distributor — reward rounds + VRF lottery        │
-│  · PancakeSwap — post-graduation liquidity          │
-│  · Chainlink — BNB/USD feed + VRF v2.5              │
+│  · PancakeSwap (BSC) / V2-V3 (Robinhood) —          │
+│      post-graduation liquidity                      │
+│  · Chainlink — BNB/USD (BSC), ETH/USD (Robinhood)   │
+│                                                     │
+│  BSC only:                                          │
+│  · Distributor — reward rounds + VRF v2.5 lottery   │
+│  · CREPoster — Chainlink CRE drives each round      │
 └─────────────────────────────────────────────────────┘
 ```
 

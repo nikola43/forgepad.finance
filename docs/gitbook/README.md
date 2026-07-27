@@ -2,7 +2,7 @@
 
 **Two icons enter. One market leaves.**
 
-Fyuz is a memecoin launchpad on BNB Smart Chain with a twist: you don't upload a logo — you **fuse two characters into one**. Name any two icons ("Elon" + "Shrek", "Pikachu" + "Terminator", your call), and Fyuz's AI forges them into a single original character that becomes the face of your token. Then the market decides if your fusion is a champion.
+Fyuz is a memecoin launchpad on **BNB Smart Chain** and **Robinhood Chain** with a twist: you don't upload a logo — you **fuse two characters into one**. Name any two icons ("Elon" + "Shrek", "Pikachu" + "Terminator", your call), and Fyuz's AI forges them into a single original character that becomes the face of your token. Then the market decides if your fusion is a champion.
 
 ## Why Fyuz is different
 
@@ -29,5 +29,5 @@ Fyuz is a memecoin launchpad on BNB Smart Chain with a twist: you don't upload a
 | Read the contracts | [Smart Contracts](technical/smart-contracts.md) |
 
 {% hint style="info" %}
-Fyuz currently runs on **BNB Smart Chain testnet** while we battle-test the mechanics. Everything in these docs works exactly the same on mainnet.
+Fyuz is live on **BNB Smart Chain** (chain 56, gas in BNB) and **Robinhood Chain** (chain 4663, gas in ETH). Everything in these docs works the same on both — same 1B supply, same $30,000 graduation target, same 1% fee. The one difference: **leaderboard reward payouts run on BNB Smart Chain only** for now. Your wallet will prompt you to switch networks if you're somewhere else.
 {% endhint %}

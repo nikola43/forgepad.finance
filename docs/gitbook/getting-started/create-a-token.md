@@ -14,7 +14,7 @@ Choose from 24+ curated art universes — Dragon Ball Z, Cyberpunk neon, Studio 
 
 ### 3. Name the coin
 
-Token name + ticker. This is what shows on the board and on PancakeSwap after graduation.
+Token name + ticker. This is what shows on the board and on the DEX after graduation.
 
 ### 4. Watch the fusion happen
 
@@ -24,10 +24,10 @@ The AI forges your two characters into **one original character** — a single p
 
 | Mode | What happens |
 | --- | --- |
-| **Bonding curve** (default) | Token launches on the curve with 1B supply. Trades immediately. Graduates to PancakeSwap at $30K market cap. |
-| **Direct launch** | 1B supply straight to a PancakeSwap pool — no curve phase. For when you want a plain DEX token. |
+| **Bonding curve** (default) | Token launches on the curve with 1B supply. Trades immediately. Graduates to the DEX at $30K market cap. |
+| **Direct launch** | 1B supply straight to a DEX pool — no curve phase. For when you want a plain DEX token. |
 
-You also pick which PancakeSwap version (V2 or V3) receives the liquidity at graduation.
+You also pick which DEX version (V2 or V3) receives the liquidity at graduation — PancakeSwap on BNB Smart Chain, the equivalent V2/V3 pools on Robinhood Chain.
 
 ### 6. (Optional but smart) Make an opening buy
 
