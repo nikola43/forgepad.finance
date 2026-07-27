@@ -263,8 +263,16 @@ const BadgePulse = styled(Box)`
 function NetworkLogo({ size = 24, network }: { size?: number, network?: CaipNetwork }) {
     const [logo, setLogo] = useState<string>()
     useEffect(() => {
-        if (network?.assets)
-            AssetUtil.fetchNetworkImage(network.assets?.imageId).then(v => setLogo(v))
+        // getNetworkImage returns the assets.imageUrl set from AppKit `chainImages`
+        // (how custom chains like Robinhood get their logo). Fall back to the async
+        // imageId fetch for built-in networks that resolve their icon by id.
+        const direct = AssetUtil.getNetworkImage(network)
+        if (direct) {
+            setLogo(direct)
+            return
+        }
+        if (network?.assets?.imageId)
+            AssetUtil.fetchNetworkImage(network.assets.imageId).then(v => setLogo(v))
     }, [network])
     return <Avatar sx={{ width: size, height: size }} src={logo} />
 }
@@ -489,6 +497,7 @@ export default function Header() {
                                 me
                                 mr={0}
                                 fontSize="12px"
+                                fontWeight={700}
                                 color="#131208"
                             />
                             {isSwitching && <CircularProgress size={20} />}
@@ -513,7 +522,7 @@ export default function Header() {
                         </div>
                         {/* <SettingsIcon sx={{ color: "white", ml: 1 }} /> */}
                     </StyledDropdownButton>
-                    : <StyledButton onClick={() => appKit?.open({ view: 'Connect' })} className="effect-button">
+                    : <StyledButton onClick={() => appKit?.open({ view: 'Connect' })} className="effect-button" sx={{ fontWeight: 700 }}>
                         <WalletIcon />
                         Connect Wallet
                     </StyledButton>

@@ -25,7 +25,8 @@ import { projectId, FYUZ_WEBSITE_URL } from "@/config";
 import { WagmiProvider } from "wagmi";
 
 const robinhoodChainId = Number(process.env.NEXT_PUBLIC_ROBINHOOD_CHAIN_ID ?? 4663);
-const robinhoodRpcUrl = process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com";
+const robinhoodRpcUrl = process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL || "https://robinhood-rpc.publicnode.com";
+const robinhoodWsUrl = process.env.NEXT_PUBLIC_ROBINHOOD_WS_URL || "wss://robinhood-rpc.publicnode.com";
 const robinhoodExplorerUrl = process.env.NEXT_PUBLIC_ROBINHOOD_EXPLORER_URL || "https://robinhoodchain.blockscout.com";
 
 const robinhoodNetwork = defineChain({
@@ -39,7 +40,7 @@ const robinhoodNetwork = defineChain({
     symbol: "ETH",
   },
   rpcUrls: {
-    default: { http: [robinhoodRpcUrl] },
+    default: { http: [robinhoodRpcUrl], webSocket: [robinhoodWsUrl] },
   },
   blockExplorers: {
     default: { name: "Robinhood Explorer", url: robinhoodExplorerUrl },
