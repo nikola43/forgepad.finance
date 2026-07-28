@@ -177,6 +177,35 @@ pub struct RecordRoundResponse {
     pub epoch_start: i64,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PotResponse {
+    /// Live BNB balance of the Distributor — the pot a round would pay from.
+    ///
+    /// `null` when DISTRIBUTOR_ADDRESS is unset or the RPC is unreachable, so the
+    /// UI can hide the figure rather than render a made-up zero next to the word
+    /// "pool". A pot that reads 0 during an RPC blip is worse than no pot at all.
+    pub pot_bnb: Option<f64>,
+    /// Share paid pro-rata by points; the remainder goes to the random winner.
+    pub distribute_bps: f64,
+    /// Unix seconds of the next round close, on the contract's own schedule.
+    pub round_end: i64,
+}
+
+/// GET /distributor/pot — the live pot, for the leaderboard's pool card.
+///
+/// Deliberately public and unauthenticated: it reports the contract's own
+/// balance, which anyone can read off an explorer. Redis-cached for 60s inside
+/// `distributor_pot_bnb`, so polling this does not hammer the RPC.
+pub async fn get_pot(State(state): State<Arc<AppState>>) -> AppResult<Json<PotResponse>> {
+    let now = chrono::Utc::now().timestamp();
+    Ok(Json(PotResponse {
+        pot_bnb: crate::handlers::points::distributor_pot_bnb(&state).await,
+        distribute_bps: crate::handlers::points::DISTRIBUTE_BPS,
+        round_end: crate::handlers::points::next_round_end(now),
+    }))
+}
+
 // POST /distributor/rounds — api-key gated; called by the round-runner after
 // distribute() confirms. Recording the round is what resets the leaderboard.
 pub async fn record_round(
