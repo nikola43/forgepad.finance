@@ -70,14 +70,21 @@ contract DeployBscFresh is Script {
         address poster = vm.envOr("POSTER", deployer);
         address treasury = vm.envOr("TREASURY", owner);
 
-        // VRF subscription. Pass VRF_SUB_ID to reuse an existing one, or leave it
-        // unset to create a fresh subscription in this same broadcast.
+        // VRF subscription — MUST already exist and be owned by the deployer.
         //
-        // Creating it here rather than by hand is deliberate: the deployer must
-        // own the subscription to call addConsumer, and a subscription that
-        // exists but is owned by someone else fails LATE — after the contracts
-        // are already deployed and paid for.
-        uint256 subId = vm.envOr("VRF_SUB_ID", uint256(0));
+        // This script deliberately does NOT call createSubscription(). VRF 2.5
+        // derives the subscription id from blockhash, so the id returned while
+        // forge SIMULATES the script is not the id the real broadcast creates.
+        // Every later use of it — addConsumer, the Distributor's initializer —
+        // then points at a subscription that does not exist. A fork run proved
+        // this: 16 transactions landed and addConsumer reverted with
+        // InvalidSubscription(), which on mainnet means paying for the whole
+        // stack and getting an unusable Distributor.
+        //
+        // Create it in its own transaction first, read the id from the
+        // SubscriptionCreated log, and pass it in here.
+        uint256 subId = vm.envUint("VRF_SUB_ID");
+        require(subId != 0, "Set VRF_SUB_ID (create the subscription first)");
         // Defaults to 0: the existing subscription is already funded, and this
         // deployer's balance is small enough that a stray 0.005 BNB top-up would
         // be a meaningful fraction of it.
@@ -98,13 +105,7 @@ contract DeployBscFresh is Script {
 
         vm.startBroadcast(pk);
 
-        // ---- 0. VRF subscription -------------------------------------------
         IVRFCoordinatorV2Plus coord = IVRFCoordinatorV2Plus(VRF_COORDINATOR);
-        if (subId == 0) {
-            subId = coord.createSubscription();
-            console.log("Created VRF subscription:", subId);
-            addConsumer = true; // we own it, so we can wire the consumer directly
-        }
 
         // ---- 1. Distributor (proxied) --------------------------------------
         Distributor distImpl = new Distributor();

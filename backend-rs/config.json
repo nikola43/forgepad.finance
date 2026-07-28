@@ -8,13 +8,16 @@
       "rpcUrl": "https://bsc-rpc.publicnode.com",
       "wsUrl": "wss://bsc-rpc.publicnode.com",
       "explorerUrl": "https://bscscan.com",
-      "contractAddress": "0xF6B950BB390E046B5e778Cf840Fc800F33E8898b",
+      "contractAddress": "0x33a98BEf6496684a8Dac83734d9CEB0CeFC7019C",
       "startBlock": 0,
       "virtualEthAmount": 8.25,
       "virtualTokenAmount": 1073000000.0,
       "totalSupply": 1000000000.0,
       "targetMarketCap": 30000.0,
-      "pools": ["pancakeswap:v2", "pancakeswap:v3"]
+      "pools": [
+        "pancakeswap:v2",
+        "pancakeswap:v3"
+      ]
     },
     {
       "name": "Robinhood Chain",
@@ -30,7 +33,10 @@
       "virtualTokenAmount": 1073000000.0,
       "totalSupply": 1000000000.0,
       "targetMarketCap": 30000.0,
-      "pools": ["uniswap:v2", "uniswap:v3"]
+      "pools": [
+        "uniswap:v2",
+        "uniswap:v3"
+      ]
     }
   ]
 }
