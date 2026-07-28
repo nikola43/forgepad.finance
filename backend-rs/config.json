@@ -8,7 +8,7 @@
       "rpcUrl": "https://bsc-rpc.publicnode.com",
       "wsUrl": "wss://bsc-rpc.publicnode.com",
       "explorerUrl": "https://bscscan.com",
-      "contractAddress": "0x33a98BEf6496684a8Dac83734d9CEB0CeFC7019C",
+      "contractAddress": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
       "startBlock": 0,
       "virtualEthAmount": 8.25,
       "virtualTokenAmount": 1073000000.0,
