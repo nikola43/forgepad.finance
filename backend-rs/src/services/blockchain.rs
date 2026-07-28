@@ -267,9 +267,6 @@ async fn catch_up<P: Provider>(
         let end = (from + chunk_size - 1).min(head);
         tracing::info!("Chain {} catching up blocks {} to {}", chain.network, from, end);
 
-        let filter = Filter::new()
-            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
-            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
         // Watch the Fyuz contract, plus the Distributor when configured, in one
         // getLogs so the reset event is indexed on the same cursor-safe path.
         // Curve + Distributor + every on-curve token, so ERC20 Transfers between
@@ -281,10 +278,8 @@ async fn catch_up<P: Provider>(
         }
         let known_before = tracked_token_addresses(state, &chain.network).await;
         watched.extend(known_before.iter().copied());
-        let filter = filter.address(watched);
 
-        let logs = provider
-            .get_logs(&filter)
+        let logs = fetch_logs_batched(&provider, from, end, watched)
             .await
             .map_err(|e| anyhow::anyhow!("catch_up get_logs {from}-{end}: {e}"))?;
         for log in logs {
@@ -312,12 +307,7 @@ async fn catch_up<P: Provider>(
                 end,
                 fresh.len()
             );
-            let refilter = Filter::new()
-                .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
-                .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end))
-                .address(fresh);
-            let logs = provider
-                .get_logs(&refilter)
+            let logs = fetch_logs_batched(&provider, from, end, fresh)
                 .await
                 .map_err(|e| anyhow::anyhow!("catch_up rescan get_logs {from}-{end}: {e}"))?;
             for log in logs {
@@ -1383,13 +1373,61 @@ async fn referrer_of(state: &AppState, uid: i32) -> Option<i32> {
     r.map(|x| x.referrer_id)
 }
 
+/// Largest address array we will put in a single `eth_getLogs`.
+///
+/// The watch list is curve + distributor + EVERY on-curve token, so it grows
+/// without bound as tokens launch. Providers cap the address array (and the
+/// request body) at values they mostly do not document, and the failure mode is
+/// the whole chunk erroring out — which stalls the cursor and silently stops
+/// indexing for that chain. Override with INDEXER_MAX_FILTER_ADDRESSES if a
+/// provider turns out to be tighter or more generous than this.
+fn max_filter_addresses() -> usize {
+    std::env::var("INDEXER_MAX_FILTER_ADDRESSES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(400)
+}
+
+/// `eth_getLogs` over a block range for an arbitrarily long address list.
+///
+/// The list is split into batches of `max_filter_addresses()` and the results are
+/// merged, so the number of tokens on the curve no longer bounds how much the
+/// indexer can watch.
+///
+/// Results are re-sorted by (block number, log index) before returning. Batching
+/// splits the range by ADDRESS, so the per-batch responses interleave in chain
+/// order and processing them back-to-back would apply a token's Transfer before
+/// the TokenCreated that defines it. Sorting restores the single, strictly
+/// increasing sequence the handlers assume.
+async fn fetch_logs_batched<P: Provider>(
+    provider: &P,
+    from: u64,
+    end: u64,
+    addresses: Vec<Address>,
+) -> anyhow::Result<Vec<Log>> {
+    let batch = max_filter_addresses();
+    let mut all: Vec<Log> = Vec::new();
+    for group in addresses.chunks(batch) {
+        let filter = Filter::new()
+            .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
+            .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end))
+            .address(group.to_vec());
+        let logs = provider.get_logs(&filter).await?;
+        all.extend(logs);
+    }
+    all.sort_by_key(|l| (l.block_number.unwrap_or(0), l.log_index.unwrap_or(0)));
+    Ok(all)
+}
+
 /// Addresses of every token we index on this network.
 ///
 /// These are added to the log filter so plain ERC20 Transfer events reach the
-/// indexer. NOTE: this list grows with the number of launched tokens, and
-/// eth_getLogs address arrays are not unbounded — past a few thousand tokens
-/// this needs to move to a topic-only filter with in-process matching, or a
-/// separate paged subscription.
+/// indexer. The list grows with every launched token, so it is fetched through
+/// `fetch_logs_batched`, which splits it across several eth_getLogs calls rather
+/// than handing a provider an address array it will reject. A topic-only filter
+/// would avoid the batching but pull every ERC20 Transfer on the chain, which is
+/// orders of magnitude more traffic than watching our own tokens.
 async fn tracked_token_addresses(state: &AppState, network: &str) -> Vec<Address> {
     use diesel::sql_types::Text;
     use diesel_async::RunQueryDsl;
