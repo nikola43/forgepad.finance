@@ -77,6 +77,7 @@ contract Fyuz is
     error InsufficientTokenBalance(); // was: "Insufficient token balance"
     error InvalidOutput(); // was: "Invalid output"
     error InvalidPoolType(); // was: "Only V2 or V3 pool type" / "Unsupported pool type"
+    error InitialBuyTooSmall(); // createToken buy below minCreateBuyUSD
     error MathDivByZero(); // was: "Math: div by zero"
     error MathMulOverflow(); // was: "Math: mul overflow"
     error MaxBuyTooHigh(); // was: "Max buy cannot exceed 100%"
@@ -105,6 +106,9 @@ contract Fyuz is
     error ZeroFeeAddress(); // was: "Fee address cannot be zero"
     error ZeroLiquidityManager(); // was: "Liquidity manager cannot be zero"
     error ZeroThreshold(); // was: "Threshold must be > 0"
+    /// @notice Emitted when the mandatory initial-buy floor changes.
+    event MinCreateBuyUSDSet(uint256 amountUSD);
+
     using SafeERC20 for IERC20;
 
     // ==================== PUMP.FUN EXACT PARAMETERS (confirmed from protocol) ====================
@@ -287,6 +291,15 @@ contract Fyuz is
     ///         the upgradeable storage layout append-only.
     uint256 public platformTreasuryShareBps;
 
+    /// @notice Minimum initial buy required to create a token, as 18-decimal USD.
+    ///         0 disables the floor entirely.
+    /// @dev Enforced ON-CHAIN. The create page has always shown a $10 minimum, but
+    ///      a frontend check is advice, not a rule: anyone calling createToken
+    ///      directly could launch for free, which is exactly how a throwaway wallet
+    ///      farms creator grants at the cost of gas. Denominated in USD rather than
+    ///      wei so the floor does not drift with the BNB price.
+    uint256 public minCreateBuyUSD;
+
     // ==================== UPGRADE GAP ====================
     /// @dev Reserved storage so future upgrades can append state without colliding
     ///      with any child contract's slots. Decrement this when adding a variable.
@@ -294,7 +307,8 @@ contract Fyuz is
     ///      of their own.
     // 50 -> 48: fallbackRouterV2 takes one slot, fallbackStable + fallbackStableDecimals
     // pack into a second. 48 -> 47: platformTreasuryShareBps appended above.
-    uint256[47] private __gap;
+    // 47 -> 46: minCreateBuyUSD appended above.
+    uint256[46] private __gap;
 
     receive() external payable {}
 
@@ -406,6 +420,19 @@ contract Fyuz is
         // internals remain in FyuzLiquidityManager but are unreachable. Only
         // 1 = Uniswap/Pancake V2 and 2 = Uniswap/Pancake V3 may be selected.
         if (!(poolType == 1 || poolType == 2)) revert InvalidPoolType();
+
+        // Mandatory initial buy. Checked BEFORE deploying the Token so a rejected
+        // create does not pay for a contract nobody will use.
+        uint256 minBuyUSD = minCreateBuyUSD;
+        if (minBuyUSD > 0) {
+            uint256 ethUsd = _rawEthPrice();
+            // Reverts when the oracle is down, unlike the reporting-only price in
+            // the TokenCreated event below. Waving the floor through on a stale
+            // feed would hand anyone a bypass: wait for an outage, create for free.
+            // Creating a token is not time-critical enough to justify that.
+            if (ethUsd == 0) revert StalePriceFeed();
+            if (_mul(buyAmount, ethUsd) / 1 ether < minBuyUSD) revert InitialBuyTooSmall();
+        }
 
         address newToken = address(new Token(name, symbol, TOTAL_SUPPLY));
 
@@ -1138,6 +1165,16 @@ contract Fyuz is
 
     /// @notice Set the Chainlink staleness threshold. On L2 chains where the feed
     ///         timestamp originates from L1, increase this to 86400+ (24h).
+    /// @notice Set the mandatory initial buy for createToken, as 18-decimal USD
+    ///         (10e18 = $10). Pass 0 to remove the floor.
+    /// @dev Owner-tunable on purpose: it is the cheapest lever against creator-grant
+    ///      farming, and the right value depends on what sybils actually cost, which
+    ///      is only observable once the platform is live.
+    function setMinCreateBuyUSD(uint256 amountUSD) external onlyOwner {
+        minCreateBuyUSD = amountUSD;
+        emit MinCreateBuyUSDSet(amountUSD);
+    }
+
     function setPriceStalenessThreshold(uint256 threshold) external onlyOwner {
         if (threshold <= 0) revert ZeroThreshold();
         priceStalenessThreshold = threshold;

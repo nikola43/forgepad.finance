@@ -70,12 +70,20 @@ contract DeployBscFresh is Script {
         address poster = vm.envOr("POSTER", deployer);
         address treasury = vm.envOr("TREASURY", owner);
 
-        uint256 subId = vm.envUint("VRF_SUB_ID");
-        require(subId != 0, "Set VRF_SUB_ID");
+        // VRF subscription. Pass VRF_SUB_ID to reuse an existing one, or leave it
+        // unset to create a fresh subscription in this same broadcast.
+        //
+        // Creating it here rather than by hand is deliberate: the deployer must
+        // own the subscription to call addConsumer, and a subscription that
+        // exists but is owned by someone else fails LATE — after the contracts
+        // are already deployed and paid for.
+        uint256 subId = vm.envOr("VRF_SUB_ID", uint256(0));
         // Defaults to 0: the existing subscription is already funded, and this
         // deployer's balance is small enough that a stray 0.005 BNB top-up would
         // be a meaningful fraction of it.
         uint256 vrfFund = vm.envOr("VRF_FUND_BNB", uint256(0));
+        // 18-decimal USD. Matches MIN_CREATE_BUY_USD on the create page; 0 disables.
+        uint256 minCreateBuyUSD = vm.envOr("MIN_CREATE_BUY_USD", uint256(10 ether));
         // addConsumer is callable only by the SUBSCRIPTION owner. Off by default
         // so a deployer who does not own the sub gets a clean printout to action
         // in the Chainlink UI instead of a failed broadcast halfway through.
@@ -90,6 +98,14 @@ contract DeployBscFresh is Script {
 
         vm.startBroadcast(pk);
 
+        // ---- 0. VRF subscription -------------------------------------------
+        IVRFCoordinatorV2Plus coord = IVRFCoordinatorV2Plus(VRF_COORDINATOR);
+        if (subId == 0) {
+            subId = coord.createSubscription();
+            console.log("Created VRF subscription:", subId);
+            addConsumer = true; // we own it, so we can wire the consumer directly
+        }
+
         // ---- 1. Distributor (proxied) --------------------------------------
         Distributor distImpl = new Distributor();
         bytes memory distInit = abi.encodeCall(
@@ -102,10 +118,10 @@ contract DeployBscFresh is Script {
         console.log("Distributor:", address(distributor));
 
         if (addConsumer) {
-            IVRFCoordinatorV2Plus(VRF_COORDINATOR).addConsumer(subId, address(distributor));
+            coord.addConsumer(subId, address(distributor));
         }
         if (vrfFund > 0) {
-            IVRFCoordinatorV2Plus(VRF_COORDINATOR).fundSubscriptionWithNative{value: vrfFund}(subId);
+            coord.fundSubscriptionWithNative{value: vrfFund}(subId);
         }
 
         // ---- 2. Liquidity manager ------------------------------------------
@@ -145,6 +161,10 @@ contract DeployBscFresh is Script {
         // 1h: BNB/USD on BSC is a native ~60s-heartbeat feed, so a feed silent for
         // an hour is broken and must not price a trade.
         fyuz.setPriceStalenessThreshold(3600);
+        // Mandatory initial buy, enforced on-chain. The create page has shown a $10
+        // floor for a while, but a frontend check is advice — a scripted caller
+        // could launch for free and farm creator grants at the cost of gas.
+        fyuz.setMinCreateBuyUSD(minCreateBuyUSD);
 
         if (owner != deployer) {
             lm.transferOwnership(owner);
@@ -167,6 +187,7 @@ contract DeployBscFresh is Script {
         require(fyuz.TOKEN_OWNER_FEE_BPS() == 20, "creator fee");
         require(fyuz.platformTreasuryShareBps() == 6250, "treasury share");
         require(fyuz.priceStalenessThreshold() == 3600, "staleness");
+        require(fyuz.minCreateBuyUSD() == minCreateBuyUSD, "min create buy");
         require(_proxyAdmin(address(fyuz)) != address(0), "Fyuz proxy admin");
         require(_proxyAdmin(address(distributor)) != address(0), "Distributor proxy admin");
 
@@ -181,6 +202,7 @@ contract DeployBscFresh is Script {
         console.log("Owner (all):      ", owner);
         console.log("Poster:           ", poster);
         console.log("VRF sub:          ", subId);
+        console.log("Min create buy USD:", minCreateBuyUSD);
         console.log("consumer added:   ", addConsumer);
         console.log("=================================================");
         if (!addConsumer) {

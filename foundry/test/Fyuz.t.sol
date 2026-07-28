@@ -931,6 +931,38 @@ contract FyuzTest is Test {
 
     /// Pre-graduation the restriction targets DEX listing, not people paying each
     /// other: wallet-to-wallet must work, sends to a CONTRACT must not.
+    /// The $10 create floor lived only in the frontend, so a scripted caller could
+    /// launch for free. It is a contract rule now, and owner-tunable.
+    function test_07z_MinCreateBuyEnforcedOnChain() public {
+        // Default in tests is 0 (disabled) — a zero-buy create must still work.
+        fyuz.createToken{value: 0.001 ether}("Free", "FREE", 0, 0, 0, 1, block.timestamp);
+
+        // Turn the floor on: $10, priced off the same feed the curve uses.
+        fyuz.setMinCreateBuyUSD(10 ether);
+        assertEq(fyuz.minCreateBuyUSD(), 10 ether, "floor stored");
+
+        uint256 ethUsd = fyuz.getETHPriceByUSD();
+        uint256 tenDollars = (10 ether * 1 ether) / ethUsd;
+
+        // A buy just under $10 is rejected...
+        uint256 tooSmall = (tenDollars * 9) / 10;
+        vm.expectRevert(Fyuz.InitialBuyTooSmall.selector);
+        fyuz.createToken{value: tooSmall + 0.01 ether}("Small", "SML", tooSmall, 0, 0, 1, block.timestamp);
+
+        // ...and a comfortable buy over it goes through.
+        uint256 enough = (tenDollars * 12) / 10;
+        fyuz.createToken{value: enough + 0.05 ether}("Big", "BIG", enough, 0, 0, 1, block.timestamp);
+
+        // Only the owner may move the floor.
+        vm.prank(addr1);
+        vm.expectRevert();
+        fyuz.setMinCreateBuyUSD(0);
+
+        // Setting it back to 0 restores free creation.
+        fyuz.setMinCreateBuyUSD(0);
+        fyuz.createToken{value: 0.001 ether}("Free2", "FRE2", 0, 0, 0, 1, block.timestamp);
+    }
+
     function test_08a_TransferToContractBlockedBeforeLaunch() public {
         console.log("=== TEST 8a: Pre-launch transfers: wallets yes, contracts no ===");
         address t = _create("RestrictToken", "RST", 1);
