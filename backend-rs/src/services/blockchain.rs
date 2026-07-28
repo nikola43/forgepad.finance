@@ -272,10 +272,16 @@ async fn catch_up<P: Provider>(
             .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end));
         // Watch the Fyuz contract, plus the Distributor when configured, in one
         // getLogs so the reset event is indexed on the same cursor-safe path.
-        let filter = match distributor_address {
-            Some(d) => filter.address(vec![contract_address, d]),
-            None => filter.address(contract_address),
-        };
+        // Curve + Distributor + every on-curve token, so ERC20 Transfers between
+        // wallets are seen. Graduated tokens are excluded: their positions stop
+        // scoring at graduation, so their transfers no longer matter.
+        let mut watched = vec![contract_address];
+        if let Some(d) = distributor_address {
+            watched.push(d);
+        }
+        let known_before = tracked_token_addresses(state, &chain.network).await;
+        watched.extend(known_before.iter().copied());
+        let filter = filter.address(watched);
 
         let logs = provider
             .get_logs(&filter)
@@ -285,6 +291,40 @@ async fn catch_up<P: Provider>(
             process_log(state, chain, &log)
                 .await
                 .map_err(|e| anyhow::anyhow!("catch_up process_log: {e}"))?;
+        }
+
+        // A token CREATED inside this chunk was not in the address filter above,
+        // so its own Transfers in the same block range were never fetched — and
+        // the cursor is about to move past them for good. Re-scan the same range
+        // for just the addresses that appeared while we were processing it. Bounded
+        // (only brand-new tokens) and safe to overlap, since every write here is
+        // idempotent on (tx_hash, log_index).
+        let fresh: Vec<Address> = {
+            let after = tracked_token_addresses(state, &chain.network).await;
+            let before: std::collections::HashSet<Address> = known_before.into_iter().collect();
+            after.into_iter().filter(|a| !before.contains(a)).collect()
+        };
+        if !fresh.is_empty() {
+            tracing::info!(
+                "Chain {} re-scanning blocks {}-{} for {} token(s) created in-chunk",
+                chain.network,
+                from,
+                end,
+                fresh.len()
+            );
+            let refilter = Filter::new()
+                .from_block(alloy::rpc::types::BlockNumberOrTag::Number(from))
+                .to_block(alloy::rpc::types::BlockNumberOrTag::Number(end))
+                .address(fresh);
+            let logs = provider
+                .get_logs(&refilter)
+                .await
+                .map_err(|e| anyhow::anyhow!("catch_up rescan get_logs {from}-{end}: {e}"))?;
+            for log in logs {
+                process_log(state, chain, &log)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("catch_up rescan process_log: {e}"))?;
+            }
         }
 
         // Advance only after the whole chunk was fetched AND processed.
@@ -366,12 +406,17 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     // Distributor payout: RoundDistributed(uint256 indexed roundId, address indexed
     // winner, uint256 winnerAmount, uint256 distributedAmount, uint256 holderCount).
     let round_distributed_sig = keccak256(b"RoundDistributed(uint256,address,uint256,uint256,uint256)");
+    // Plain ERC20 movement of a launchpad token between wallets.
+    let transfer_sig = keccak256(b"Transfer(address,address,uint256)");
 
     // log index within its block — used together with tx_hash as the trade's
     // idempotency key so replays/reorgs cannot double-count.
     let log_index = log.log_index.unwrap_or(0) as i64;
 
-    if *topic == token_created_sig {
+    if *topic == transfer_sig {
+        let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
+        process_transfer_log(state, chain, log, &tx_hash, log_index).await?;
+    } else if *topic == token_created_sig {
         let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}")).unwrap_or_default();
         process_token_created_log(state, chain, &data.data, &tx_hash).await?;
     } else if *topic == buy_tokens_sig {
@@ -661,7 +706,11 @@ async fn process_swap_log(
     let (eth_price, eth_price_bd) = if event_eth_price > 0.0 {
         (event_eth_price, event_eth_price_bd)
     } else {
-        let fallback = fetch_eth_price(chain).await.unwrap_or(2040.0);
+        // 0.0, never a hardcoded price: a stale constant silently mis-scores every
+        // trade it touches (2040.0 was ~3.4x the real BNB price), and points are a
+        // claim on the payout pot. Zero scores the trade at zero, which is wrong
+        // but visibly and safely wrong, and matches the sibling path above.
+        let fallback = fetch_eth_price(chain).await.unwrap_or(0.0);
         (fallback, BigDecimal::from_str(&fallback.to_string()).unwrap_or_default())
     };
 
@@ -1071,6 +1120,9 @@ pub async fn process_swap(
     // a crash between them permanently loses reserves/volume/holder deltas while
     // the (tx_hash, log_index) idempotency guard blocks re-application on replay.
     // A duplicate log inserts nothing and leaves every aggregate untouched.
+    // Rewards are credited by the event that earns them, not by anyone viewing a
+    // profile — see handlers::rewards::sync_grants. Runs after the trade commits
+    // so quest conditions see it; failures are logged, never fatal to indexing.
     let applied: bool = conn
         .transaction::<bool, diesel::result::Error, _>(|conn| {
             async move {
@@ -1143,6 +1195,20 @@ pub async fn process_swap(
             log_index
         );
         return Ok(());
+    }
+
+    // Credit any reward this trade just earned (first buy, daily quests, whale,
+    // the referrer's bonus, ...). Idempotent and driven by the on-chain event, so
+    // a user is credited whether or not anyone ever opens their profile, and the
+    // grant lands in the round window the trade belongs to.
+    if let Err(e) = crate::handlers::rewards::sync_grants(state, swapper_id).await {
+        tracing::warn!("sync_grants failed for user {swapper_id}: {e}");
+    }
+    // The referrer earns from THIS user's trade, so refresh them too.
+    if let Some(rid) = referrer_of(state, swapper_id).await {
+        if let Err(e) = crate::handlers::rewards::sync_grants(state, rid).await {
+            tracing::warn!("sync_grants failed for referrer {rid}: {e}");
+        }
     }
 
     // Emit WebSocket event
@@ -1296,4 +1362,243 @@ mod money_tests {
             BigDecimal::from_str("123456789.123456789123456789").unwrap().normalized()
         );
     }
+}
+
+/// The user who referred `uid`, if any. Used to credit referral rewards from the
+/// referee's trade rather than waiting for the referrer to load a page.
+async fn referrer_of(state: &AppState, uid: i32) -> Option<i32> {
+    use diesel_async::RunQueryDsl;
+    let mut conn = state.db.get().await.ok()?;
+    #[derive(diesel::QueryableByName)]
+    struct R {
+        #[diesel(sql_type = diesel::sql_types::Integer)]
+        referrer_id: i32,
+    }
+    let r: Option<R> = diesel::sql_query(format!(
+        "SELECT referrer_id FROM referrals WHERE referee_id = {uid} LIMIT 1"
+    ))
+    .get_result(&mut conn)
+    .await
+    .ok();
+    r.map(|x| x.referrer_id)
+}
+
+/// Addresses of every token we index on this network.
+///
+/// These are added to the log filter so plain ERC20 Transfer events reach the
+/// indexer. NOTE: this list grows with the number of launched tokens, and
+/// eth_getLogs address arrays are not unbounded — past a few thousand tokens
+/// this needs to move to a topic-only filter with in-process matching, or a
+/// separate paged subscription.
+async fn tracked_token_addresses(state: &AppState, network: &str) -> Vec<Address> {
+    use diesel::sql_types::Text;
+    use diesel_async::RunQueryDsl;
+    let Ok(mut conn) = state.db.get().await else {
+        return Vec::new();
+    };
+    #[derive(diesel::QueryableByName)]
+    struct A {
+        #[diesel(sql_type = Text)]
+        token_address: String,
+    }
+    let rows: Vec<A> = diesel::sql_query(
+        "SELECT token_address FROM tokens WHERE network = $1 AND launched_at IS NULL",
+    )
+    .bind::<Text, _>(network)
+    .load(&mut conn)
+    .await
+    .unwrap_or_default();
+    rows.iter()
+        .filter_map(|r| r.token_address.parse::<Address>().ok())
+        .collect()
+}
+
+/// Record a plain ERC20 transfer of a launchpad token between wallets.
+///
+/// Only the OUTGOING side matters for scoring: tokens leaving a wallet reduce
+/// its position, while tokens arriving are ignored (see handlers::points — a
+/// transfer destroys points rather than moving them, so a position cannot be
+/// laundered through a second wallet).
+///
+/// Curve-side legs are skipped. Every buy and sell also emits a Transfer to or
+/// from the bonding-curve contract, and those token movements are ALREADY
+/// accounted for by the trade row — recording them here as well would subtract a
+/// sell twice and zero out honest holders.
+///
+/// The `holders` balance IS updated on both sides, unlike the score: a balance is
+/// a statement of fact about who holds what, so it must follow the tokens, while
+/// points deliberately do not (see handlers::points).
+async fn process_transfer_log(
+    state: &AppState,
+    chain: &ChainConfig,
+    log: &Log,
+    tx_hash: &str,
+    log_index: i64,
+) -> anyhow::Result<()> {
+    use diesel::sql_types::{BigInt, Integer, Nullable, Numeric, Text};
+
+    let topics = log.topics();
+    if topics.len() < 3 {
+        return Ok(()); // non-standard Transfer (no indexed from/to)
+    }
+    let from = Address::from_slice(&topics[1].as_slice()[12..]);
+    let to = Address::from_slice(&topics[2].as_slice()[12..]);
+    // Mint/burn legs carry no holder-to-holder movement.
+    if from == Address::ZERO || to == Address::ZERO {
+        return Ok(());
+    }
+    // The curve itself is the counterparty on every buy/sell; those are trades.
+    let curve: Address = match chain.contract_address.parse() {
+        Ok(a) => a,
+        Err(_) => return Ok(()),
+    };
+    if from == curve || to == curve {
+        return Ok(());
+    }
+
+    // A standard Transfer carries exactly one uint256. Anything longer is a
+    // non-standard event, and U256::from_be_slice PANICS above 32 bytes — that
+    // would kill the listener task for the whole chain, not just this log.
+    let data = log.data().data.as_ref();
+    if data.len() > 32 {
+        return Ok(());
+    }
+    // WHOLE TOKENS, never raw wei. `trades.token_amount` is wei/1e18 (wei_to_bd)
+    // and the scoring query unions trades and transfers into ONE running balance,
+    // so a raw-wei transfer outweighs the position it is subtracted from by 1e18:
+    // transferring a single token out of a 514,545-token position drove the
+    // balance to -1e18 and floored that holder's score to zero permanently.
+    let amount = wei_to_bd(data);
+    if amount <= BigDecimal::from(0) {
+        return Ok(());
+    }
+    // Block time, not wall-clock. Trades take their timestamp from the event
+    // payload, and the scoring integral orders trades and transfers in one
+    // sequence — stamping now() put every backfilled transfer after every trade
+    // and sliced the segments against the wrong instants.
+    let ts = log
+        .block_timestamp
+        .map(|t| t as i64)
+        .unwrap_or_else(|| chrono::Utc::now().timestamp());
+
+    let token_addr = format!("{:#x}", log.address()).to_lowercase();
+    let from_addr = format!("{from:#x}").to_lowercase();
+    let to_addr = format!("{to:#x}").to_lowercase();
+
+    let mut conn = state.db.get().await?;
+
+    // Only tokens we actually index are scored; anything else is not our concern.
+    // Either user id may be NULL (a wallet we have never seen) — the scoring query
+    // filters those out and the holder update below skips them.
+    #[derive(diesel::QueryableByName)]
+    struct Resolved {
+        #[diesel(sql_type = Integer)]
+        token_id: i32,
+        #[diesel(sql_type = Nullable<Integer>)]
+        from_user_id: Option<i32>,
+        #[diesel(sql_type = Nullable<Integer>)]
+        to_user_id: Option<i32>,
+    }
+    let resolved: Option<Resolved> = diesel::sql_query(
+        "SELECT tk.id AS token_id, \
+                (SELECT id FROM users WHERE lower(address) = $2) AS from_user_id, \
+                (SELECT id FROM users WHERE lower(address) = $3) AS to_user_id \
+         FROM tokens tk WHERE lower(tk.token_address) = $1 AND tk.network = $4",
+    )
+    .bind::<Text, _>(&token_addr)
+    .bind::<Text, _>(&from_addr)
+    .bind::<Text, _>(&to_addr)
+    .bind::<Text, _>(&chain.network)
+    .get_result(&mut conn)
+    .await
+    .optional()?;
+    let Some(r) = resolved else {
+        return Ok(());
+    };
+
+    // The transfer row and both holder balances commit together. The
+    // (tx_hash, log_index) guard blocks re-application on replay, so a crash
+    // between the insert and the balance updates would desync them for good.
+    let amount_for_tx = amount.clone();
+    let applied: bool = conn
+        .transaction::<bool, diesel::result::Error, _>(|conn| {
+            async move {
+                let inserted = diesel::sql_query(
+                    "INSERT INTO token_transfers \
+                       (token_id, from_user_id, to_user_id, amount, transferred_at, tx_hash, log_index) \
+                     VALUES ($1, $2, $3, $4::numeric, $5, $6, $7) \
+                     ON CONFLICT (tx_hash, log_index) DO NOTHING",
+                )
+                .bind::<Integer, _>(r.token_id)
+                .bind::<Nullable<Integer>, _>(r.from_user_id)
+                .bind::<Nullable<Integer>, _>(r.to_user_id)
+                .bind::<Numeric, _>(&amount_for_tx)
+                .bind::<BigInt, _>(ts)
+                .bind::<Text, _>(tx_hash)
+                .bind::<BigInt, _>(log_index)
+                .execute(conn)
+                .await?;
+                if inserted == 0 {
+                    return Ok(false);
+                }
+
+                // Sender: debit, floored at zero. No row means we never saw them
+                // acquire anything, so there is nothing to debit.
+                if let Some(uid) = r.from_user_id {
+                    let existing: Option<crate::models::holder::Holder> = holders::table
+                        .filter(holders::token_id.eq(r.token_id).and(holders::user_id.eq(uid)))
+                        .first(conn)
+                        .await
+                        .optional()?;
+                    if let Some(h) = existing {
+                        let mut next = &h.amount - &amount_for_tx;
+                        if next < BigDecimal::from(0) {
+                            next = BigDecimal::from(0);
+                        }
+                        diesel::update(holders::table.find(h.id))
+                            .set(holders::amount.eq(next))
+                            .execute(conn)
+                            .await?;
+                    }
+                }
+
+                // Receiver: credit, creating the row if this is their first hold.
+                if let Some(uid) = r.to_user_id {
+                    let existing: Option<crate::models::holder::Holder> = holders::table
+                        .filter(holders::token_id.eq(r.token_id).and(holders::user_id.eq(uid)))
+                        .first(conn)
+                        .await
+                        .optional()?;
+                    match existing {
+                        Some(h) => {
+                            let next = &h.amount + &amount_for_tx;
+                            diesel::update(holders::table.find(h.id))
+                                .set(holders::amount.eq(next))
+                                .execute(conn)
+                                .await?;
+                        }
+                        None => {
+                            diesel::insert_into(holders::table)
+                                .values(crate::models::holder::NewHolder {
+                                    token_id: r.token_id,
+                                    user_id: uid,
+                                    amount: amount_for_tx.clone(),
+                                })
+                                .execute(conn)
+                                .await?;
+                        }
+                    }
+                }
+                Ok(true)
+            }
+            .scope_boxed()
+        })
+        .await?;
+
+    if applied {
+        tracing::debug!(
+            "indexed token transfer {token_addr} {from:#x} -> {to:#x} amount={amount}"
+        );
+    }
+    Ok(())
 }
