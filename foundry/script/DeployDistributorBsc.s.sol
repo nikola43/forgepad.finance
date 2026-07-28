@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
 
@@ -63,7 +64,15 @@ contract DeployDistributorBsc is Script {
 
         vm.startBroadcast(pk);
 
-        Distributor distributor = new Distributor(VRF_COORDINATOR, subId, KEY_HASH_200_GWEI, poster);
+        // Distributor is upgradeable now, so it goes behind a proxy and is
+        // initialized rather than constructed. The proxy admin is the
+        // multisig, matching where upgrade authority lives for Fyuz.
+        Distributor distImpl = new Distributor();
+        Distributor distributor = Distributor(payable(address(new TransparentUpgradeableProxy(
+            address(distImpl),
+            multisig,
+            abi.encodeCall(Distributor.initialize, (VRF_COORDINATOR, subId, KEY_HASH_200_GWEI, poster, deployer))
+        ))));
 
         IVRFCoordinatorV2Plus coordinator = IVRFCoordinatorV2Plus(VRF_COORDINATOR);
         coordinator.addConsumer(subId, address(distributor));

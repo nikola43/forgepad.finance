@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
 
@@ -49,7 +50,15 @@ contract DeployDistributorBscTestnet is Script {
         vm.startBroadcast(pk);
 
         IVRFCoordinatorV2Plus coordinator = IVRFCoordinatorV2Plus(VRF_COORDINATOR);
-        Distributor distributor = new Distributor(VRF_COORDINATOR, subId, KEY_HASH_50_GWEI, poster);
+        // Distributor is upgradeable now, so it goes behind a proxy and is
+        // initialized rather than constructed. The proxy admin is the
+        // deployer on testnet, which is who operates this stack.
+        Distributor distImpl = new Distributor();
+        Distributor distributor = Distributor(payable(address(new TransparentUpgradeableProxy(
+            address(distImpl),
+            deployer,
+            abi.encodeCall(Distributor.initialize, (VRF_COORDINATOR, subId, KEY_HASH_50_GWEI, poster, deployer))
+        ))));
         coordinator.addConsumer(subId, address(distributor));
         coordinator.fundSubscriptionWithNative{value: vrfFund}(subId);
 

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+// PausableUpgradeable, not Pausable: the plain one inherits Context while
+// OwnableUpgradeable inherits ContextUpgradeable, and Solidity refuses the
+// ambiguous _msgSender/_msgData that results.
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {VRFConsumerBaseV2PlusUpgradeable} from "./VRFConsumerBaseV2PlusUpgradeable.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -34,7 +37,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///      but Automation v2.1 sunsets 2026-07-31, so that entrypoint is gone —
 ///      distribute() is permissionless anyway, so any keeper, cron or human can
 ///      finish a round if CRE is down.
-contract Distributor is VRFConsumerBaseV2Plus, Pausable {
+/// @dev UPGRADEABLE: deployed behind a TransparentUpgradeableProxy, so state lives
+///      in the proxy and `initialize` replaces the constructor. OZ 5.x `Pausable`
+///      is safe to inherit as-is — it has no constructor and a fresh proxy's zero
+///      slot reads as "not paused". The VRF base had to be swapped for a
+///      proxy-safe one; see VRFConsumerBaseV2PlusUpgradeable for why Chainlink's
+///      own base cannot be used here.
+contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable {
 
     // Custom errors (one per former require/revert string).
     error BpsTooHigh(); // was: "Cannot exceed 100%"
@@ -82,18 +91,25 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     uint256 public totalClaimable;
 
     // ---- config ------------------------------------------------------------
+    //
+    // Declared WITHOUT inline initializers on purpose. A field initializer is
+    // compiled into the constructor, and a proxy never runs the implementation
+    // constructor against its own storage — so `= 9000` here would leave the
+    // PROXY reading 0. That is not a cosmetic default: percentForDistribute at
+    // zero pays nobody and strands the pot, and vrfGasLimit at zero makes every
+    // fulfilment run out of gas. Every one of these is set in initialize().
 
-    uint256 public period = 1 weeks;
-    uint256 public percentForWinner = 1000;     // 10% of the pot, basis points
-    uint256 public percentForDistribute = 9000; // 90% of the pot, basis points
+    uint256 public period;
+    uint256 public percentForWinner;     // 10% of the pot, basis points
+    uint256 public percentForDistribute; // 90% of the pot, basis points
     /// @notice Backend key allowed to run rounds and post shares.
     address public poster;
 
     uint256 public vrfSubscriptionId;
     bytes32 public vrfKeyHash;
-    uint32 public vrfGasLimit = 200000; // fulfill only stores one word
-    uint16 public vrfConfirmations = 3;
-    bool public vrfNativePayment = true;
+    uint32 public vrfGasLimit; // fulfill only stores one word
+    uint16 public vrfConfirmations;
+    bool public vrfNativePayment;
 
     // ---- events ------------------------------------------------------------
 
@@ -106,18 +122,40 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
 
     // ---- setup -------------------------------------------------------------
 
-    constructor(
+    /// @dev Locks the IMPLEMENTATION so nobody can initialize it directly and take
+    ///      ownership of the logic contract. State only ever lives in the proxy.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Proxy initializer. Replaces the constructor — see the contract-level
+    ///         note on why this contract cannot use one.
+    /// @param _owner Receives ownership. Passed explicitly rather than defaulting to
+    ///        msg.sender, because behind a proxy msg.sender is whatever deployed the
+    ///        proxy, which is not necessarily who should own the contract.
+    function initialize(
         address _vrfCoordinator,
         uint256 _vrfSubscriptionId,
         bytes32 _vrfKeyHash,
-        address _poster
-    ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
+        address _poster,
+        address _owner
+    ) external initializer {
         if (_poster == address(0)) revert ZeroPoster();
         if (_vrfKeyHash == bytes32(0)) revert ZeroKeyHash();
         if (_vrfSubscriptionId == 0) revert ZeroSubId();
+        __VRFConsumerBaseV2Plus_init(_vrfCoordinator, _owner);
+        __Pausable_init();
         vrfSubscriptionId = _vrfSubscriptionId;
         vrfKeyHash = _vrfKeyHash;
         poster = _poster;
+
+        // Defaults that used to be field initializers — see the config block.
+        period = 1 weeks;
+        percentForWinner = 1000;     // 10% of the pot
+        percentForDistribute = 9000; // 90% of the pot
+        vrfGasLimit = 200000;        // fulfill only stores one word
+        vrfConfirmations = 3;
+        vrfNativePayment = true;
     }
 
     /// Max holders per round — must match the top-N the backend posts. Bounds

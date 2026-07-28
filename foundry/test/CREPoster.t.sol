@@ -2,6 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from
+    "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {CREPoster} from "../src/CREPoster.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
@@ -23,7 +25,15 @@ contract CREPosterTest is Test {
         uint256 subId = coordinator.createSubscription();
         coordinator.fundSubscriptionWithNative{value: 10 ether}(subId);
 
-        distributor = new Distributor(address(coordinator), subId, KEY_HASH, address(this));
+        // Deployed behind a proxy exactly as in production: Distributor is
+        // upgradeable, so a constructor-built one would not exercise the
+        // initializer path the real contract takes.
+        Distributor distImpl = new Distributor();
+        distributor = Distributor(payable(address(new TransparentUpgradeableProxy(
+            address(distImpl),
+            address(this),
+            abi.encodeCall(Distributor.initialize, (address(coordinator), subId, KEY_HASH, address(this), address(this)))
+        ))));
         coordinator.addConsumer(subId, address(distributor));
 
         poster = new CREPoster(distributor, forwarder);
