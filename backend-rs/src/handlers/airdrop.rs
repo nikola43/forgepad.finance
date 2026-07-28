@@ -23,11 +23,13 @@ use crate::AppState;
 // nothing is promised or reserved on-chain.
 // ---------------------------------------------------------------------------
 
-// points = max(0, buy_volume_usd - sell_volume_usd) + sum(points_ledger.amount)
-// Identical net-volume model to get_leaderboard so ranks stay consistent.
-const POINTS: &str = "GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
-     - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
-     + COALESCE((SELECT SUM(pl.amount) FROM points_ledger pl WHERE pl.user_id = u.id), 0)";
+// Canonical scoring — see handlers/points.rs. Identical to the leaderboard and
+// to the Distributor shares so ranks stay consistent across all three.
+//
+// The airdrop scores the WHOLE history (window = [0, now]) rather than the
+// current round window: it is a lifetime-contribution view, not a per-round
+// payout. Allocation remains purely indicative — nothing is promised or
+// reserved on-chain.
 
 #[derive(QueryableByName)]
 struct IdRow {
@@ -86,20 +88,24 @@ pub async fn get_airdrop(
 
     // per_user: every user with a positive score. uid is an i32 from the DB, so
     // inlining it is injection-safe.
+    let now = chrono::Utc::now().timestamp();
+    // Lifetime window: anchored at the first trade, not 1970.
+    let lifetime_from = crate::handlers::points::clamp_window_start(&state, 0).await?;
+    let points = crate::handlers::points::points_expr();
     let stats: StatsRow = diesel::sql_query(format!(
-        "WITH per_user AS ( \
-           SELECT u.id AS uid, {POINTS} AS points \
-           FROM users u \
-           JOIN trades t ON t.swapper_id = u.id \
-           GROUP BY u.id \
-           HAVING {POINTS} > 0 \
+        "{with}, per_user AS ( \
+           SELECT u.id AS uid, {points} AS points \
+           FROM users u {joins} \
+           WHERE {points} > 0 \
          ) \
          SELECT \
            COALESCE((SELECT points FROM per_user WHERE uid = {uid}), 0) AS your_points, \
            COALESCE(SUM(points), 0) AS total_points, \
            COUNT(*)::bigint AS total_users, \
            (1 + COUNT(*) FILTER (WHERE points > COALESCE((SELECT points FROM per_user WHERE uid = {uid}), 0)))::bigint AS rank \
-         FROM per_user"
+         FROM per_user",
+        with = crate::handlers::points::points_with(lifetime_from, now),
+        joins = crate::handlers::points::POINTS_JOINS,
     ))
     .get_result(&mut conn)
     .await?;

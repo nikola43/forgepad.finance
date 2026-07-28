@@ -53,7 +53,11 @@ import { socket } from "@/utils/socket";
 
 // Minimum opening buy per launch, in USD, converted to BNB at confirm time via
 // the contract's Chainlink feed. 0 = no mandatory buy (opening buy optional).
-const MIN_CREATE_BUY_USD = 0;
+// A token launch grants launch_token (20 pts) + the creator achievement (10 pts).
+// With no minimum buy those 30 points cost only gas, which made "create a token"
+// the cheapest way to manufacture leaderboard weight. Requiring a real initial
+// buy prices the launch in capital rather than gas.
+const MIN_CREATE_BUY_USD = 10;
 
 // Flat citron display headline (§10: no gradient text, no glow).
 const Title = styled(Typography)`

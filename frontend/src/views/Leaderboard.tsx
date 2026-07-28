@@ -18,6 +18,9 @@ type Entry = {
     volumeUsd: number
     trades: number
     points: number
+    pointsTotal: number
+    pointsProjected: number
+    heldUsd: number
     rewardEth: number
 }
 
@@ -67,7 +70,7 @@ export default function Leaderboard() {
                     <EmojiEventsIcon sx={{ fontSize: 26 }} /> The Rankings
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Points = net USD invested (buys − sells) plus bonus points from quests and referrals. Each point is worth 0.00001 BNB in rewards.
+                    Points = the average position you HOLD across the round, plus bonus points from quests and referrals, projected to the round&apos;s close if you keep holding. Holding earns; buying just before the close does not. Rewards = your share of the live pot, split 90% by points and 10% to one random holder.
                 </Typography>
             </Box>
 
@@ -132,7 +135,7 @@ export default function Leaderboard() {
                     <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, px: 2, py: 1.5, background: 'rgba(234,230,218,0.03)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, fontFamily: 'var(--font-data)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         <Box>#</Box>
                         <Box>Trader</Box>
-                        <Box textAlign="right">Volume</Box>
+                        <Box textAlign="right">Holding</Box>
                         <Box textAlign="right">Points</Box>
                         <Box textAlign="right">Reward</Box>
                     </Box>
@@ -153,8 +156,11 @@ export default function Leaderboard() {
                                     {r.username || `${r.address.slice(0, 6)}...${r.address.slice(-4)}`}
                                 </Typography>
                             </Box>
-                            <Typography textAlign="right" color="var(--bone)" fontSize={14} fontFamily="var(--font-data)">${priceFormatter(r.volumeUsd, 2)}</Typography>
-                            <Typography textAlign="right" color="var(--citron)" fontSize={14} fontWeight={600} fontFamily="var(--font-data)">{priceFormatter(r.points, 2)}</Typography>
+                            <Box textAlign="right">
+                                <Typography color="var(--bone)" fontSize={14} fontFamily="var(--font-data)">${priceFormatter(r.heldUsd ?? 0, 2)}</Typography>
+                                <Typography color="var(--text-muted)" fontSize={11} fontFamily="var(--font-data)">${priceFormatter(r.volumeUsd, 2)} traded</Typography>
+                            </Box>
+                            <Typography textAlign="right" color="var(--citron)" fontSize={14} fontWeight={600} fontFamily="var(--font-data)">{priceFormatter(r.pointsProjected ?? r.points, 2)}</Typography>
                             <Box textAlign="right">
                                 <Typography color="var(--up)" fontSize={14} fontWeight={600} fontFamily="var(--font-data)">{priceFormatter(r.rewardEth, 6)} BNB</Typography>
                                 {ethUsd != null && (

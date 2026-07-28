@@ -12,7 +12,7 @@ import { useAppKitAccount } from "@reown/appkit/react"
 import { useRewards, type Quest } from "@/hooks/rewards"
 import toast from "react-hot-toast"
 
-function QuestRow({ q, onClaim, claiming }: { q: Quest; onClaim: () => void; claiming: boolean }) {
+function QuestRow({ q }: { q: Quest }) {
     const pct = Math.min(100, (q.progress / q.target) * 100)
     return (
         <Box sx={{ p: 2, borderRadius: '12px', border: '1px solid rgba(234,230,218,0.06)', background: 'rgba(234,230,218,0.02)', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -37,17 +37,12 @@ function QuestRow({ q, onClaim, claiming }: { q: Quest; onClaim: () => void; cla
                 </Typography>
                 {q.claimed ? (
                     <Typography color="var(--up)" fontSize={12} fontWeight={600} display="flex" alignItems="center" gap={0.4}>
-                        <CheckCircleIcon sx={{ fontSize: 14 }} /> Claimed
+                        <CheckCircleIcon sx={{ fontSize: 14 }} /> Earned
                     </Typography>
                 ) : q.completed ? (
-                    <Button
-                        size="small"
-                        disabled={claiming}
-                        onClick={onClaim}
-                        sx={{ textTransform: 'none', color: 'var(--moss-black)', background: 'var(--citron)', borderRadius: '8px', px: 1.5, py: 0.25, fontWeight: 700, '&:hover': { background: 'var(--citron)' } }}
-                    >
-                        {claiming ? <CircularProgress size={14} sx={{ color: 'var(--moss-black)' }} /> : 'Claim'}
-                    </Button>
+                    // Completed but not yet credited: the indexer grants on the
+                    // next trade event. No action is required from the user.
+                    <Typography color="var(--citron)" fontSize={12} fontWeight={600}>Crediting…</Typography>
                 ) : (
                     <Typography color="var(--text-muted)" fontSize={12}>In progress</Typography>
                 )}
@@ -58,20 +53,7 @@ function QuestRow({ q, onClaim, claiming }: { q: Quest; onClaim: () => void; cla
 
 export default function Rewards() {
     const { address, isConnected } = useAppKitAccount()
-    const { rewards, claim } = useRewards(address)
-    const [claiming, setClaiming] = useState<string | null>(null)
-
-    const doClaim = async (key: string) => {
-        setClaiming(key)
-        try {
-            await claim(key)
-            toast.success('Points claimed!')
-        } catch (e: any) {
-            toast.error(e?.response?.data?.error || e?.message || 'Claim failed')
-        } finally {
-            setClaiming(null)
-        }
-    }
+    const { rewards } = useRewards(address)
 
     return (
         <PageBox pt={6} maxWidth="900px" mx="auto" width="100%">
@@ -118,7 +100,7 @@ export default function Rewards() {
                     <Typography color="var(--bone)" fontSize={18} fontWeight={700} fontFamily="var(--font-display)" mb={1.5}>Quests</Typography>
                     <Box sx={{ display: 'grid', gap: 1.5, mb: 4 }}>
                         {rewards.quests.map((q) => (
-                            <QuestRow key={q.key} q={q} claiming={claiming === q.key} onClaim={() => doClaim(q.key)} />
+                            <QuestRow key={q.key} q={q} />
                         ))}
                     </Box>
 

@@ -67,28 +67,20 @@ pub async fn get_season(
     let start = SEASON_START;
     let end = SEASON_END;
 
+    // Canonical scoring — handlers/points.rs. The season table used to carry its
+    // own copy of the formula; keeping one definition is what guarantees the
+    // number here matches the one the Distributor pays on.
+    let points = crate::handlers::points::points_expr();
     let rows: Vec<LeaderRow> = diesel::sql_query(format!(
-        "SELECT u.address, u.username, u.avatar, \
-           GREATEST(COALESCE(tv.net_usd, 0), 0) + COALESCE(pl.pts, 0) AS points \
-         FROM users u \
-         LEFT JOIN ( \
-           SELECT swapper_id AS uid, \
-             SUM(CASE WHEN trade_type = 'buy' \
-                      THEN eth_amount::float8 * eth_price::float8 \
-                      ELSE -(eth_amount::float8 * eth_price::float8) END) AS net_usd \
-           FROM trades \
-           WHERE traded_at BETWEEN {start} AND {end} \
-           GROUP BY swapper_id \
-         ) tv ON tv.uid = u.id \
-         LEFT JOIN ( \
-           SELECT user_id AS uid, SUM(amount) AS pts \
-           FROM points_ledger \
-           WHERE created_at BETWEEN to_timestamp({start}) AND to_timestamp({end}) \
-           GROUP BY user_id \
-         ) pl ON pl.uid = u.id \
-         WHERE GREATEST(COALESCE(tv.net_usd, 0), 0) + COALESCE(pl.pts, 0) > 0 \
-         ORDER BY points DESC \
-         LIMIT 50"
+        "{with} \
+         SELECT u.address, u.username, u.avatar, \
+           {points} AS points \
+         FROM users u {joins} \
+         WHERE {points} > 0 \
+         ORDER BY points DESC, u.address ASC \
+         LIMIT 50",
+        with = crate::handlers::points::points_with(start, end),
+        joins = crate::handlers::points::POINTS_JOINS,
     ))
     .load(&mut conn)
     .await?;

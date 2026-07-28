@@ -1,4 +1,4 @@
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::Router;
 use std::sync::Arc;
 
@@ -7,10 +7,8 @@ use crate::AppState;
 
 pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
+        // Read-only. Rewards are granted automatically by the indexer as they
+        // are earned (handlers::rewards::sync_grants) — there is no claim step.
         .route("/{address}", get(handlers::rewards::get_rewards))
-        .route(
-            "/{address}/claim/{questKey}",
-            post(handlers::rewards::claim_quest),
-        )
         .with_state(state)
 }

@@ -219,8 +219,13 @@ CREATE TABLE IF NOT EXISTS points_ledger (
     user_id INTEGER NOT NULL REFERENCES users(id),
     source VARCHAR(20) NOT NULL,
     amount DOUBLE PRECISION NOT NULL,
-    ref VARCHAR(120) NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    -- Idempotency key for a grant. Unique PER USER, never globally: the refs the
+    -- code builds ("quest:first_buy", "ach:creator") carry no user id, so a
+    -- global UNIQUE(ref) let the first user on the platform consume every quest
+    -- and achievement for everybody else.
+    ref VARCHAR(120) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT points_ledger_user_ref_key UNIQUE (user_id, ref)
 );
 CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(user_id);
 

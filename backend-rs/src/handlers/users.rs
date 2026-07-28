@@ -81,9 +81,11 @@ pub struct UserProfileResponse {
     pub followees: i64,
     pub referral_count: i64,
     pub points: i32,
-    // Trading rewards — same net-volume model as the leaderboard:
-    // trading_points = max(0, USD bought - USD sold); reward_eth = points * rate
-    // (see point_reward_rate).
+    // Trading rewards — same model as the leaderboard: trading_points is the
+    // time-weighted position plus unlocked grants (handlers/points.rs), and
+    // reward_eth is this user's slice of the LIVE pot:
+    //   90% x distributor balance x (your points / payout-set points).
+    // There is deliberately no fixed BNB-per-point rate; see points.rs.
     pub trading_points: f64,
     pub trading_volume_usd: f64,
     pub reward_eth: f64,
@@ -384,13 +386,6 @@ pub async fn create_user(
 
 /// BNB paid per leaderboard/bonus point. Env-tunable so the rate can track BNB
 /// price and observed churn without a rebuild.
-pub fn point_reward_rate() -> f64 {
-    std::env::var("POINT_REWARD_BNB")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0.00001)
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LeaderboardQuery {
@@ -406,7 +401,21 @@ pub struct LeaderboardEntry {
     pub avatar: Option<String>,
     pub volume_usd: f64,
     pub trades: i64,
+    /// Points that actually count toward the payout share — this is the exact
+    /// number the Distributor is served, so the ranking never advertises a share
+    /// the contract will not honour.
     pub points: f64,
+    /// Total points EARNED (position + all grants, uncapped). Display only; it
+    /// matches the Rewards Hub so the two screens agree. Always >= `points`; the
+    /// gap is grants not yet unlocked by the user's held position.
+    pub points_total: f64,
+    /// Points at round close if the current position is held until then. This is
+    /// the real-time number the leaderboard leads with — it moves the moment a
+    /// trade lands, where accrued points necessarily lag. Guidance, not a payout.
+    pub points_projected: f64,
+    /// USD value currently held. Real-time, so a fresh buyer sees their money
+    /// represented immediately instead of an apparently broken 0.
+    pub held_usd: f64,
     pub reward_eth: f64,
 }
 
@@ -429,6 +438,14 @@ pub async fn get_leaderboard(
         volume_usd: f64,
         #[diesel(sql_type = Double)]
         points: f64,
+        #[diesel(sql_type = Double)]
+        points_total: f64,
+        #[diesel(sql_type = Double)]
+        payout_total_points: f64,
+        #[diesel(sql_type = Double)]
+        points_projected: f64,
+        #[diesel(sql_type = Double)]
+        held_usd: f64,
         #[diesel(sql_type = BigInt)]
         trades: i64,
     }
@@ -437,32 +454,56 @@ pub async fn get_leaderboard(
     // since the last paid round's time_end counts (0 before the first round).
     let epoch = crate::handlers::distributor::epoch_start(&state).await?;
 
-    // points = max(0, buy_volume_usd - sell_volume_usd) (net USD invested).
-    // GREATEST floors at 0 so a net seller never goes negative. HAVING repeats the
-    // expression because Postgres can't reference SELECT aliases there.
-    // limit is clamped to an integer and epoch comes from our own DB, so
+    // Canonical scoring — handlers/points.rs. This MUST be the same expression
+    // the Distributor pays on, or the leaderboard is advertising a share the
+    // contract will not honour; that is why it lives in one module now.
+    //
+    // `to` is now(), matching what the round-runner passes when it snapshots
+    // shares. epoch/limit come from our own DB and a clamped integer, so
     // inlining them is injection-safe.
-    // Net-volume trade points + idempotent bonus points from the Rewards Hub
-    // (quests/streaks/achievements/referrals) recorded in points_ledger.
-    let points = format!(
-        "GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
-         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
-         + COALESCE((SELECT SUM(pl.amount) FROM points_ledger pl WHERE pl.user_id = u.id AND pl.created_at >= to_timestamp({epoch})), 0)"
-    );
+    let now = chrono::Utc::now().timestamp();
+    let epoch = crate::handlers::points::clamp_window_start(&state, epoch).await?;
+    let points = crate::handlers::points::points_expr();
+    let floor = crate::handlers::points::min_payout_points();
+    // Round close drives the projection and the countdown; same Monday-08:00-UTC
+    // schedule the contract enforces.
+    let round_end = crate::handlers::points::next_round_end(now);
     let rows: Vec<Row> = diesel::sql_query(format!(
-        "SELECT u.address, u.username, u.avatar, \
-         COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
+        "{with}, payout_set AS ( \
+           SELECT {points} AS p FROM users u {joins} \
+           WHERE {points} >= {floor} ORDER BY p DESC LIMIT 100 \
+         ) \
+         SELECT u.address, u.username, u.avatar, \
+         COALESCE(vol.volume_usd, 0) as volume_usd, \
          {points} as points, \
-         COUNT(t.id) as trades \
-         FROM users u \
-         JOIN trades t ON t.swapper_id = u.id AND t.traded_at >= {epoch} \
-         GROUP BY u.id, u.address, u.username, u.avatar \
-         HAVING {points} > 0 \
-         ORDER BY points DESC \
-         LIMIT {limit}"
+         {points_total} as points_total, \
+         {points_projected} as points_projected, \
+         {held} as held_usd, \
+         (SELECT COALESCE(SUM(p), 0) FROM payout_set) as payout_total_points, \
+         COALESCE(vol.trades, 0) as trades \
+         FROM users u {joins} \
+         LEFT JOIN ( \
+           SELECT swapper_id AS uid, \
+                  SUM(eth_amount::float8 * eth_price::float8) AS volume_usd, \
+                  COUNT(id) AS trades \
+           FROM trades WHERE traded_at > {epoch} AND traded_at <= {now} \
+           GROUP BY swapper_id \
+         ) vol ON vol.uid = u.id \
+         WHERE {points} > 0 OR {points_projected} > 0 \
+         ORDER BY points_projected DESC, points DESC, u.address ASC \
+         LIMIT {limit}",
+        with = crate::handlers::points::points_with(epoch, now),
+        joins = crate::handlers::points::POINTS_JOINS,
+        points_total = crate::handlers::points::points_total_expr(),
+        points_projected = crate::handlers::points::points_projected_expr(epoch, now, round_end),
+        held = crate::handlers::points::HELD_NOW_EXPR,
+        floor = floor,
     ))
     .load(&mut conn)
     .await?;
+
+    // One cached RPC read per request (60s TTL), shared by every row.
+    let pot = crate::handlers::points::distributor_pot_bnb(&state).await;
 
     let entries: Vec<LeaderboardEntry> = rows
         .into_iter()
@@ -475,7 +516,16 @@ pub async fn get_leaderboard(
             volume_usd: r.volume_usd,
             trades: r.trades,
             points: r.points,
-            reward_eth: r.points * point_reward_rate(),
+            points_total: r.points_total,
+            points_projected: r.points_projected,
+            held_usd: r.held_usd,
+            // Your actual slice of the real pot: 90% x pot x (you / payout set).
+            // Exactly what the contract will compute — no fixed rate to drift.
+            reward_eth: crate::handlers::points::estimate_reward_bnb(
+                r.points,
+                r.payout_total_points,
+                pot,
+            ),
         })
         .collect();
 
@@ -625,17 +675,57 @@ pub async fn get_user_profile(
         #[diesel(sql_type = Double)]
         points: f64,
     }
+    // Canonical scoring, scoped to the CURRENT round window. This query had no
+    // epoch filter at all — neither on the trades sum nor on the ledger sum — so
+    // the profile kept accumulating points from rounds that had already been paid
+    // out while the leaderboard correctly reset. The "Reward" tile therefore grew
+    // without bound and showed BNB the user had already received or would never
+    // receive.
+    let epoch = crate::handlers::distributor::epoch_start(&state).await?;
+    let epoch = crate::handlers::points::clamp_window_start(&state, epoch).await?;
+    let now = chrono::Utc::now().timestamp();
     let agg: TradeAgg = diesel::sql_query(format!(
-        "SELECT COALESCE(SUM(t.eth_amount::float8 * t.eth_price::float8), 0) as volume_usd, \
-         GREATEST(COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) \
-         - COALESCE(SUM(CASE WHEN t.trade_type = 'sell' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0), 0) \
-         + COALESCE((SELECT SUM(amount) FROM points_ledger WHERE user_id = {uid}), 0) as points \
-         FROM trades t WHERE t.swapper_id = {uid}",
+        "{with} \
+         SELECT COALESCE(vol.volume_usd, 0) as volume_usd, {points} as points \
+         FROM users u {joins} \
+         LEFT JOIN ( \
+           SELECT swapper_id AS uid, SUM(eth_amount::float8 * eth_price::float8) AS volume_usd \
+           FROM trades WHERE traded_at > {epoch} AND traded_at <= {now} GROUP BY swapper_id \
+         ) vol ON vol.uid = u.id \
+         WHERE u.id = {uid}",
+        with = crate::handlers::points::points_with(epoch, now),
+        points = crate::handlers::points::points_expr(),
+        joins = crate::handlers::points::POINTS_JOINS,
         uid = user.id
     ))
     .get_result(&mut conn)
     .await?;
-    let reward_eth = agg.points * point_reward_rate();
+    // Same pot-share model as the leaderboard (see handlers/points.rs). The
+    // denominator is the set that actually gets posted on-chain, so the profile
+    // and the leaderboard quote the same BNB for the same user.
+    let floor = crate::handlers::points::min_payout_points();
+    let payout_total: f64 = {
+        #[derive(diesel::QueryableByName)]
+        struct T {
+            #[diesel(sql_type = Double)]
+            t: f64,
+        }
+        let r: T = diesel::sql_query(format!(
+            "{with} SELECT COALESCE(SUM(p), 0) AS t FROM ( \
+               SELECT {points} AS p FROM users u {joins} \
+               WHERE {points} >= {floor} ORDER BY p DESC LIMIT 100 \
+             ) q",
+            with = crate::handlers::points::points_with(epoch, now),
+            points = crate::handlers::points::points_expr(),
+            joins = crate::handlers::points::POINTS_JOINS,
+            floor = floor,
+        ))
+        .get_result(&mut conn)
+        .await?;
+        r.t
+    };
+    let pot = crate::handlers::points::distributor_pot_bnb(&state).await;
+    let reward_eth = crate::handlers::points::estimate_reward_bnb(agg.points, payout_total, pot);
 
     Ok(Json(UserProfileResponse {
         user: user_resp,

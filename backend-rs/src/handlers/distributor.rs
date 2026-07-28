@@ -97,31 +97,34 @@ pub async fn get_shares(
         points: f64,
     }
 
-    // Same scoring as the season leaderboard: net USD invested in the window
-    // (floored at zero) plus bonus points granted in the window.
-    let rows: Vec<Row> = diesel::sql_query(
-        "SELECT u.address, \
-           GREATEST(COALESCE(tv.net_usd, 0), 0) + COALESCE(pl.pts, 0) AS points \
-         FROM users u \
-         LEFT JOIN ( \
-           SELECT swapper_id AS uid, \
-             SUM(CASE WHEN trade_type = 'buy' \
-                      THEN eth_amount::float8 * eth_price::float8 \
-                      ELSE -(eth_amount::float8 * eth_price::float8) END) AS net_usd \
-           FROM trades WHERE traded_at BETWEEN $1 AND $2 GROUP BY swapper_id \
-         ) tv ON tv.uid = u.id \
-         LEFT JOIN ( \
-           SELECT user_id AS uid, SUM(amount) AS pts \
-           FROM points_ledger \
-           WHERE created_at BETWEEN to_timestamp($1) AND to_timestamp($2) \
-           GROUP BY user_id \
-         ) pl ON pl.uid = u.id \
-         WHERE GREATEST(COALESCE(tv.net_usd, 0), 0) + COALESCE(pl.pts, 0) > 0 \
+    // Canonical scoring — see handlers/points.rs. Time-weighted net position over
+    // the window, plus grants capped at GRANT_CAP_RATIO x that, rounded to whole
+    // points. This is the number that becomes a holder's share of the pot, so it
+    // is deliberately the SAME expression the leaderboard displays.
+    //
+    // The `min_payout_points()` floor is doing two jobs. It is a dust filter — a
+    // payout push costs ~13k gas (~$0.02), so paying a holder owed less than that
+    // destroys value — and it is the lottery's anti-sybil price: the contract
+    // draws its 10% winner uniformly from whoever is posted here, one ticket
+    // each, so a ticket costs exactly what clearing this floor costs.
+    //
+    // `from`/`to` come from our own DB and the chain (never user input), and the
+    // floor is a parsed f64, so inlining them is injection-safe.
+    let floor = crate::handlers::points::min_payout_points();
+    // Never time-weight against a 1970 window start — see clamp_window_start.
+    let from = crate::handlers::points::clamp_window_start(&state, from).await?;
+    let rows: Vec<Row> = diesel::sql_query(format!(
+        "{with} \
+         SELECT u.address, {points} AS points \
+         FROM users u {joins} \
+         WHERE {points} >= {floor} \
          ORDER BY points DESC, u.address ASC \
-         LIMIT $3",
-    )
-    .bind::<BigInt, _>(from)
-    .bind::<BigInt, _>(to)
+         LIMIT $1",
+        with = crate::handlers::points::points_with(from, to),
+        points = crate::handlers::points::points_expr(),
+        joins = crate::handlers::points::POINTS_JOINS,
+        floor = floor,
+    ))
     .bind::<BigInt, _>(limit)
     .load(&mut conn)
     .await?;

@@ -6,6 +6,7 @@ pub mod discover;
 pub mod distributor;
 pub mod kings;
 pub mod paper;
+pub mod points;
 pub mod portfolio;
 pub mod referrals;
 pub mod rewards;

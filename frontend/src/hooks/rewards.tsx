@@ -44,11 +44,7 @@ export function useRewards(address?: string) {
         { refreshInterval: 15000, keepPreviousData: true }
     )
 
-    const claim = async (questKey: string) => {
-        if (!address) return
-        await axios.post(`${API_ENDPOINT}/rewards/${address}/claim/${questKey}`)
-        await mutate()
-    }
-
-    return { rewards: data, reload: mutate, claim, error, isLoading }
+    // No claim(): rewards are credited automatically by the indexer when the
+    // trade that earns them is recorded (backend handlers::rewards::sync_grants).
+    return { rewards: data, reload: mutate, error, isLoading }
 }

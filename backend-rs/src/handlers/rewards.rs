@@ -21,7 +21,7 @@ use crate::AppState;
 // `trades`/`tokens`/`referrals`/`holders` tables. The only persisted state is the
 // `points_ledger`: discrete point grants keyed by a UNIQUE `ref` so re-evaluation
 // (or a double-claim) never double-grants. Each point is worth the same as a
-// leaderboard point (reward_eth = points * point_reward_rate()).
+// leaderboard point (reward_eth = this user's share of the live pot).
 // ---------------------------------------------------------------------------
 
 struct QuestDef {
@@ -213,9 +213,9 @@ async fn compute_metrics(state: &AppState, uid: i32) -> AppResult<Metrics> {
         "SELECT \
            COALESCE(SUM(CASE WHEN t.trade_type = 'buy' THEN 1 ELSE 0 END), 0)::bigint AS buy_count, \
            COUNT(t.id)::bigint AS trade_count, \
-           COALESCE(MAX(t.eth_amount::float8 * t.eth_price::float8), 0) AS max_trade_usd, \
-           COALESCE(SUM(CASE WHEN to_timestamp(t.traded_at)::date = CURRENT_DATE THEN 1 ELSE 0 END), 0)::bigint AS trades_today, \
-           COALESCE(SUM(CASE WHEN to_timestamp(t.traded_at)::date = CURRENT_DATE THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) AS volume_today, \
+           COALESCE(MAX(CASE WHEN t.trade_type = 'buy' THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) AS max_trade_usd, \
+           COALESCE(SUM(CASE WHEN t.trade_type = 'buy' AND to_timestamp(t.traded_at) AT TIME ZONE 'UTC' >= date_trunc('day', now() AT TIME ZONE 'UTC') THEN 1 ELSE 0 END), 0)::bigint AS trades_today, \
+           COALESCE(SUM(CASE WHEN t.trade_type = 'buy' AND to_timestamp(t.traded_at) AT TIME ZONE 'UTC' >= date_trunc('day', now() AT TIME ZONE 'UTC') THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) AS volume_today, \
            (SELECT COUNT(*) FROM tokens WHERE creator_id = {uid})::bigint AS tokens_created, \
            (SELECT COUNT(*) FROM referrals WHERE referrer_id = {uid})::bigint AS referral_count, \
            (SELECT COUNT(*) FROM holders h JOIN tokens tk ON tk.id = h.token_id \
@@ -259,7 +259,8 @@ async fn bonus_points(state: &AppState, uid: i32) -> AppResult<f64> {
         total: f64,
     }
     let p: P = diesel::sql_query(format!(
-        "SELECT COALESCE(SUM(amount), 0) AS total FROM points_ledger WHERE user_id = {uid}"
+        "SELECT round(COALESCE(SUM(amount), 0)::numeric)::float8 AS total \
+         FROM points_ledger WHERE user_id = {uid}"
     ))
     .get_result(&mut conn)
     .await?;
@@ -282,13 +283,18 @@ async fn graduated_created_tokens(state: &AppState, uid: i32) -> AppResult<Vec<i
     Ok(rows.into_iter().map(|t| t.id).collect())
 }
 
-/// Insert an idempotent point grant (no-op if `ref` already exists). Returns the
-/// number of rows inserted (1 = newly granted, 0 = already present).
+/// Insert an idempotent point grant (no-op if this USER already has `ref`).
+/// Returns rows inserted (1 = newly granted, 0 = already present).
+///
+/// The conflict target is (user_id, ref), NOT ref alone. It used to be `ref`,
+/// which was globally unique while the refs built by quest_ref/achievements
+/// carry no user id — so the first user to claim "quest:first_buy" consumed it
+/// for the entire platform and every later claim silently inserted 0 rows.
 async fn grant(state: &AppState, uid: i32, source: &str, amount: f64, reference: &str) -> AppResult<usize> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
     let n = diesel::sql_query(
         "INSERT INTO points_ledger (user_id, source, amount, ref) VALUES ($1, $2, $3, $4) \
-         ON CONFLICT (ref) DO NOTHING",
+         ON CONFLICT (user_id, ref) DO NOTHING",
     )
     .bind::<diesel::sql_types::Integer, _>(uid)
     .bind::<Text, _>(source)
@@ -302,8 +308,14 @@ async fn grant(state: &AppState, uid: i32, source: &str, amount: f64, reference:
 /// Points granted per referred trader (once they make their first trade).
 const REFERRAL_POINTS: f64 = 25.0;
 
-/// Referees of `uid` who have made at least one trade. Referral points are
-/// gated on real activity so sybil signups earn nothing.
+/// Minimum net USD a referee must have bought (and still hold) before the
+/// referrer is paid for them. "Made one trade" was too cheap a bar: a dust buy
+/// costs cents, so 25 points per wallet was a faucet priced far below the pot
+/// share those points claim.
+const REFERRAL_MIN_REFEREE_USD: f64 = 50.0;
+
+/// Referees of `uid` who are real traders: net USD bought (buys minus sells)
+/// at or above REFERRAL_MIN_REFEREE_USD. Self-referrals are excluded outright.
 async fn traded_referees(state: &AppState, uid: i32) -> AppResult<Vec<i32>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
     #[derive(QueryableByName)]
@@ -313,14 +325,110 @@ async fn traded_referees(state: &AppState, uid: i32) -> AppResult<Vec<i32>> {
     }
     let rows: Vec<T> = diesel::sql_query(format!(
         "SELECT r.referee_id FROM referrals r WHERE r.referrer_id = {uid} \
-         AND EXISTS (SELECT 1 FROM trades t WHERE t.swapper_id = r.referee_id)"
+         AND r.referee_id <> {uid} \
+         AND COALESCE(( \
+               SELECT SUM(CASE WHEN t.trade_type = 'buy' \
+                               THEN t.eth_amount::float8 * t.eth_price::float8 \
+                               ELSE -(t.eth_amount::float8 * t.eth_price::float8) END) \
+               FROM trades t WHERE t.swapper_id = r.referee_id \
+             ), 0) >= {min_usd}",
+        min_usd = REFERRAL_MIN_REFEREE_USD
     ))
     .load(&mut conn)
     .await?;
     Ok(rows.into_iter().map(|t| t.referee_id).collect())
 }
 
-// GET /rewards/:address
+/// Grant every reward `uid` has earned but not yet been credited. Idempotent —
+/// each grant is keyed by a (user_id, ref) unique constraint, so calling this
+/// repeatedly is a no-op once a reward has landed.
+///
+/// This is deliberately NOT called from a read handler. Grants are timestamped
+/// with `created_at`, and `created_at` decides which payout round a grant scores
+/// in — so if an anonymous GET triggered the write, a stranger refreshing a
+/// profile would choose which week a user's points counted toward, and a user
+/// nobody viewed would never be credited at all. It is driven instead by the
+/// events that actually earn the reward: a trade landing in the indexer, a token
+/// being created, a referral being registered.
+pub async fn sync_grants(state: &AppState, uid: i32) -> AppResult<()> {
+    let metrics = compute_metrics(state, uid).await?;
+    let (_, longest_streak) = compute_streak_pair(state, uid).await?;
+    let today = Utc::now().date_naive();
+
+    // Quests: granted the moment their condition is met. There is no claim step
+    // — users should not have to click to receive something they have earned.
+    for q in QUESTS {
+        if quest_progress(q.key, &metrics) >= q.target {
+            let _ = grant(state, uid, "quest", q.points, &quest_ref(q, today)).await;
+        }
+    }
+
+    // Achievements.
+    for a in ACHIEVEMENTS {
+        if a.points > 0.0 && ach_earned(a.key, &metrics, longest_streak) {
+            let _ = grant(state, uid, "achievement", a.points, &format!("ach:{}", a.key)).await;
+        }
+    }
+
+    // Creator reward: +50 points per token you created that graduated to a DEX.
+    for tid in graduated_created_tokens(state, uid).await? {
+        let _ = grant(state, uid, "creator", 50.0, &format!("creator_grad:{tid}")).await;
+    }
+
+    // Referral reward: +25 points per referred trader who cleared the activity
+    // floor. Idempotent — a referee has exactly one referrer, so refs can't collide.
+    for rid in traded_referees(state, uid).await? {
+        let _ = grant(state, uid, "referral", REFERRAL_POINTS, &format!("referral:{rid}")).await;
+    }
+    Ok(())
+}
+
+/// Periodically credit every recently-active user.
+///
+/// The indexer hook alone is not enough, for two reasons:
+///
+///   1. Not every reward is earned by a trade. Creating a token completes
+///      `launch_token`, a token graduating pays `creator_grad`, and a streak
+///      crosses a day boundary with no trade at all. Nothing in those paths
+///      touches the swap indexer, so a purely trade-driven grant leaves them
+///      pending forever — the UI shows "Crediting…" and it never resolves.
+///   2. Anything earned BEFORE the auto-grant existed was never credited, and
+///      would not be until the user happened to trade again.
+///
+/// The sweep is the backstop that makes "automatic" actually mean automatic:
+/// idempotent, so it only ever fills gaps, and scoped to users active within the
+/// round window since nobody outside it can be earning.
+pub async fn sweep_grants(state: &AppState) -> AppResult<usize> {
+    use diesel::sql_types::BigInt;
+    let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
+    #[derive(QueryableByName)]
+    struct U {
+        #[diesel(sql_type = diesel::sql_types::Integer)]
+        id: i32,
+    }
+    // Active = traded or created a token in the last 8 days (one round window
+    // plus slack). Bounded so this stays cheap as the user table grows.
+    let cutoff = chrono::Utc::now().timestamp() - 8 * 86400;
+    let users: Vec<U> = diesel::sql_query(
+        "SELECT DISTINCT u.id FROM users u \
+         WHERE EXISTS (SELECT 1 FROM trades t WHERE t.swapper_id = u.id AND t.traded_at >= $1) \
+            OR EXISTS (SELECT 1 FROM tokens tk WHERE tk.creator_id = u.id)",
+    )
+    .bind::<BigInt, _>(cutoff)
+    .load(&mut conn)
+    .await?;
+    drop(conn);
+
+    let mut n = 0;
+    for u in &users {
+        if sync_grants(state, u.id).await.is_ok() {
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
+// GET /rewards/:address — READ ONLY. See sync_grants for why nothing is minted here.
 pub async fn get_rewards(
     State(state): State<Arc<AppState>>,
     Path(address): Path<String>,
@@ -330,25 +438,6 @@ pub async fn get_rewards(
     let metrics = compute_metrics(&state, uid).await?;
     let (current_streak, longest_streak) = compute_streak_pair(&state, uid).await?;
     let today = Utc::now().date_naive();
-
-    // Auto-grant achievements the moment their condition is met (idempotent).
-    for a in ACHIEVEMENTS {
-        if a.points > 0.0 && ach_earned(a.key, &metrics, longest_streak) {
-            let _ = grant(&state, uid, "achievement", a.points, &format!("ach:{}", a.key)).await;
-        }
-    }
-
-    // Creator reward: +50 points per token you created that graduated to a DEX.
-    for tid in graduated_created_tokens(&state, uid).await? {
-        let _ = grant(&state, uid, "creator", 50.0, &format!("creator_grad:{tid}")).await;
-    }
-
-    // Referral reward: +25 points per referred trader, granted the moment
-    // their first trade lands (idempotent — each referee pays out once; a
-    // referee has exactly one referrer, so the ref key can't collide).
-    for rid in traded_referees(&state, uid).await? {
-        let _ = grant(&state, uid, "referral", REFERRAL_POINTS, &format!("referral:{rid}")).await;
-    }
 
     let claimed = claimed_quest_refs(&state, uid).await?;
     let quests = QUESTS
@@ -401,37 +490,8 @@ pub struct ClaimResponse {
     message: String,
 }
 
-// POST /rewards/:address/claim/:questKey
-pub async fn claim_quest(
-    State(state): State<Arc<AppState>>,
-    Path((address, quest_key)): Path<(String, String)>,
-) -> AppResult<Json<ClaimResponse>> {
-    let q = QUESTS
-        .iter()
-        .find(|q| q.key == quest_key)
-        .ok_or_else(|| AppError::NotFound("Unknown quest".to_string()))?;
-
-    let user = load_user(&state, &address).await?;
-    let uid = user.id;
-    let metrics = compute_metrics(&state, uid).await?;
-    let progress = quest_progress(q.key, &metrics);
-    if progress < q.target {
-        return Err(AppError::BadRequest("Quest not completed yet".to_string()));
-    }
-
-    let today = Utc::now().date_naive();
-    let reference = quest_ref(q, today);
-    let inserted = grant(&state, uid, "quest", q.points, &reference).await?;
-    if inserted == 0 {
-        return Ok(Json(ClaimResponse {
-            claimed: false,
-            points: 0.0,
-            message: "Already claimed".to_string(),
-        }));
-    }
-    Ok(Json(ClaimResponse {
-        claimed: true,
-        points: q.points,
-        message: format!("Claimed {} points", q.points),
-    }))
-}
+// Quests are granted automatically by sync_grants() as soon as they are earned,
+// so there is no claim endpoint. The old POST /rewards/:address/claim/:questKey
+// is gone: a claim button meant a user could earn a reward and never receive it
+// by simply not clicking, and gating the mint behind a request made an
+// unauthenticated caller the one deciding when points were created.
