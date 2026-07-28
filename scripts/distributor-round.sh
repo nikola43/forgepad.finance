@@ -15,7 +15,7 @@
 # Optional:
 #   RPC_URL      default https://bsc-testnet.rpc.sentio.xyz
 #   API_URL      default http://localhost:5002
-#   API_KEY      backend api-key for POST /rounds (default from .env API_KEY)
+#   API_KEY      backend api-key for POST /rounds (from .env; no default)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,7 +23,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 RPC_URL="${RPC_URL:-https://bsc-testnet.rpc.sentio.xyz}"
 API_URL="${API_URL:-http://localhost:5002}"
-API_KEY="${API_KEY:-hola}"
+# No default: a fallback key would silently re-open the hole that let
+# anyone rewrite the payout window. Fail closed if it is unset.
+API_KEY="${API_KEY:?Set API_KEY (see .env) — refusing to use a default}"
 CAST="${CAST:-$HOME/.foundry/bin/cast}"
 
 : "${DISTRIBUTOR_ADDRESS:?Set DISTRIBUTOR_ADDRESS}"

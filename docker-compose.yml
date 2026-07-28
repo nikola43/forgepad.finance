@@ -104,7 +104,7 @@ services:
       SD_MODEL_PATH: ${SD_MODEL_PATH:-/models/sd_turbo-f16-q8_0.gguf}
       SD_THREADS: ${SD_THREADS:-2}
       SD_STEPS: ${SD_STEPS:-4}
-      API_KEY: hola
+      API_KEY: ${API_KEY:?API_KEY must be set in .env (never commit it)}
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: ${UPLOAD_BASE_URL:-https://api.fyuz.fun/uploads}
       S3_ENDPOINT: http://minio:9000
