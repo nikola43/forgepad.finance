@@ -81,8 +81,11 @@ export default function Rewards() {
                             <Typography fontSize={11} color="var(--muted)" textTransform="uppercase" letterSpacing="0.05em" fontFamily="var(--font-data)">Day streak · best {rewards.longestStreak}</Typography>
                         </Box>
                         <Box sx={{ flex: 1, minWidth: 150, p: 2, borderRadius: '14px', border: '1px solid var(--border)', background: 'rgba(234,230,218,0.03)' }}>
-                            <Typography fontSize={26} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)">{priceFormatter(rewards.bonusPoints, 0)}</Typography>
-                            <Typography fontSize={11} color="var(--muted)" textTransform="uppercase" letterSpacing="0.05em" fontFamily="var(--font-data)">Bonus points earned</Typography>
+                            {/* The leaderboard's number, not the grant subtotal. Showing
+                                bonusPoints here put 38 on this screen against 39 on the
+                                ranking for the same wallet, which reads as a bug. */}
+                            <Typography fontSize={26} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)">{priceFormatter(rewards.points ?? rewards.bonusPoints, 0)}</Typography>
+                            <Typography fontSize={11} color="var(--muted)" textTransform="uppercase" letterSpacing="0.05em" fontFamily="var(--font-data)">Points</Typography>
                         </Box>
                     </Box>
 

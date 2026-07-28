@@ -129,6 +129,10 @@ pub struct RewardsResponse {
     address: String,
     current_streak: i64,
     longest_streak: i64,
+    /// Headline figure — identical to the leaderboard's. See `total_points`.
+    points: f64,
+    /// The grant subtotal only. Kept so the Hub can still say what quests alone
+    /// are worth, but it is NOT the number to lead with.
     bonus_points: f64,
     quests: Vec<QuestState>,
     achievements: Vec<AchievementState>,
@@ -261,6 +265,41 @@ async fn bonus_points(state: &AppState, uid: i32) -> AppResult<f64> {
     let p: P = diesel::sql_query(format!(
         "SELECT round(COALESCE(SUM(amount), 0)::numeric)::float8 AS total \
          FROM points_ledger WHERE user_id = {uid}"
+    ))
+    .get_result(&mut conn)
+    .await?;
+    Ok(p.total)
+}
+
+/// The user's headline points — the SAME number the leaderboard ranks them by.
+///
+/// The Rewards Hub used to lead with `bonus_points` (grants only) while the
+/// leaderboard showed position + grants projected to the round close. Both labels
+/// were accurate and the two screens still disagreed — 38 here against 39 there —
+/// which reads as one of them being broken. There is no reading of "my points"
+/// under which a user should have to reconcile two figures, so this returns the
+/// canonical one and `bonus_points` is left to describe only the grant subtotal.
+///
+/// Window and expression are copied from get_leaderboard deliberately: same
+/// epoch, same now, same round close, same projection. If that query changes,
+/// this must change with it or the two screens drift apart again.
+async fn total_points(state: &AppState, uid: i32) -> AppResult<f64> {
+    let epoch = crate::handlers::distributor::epoch_start(state).await?;
+    let epoch = crate::handlers::points::clamp_window_start(state, epoch).await?;
+    let now = Utc::now().timestamp();
+    let round_end = crate::handlers::points::next_round_end(now);
+
+    let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
+    #[derive(QueryableByName)]
+    struct P {
+        #[diesel(sql_type = Double)]
+        total: f64,
+    }
+    let p: P = diesel::sql_query(format!(
+        "{with} SELECT {projected} AS total FROM users u {joins} WHERE u.id = {uid}",
+        with = crate::handlers::points::points_with(epoch, now),
+        projected = crate::handlers::points::points_projected_expr(epoch, now, round_end),
+        joins = crate::handlers::points::POINTS_JOINS,
     ))
     .get_result(&mut conn)
     .await?;
@@ -471,11 +510,13 @@ pub async fn get_rewards(
         .collect();
 
     let bonus = bonus_points(&state, uid).await?;
+    let points = total_points(&state, uid).await?;
 
     Ok(Json(RewardsResponse {
         address: user.address,
         current_streak,
         longest_streak,
+        points,
         bonus_points: bonus,
         quests,
         achievements,

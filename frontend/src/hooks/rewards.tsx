@@ -27,6 +27,9 @@ export type Rewards = {
     address: string
     currentStreak: number
     longestStreak: number
+    /** Canonical total — the same figure the leaderboard ranks by. Lead with this. */
+    points: number
+    /** Grant subtotal only (quests, achievements, referrals). Not the headline. */
     bonusPoints: number
     quests: Quest[]
     achievements: Achievement[]
