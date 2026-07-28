@@ -929,8 +929,10 @@ contract FyuzTest is Test {
     //  8. TRANSFER RESTRICTIONS
     // ================================================================
 
-    function test_08a_TransferBlockedBeforeLaunch() public {
-        console.log("=== TEST 8a: Transfer blocked before launch ===");
+    /// Pre-graduation the restriction targets DEX listing, not people paying each
+    /// other: wallet-to-wallet must work, sends to a CONTRACT must not.
+    function test_08a_TransferToContractBlockedBeforeLaunch() public {
+        console.log("=== TEST 8a: Pre-launch transfers: wallets yes, contracts no ===");
         address t = _create("RestrictToken", "RST", 1);
 
         uint256 fee = fyuz.getFirstBuyFee(t);
@@ -946,19 +948,32 @@ contract FyuzTest is Test {
         assertTrue(bal > 0, "has tokens");
         assertFalse(Token(t).launched(), "not launched yet");
 
-        // Direct transfer should revert
+        // Wallet -> wallet is allowed. This is the case that used to revert.
+        uint256 send = bal / 4;
+        vm.prank(addr1);
+        IERC20(t).transfer(addr2, send);
+        assertEq(IERC20(t).balanceOf(addr2), send, "peer transfer credited");
+
+        // transferFrom between wallets is allowed too.
+        vm.prank(addr1);
+        IERC20(t).approve(addr2, send);
+        vm.prank(addr2);
+        IERC20(t).transferFrom(addr1, addr3, send);
+        assertEq(IERC20(t).balanceOf(addr3), send, "peer transferFrom credited");
+
+        // A contract is the shape every DEX pair/router takes, so it stays blocked.
+        // `address(this)` is the test contract — deployed, so it has code.
         vm.prank(addr1);
         vm.expectRevert(Token.NotLaunched.selector);
-        IERC20(t).transfer(addr2, bal / 2);
+        IERC20(t).transfer(address(this), send);
 
-        // transferFrom should also revert
         vm.prank(addr1);
-        IERC20(t).approve(addr2, bal / 2);
+        IERC20(t).approve(addr2, send);
         vm.prank(addr2);
         vm.expectRevert(Token.NotLaunched.selector);
-        IERC20(t).transferFrom(addr1, addr3, bal / 2);
+        IERC20(t).transferFrom(addr1, address(this), send);
 
-        console.log("Transfers correctly blocked before launch");
+        console.log("Peer transfers allowed, contract transfers blocked");
     }
 
     function test_08b_TransferToFyuzAllowed() public {

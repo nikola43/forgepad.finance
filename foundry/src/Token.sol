@@ -33,13 +33,32 @@ contract Token is ERC20, Ownable, ILaunchable {
         renounceOwnership();
     }
 
+    /// @dev Who may move tokens while the token is still on the bonding curve.
+    ///
+    /// The restriction exists to stop a token being listed on a DEX before it
+    /// graduates — a parallel market would break price discovery on the curve and
+    /// let holders exit around it. It was never meant to stop one person paying
+    /// another, but that is what it did: the only permitted counterparty was the
+    /// curve itself, so every wallet-to-wallet transfer reverted with NotLaunched.
+    ///
+    /// Wallets are now free to move tokens between themselves; only sends to
+    /// CONTRACTS stay blocked, since a DEX pair, router or liquidity manager is
+    /// always a contract.
+    ///
+    /// LIMIT, stated plainly: `to.code.length == 0` is not proof of an EOA. An
+    /// address has no code before it is deployed, and V2-style pair addresses are
+    /// CREATE2-derived and therefore known in advance — so tokens can be sent to a
+    /// pair address first and the pair deployed at it afterwards. It also reads 0
+    /// for a contract still inside its own constructor. This raises the cost of
+    /// pre-graduation listing; it does not make it impossible.
     function _transferAllowed(
         address from,
         address to
     ) private view returns (bool) {
         if (launched) return true;
-        if (from == owner() || to == owner()) return true;
-        return false;
+        address curve = owner();
+        if (from == curve || to == curve) return true;
+        return to.code.length == 0;
     }
 
     function transferFrom(
