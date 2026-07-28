@@ -329,6 +329,9 @@ export default function Create() {
   const [isDirectLaunch, setIsDirectLaunch] = React.useState(false);
   // Mandatory $10 initial buy, converted to BNB at confirm time (see effect below).
   const [minBuyBnb, setMinBuyBnb] = React.useState<number>();
+  // BNB/USD from the SAME oracle the contract prices the floor against, so the
+  // dollar figure shown here cannot disagree with what createToken enforces.
+  const [bnbUsd, setBnbUsd] = React.useState<number>();
 
 
   const chain = useMemo(
@@ -366,11 +369,15 @@ export default function Create() {
     return undefined;
   }, [character1, character2, coinName, coinTicker, isDirectLaunch, minBuyBnb, initBuyAmount]);
 
-  // Optional minimum buy: when MIN_CREATE_BUY_USD > 0 and the confirm modal
-  // opens, read live BNB/USD from the contract's Chainlink feed
-  // (getETHPriceByUSD, 1e18-scaled) and pre-fill the Spend field with that much
-  // BNB; the error memo above then keeps the confirm button disabled below it.
-  // ponytail: UI-level enforcement only — the contract itself doesn't require it.
+  // Minimum initial buy. When the confirm modal opens, read live BNB/USD from the
+  // contract's own Chainlink feed (getETHPriceByUSD, 1e18-scaled), pre-fill the
+  // Spend field with that much BNB, and keep the rate for the USD line under the
+  // input.
+  //
+  // The contract ENFORCES this now (minCreateBuyUSD, checked in createToken), so
+  // the read deliberately uses the same oracle rather than a public price API: a
+  // second source could disagree, and the user would see a figure that clears the
+  // UI check but reverts on-chain with InitialBuyTooSmall.
   React.useEffect(() => {
     if (MIN_CREATE_BUY_USD <= 0) return; // no floor: nothing to prefill, skip the RPC
     if (!deployModal || isDirectLaunch || !chain) return;
@@ -378,15 +385,18 @@ export default function Create() {
       try {
         const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
         const fyuz = new ethers.Contract(chain.contractAddress, chain.abi, provider);
-        const bnbUsd = Number(ethers.formatEther(await fyuz.getETHPriceByUSD()));
-        if (!bnbUsd) return;
-        // Round UP to 6 decimals so the prefilled amount never dips below $10.
-        const min = Math.ceil((MIN_CREATE_BUY_USD / bnbUsd) * 1e6) / 1e6;
+        const rate = Number(ethers.formatEther(await fyuz.getETHPriceByUSD()));
+        if (!rate) return;
+        setBnbUsd(rate);
+        // Round UP to 6 decimals so the prefilled amount never dips below $10 —
+        // rounding down would prefill a value the contract then rejects.
+        const min = Math.ceil((MIN_CREATE_BUY_USD / rate) * 1e6) / 1e6;
         setMinBuyBnb(min);
         setInitBuyAmount((cur) => (Number(cur || 0) < min ? String(min) : cur));
       } catch (e) {
-        // Price read failed (e.g. stale feed on a paused fork): don't block
-        // creation on a UI-only check.
+        // Price read failed (e.g. stale feed): don't block the dialog on it. The
+        // contract still enforces the floor, so the create reverts rather than
+        // slipping through.
         console.error("min-buy price fetch failed:", e);
       }
     })();
@@ -1109,6 +1119,20 @@ export default function Create() {
                   setInitBuyAmount(values.value);
                 }}
               />
+              {/* Dollar value of what they are about to spend. The floor is set in
+                  USD on-chain, so BNB alone does not tell them whether they clear
+                  it. Hidden until the rate loads rather than showing "$0". */}
+              {!!bnbUsd && Number(initBuyAmount || 0) > 0 && (
+                <Typography
+                  component="span"
+                  color="rgba(234,230,218,0.53)"
+                  fontFamily="var(--font-data)"
+                  fontSize={13}
+                  alignSelf="flex-end"
+                >
+                  ≈ ${priceFormatter(Number(initBuyAmount) * bnbUsd, 2)}
+                </Typography>
+              )}
               {/* <Box display="flex" gap="8px">
                                 <Button variant="outlined" color="secondary" onClick={() => setInitBuyPercent(0.25)}>25%</Button>
                                 <Button variant="outlined" color="secondary" onClick={() => setInitBuyPercent(0.5)}>50%</Button>
