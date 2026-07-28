@@ -52,7 +52,7 @@ import { useUserInfo } from "@/hooks/user";
 import SendIcon from '@mui/icons-material/Send';
 import ReplyIcon from '@mui/icons-material/Reply';
 import axios from "axios";
-import { API_ENDPOINT } from "@/config";
+import { API_ENDPOINT, FILE_ENDPOINT } from "@/config";
 
 const SlippageInput = styled("input") <{ slippage: number }>`
   width: 48px;
@@ -797,7 +797,55 @@ export default function Token() {
         return sorted[0].tokenAmount / tokenChain.totalSupply * 100
     }, [holders, tokenChain])
     const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
+    const { caipNetwork: activeNetwork } = useAppKitNetwork()
     const chatMessagesRef = useRef<HTMLDivElement>(null)
+
+    // EIP-747 `wallet_watchAsset` — ask the wallet to track this token so its
+    // balance shows up there instead of the holder having to paste the contract
+    // address by hand.
+    //
+    // Goes through the AppKit provider rather than window.ethereum so a
+    // WalletConnect session works too, not only an injected MetaMask; window
+    // .ethereum is just the fallback when nothing is connected through AppKit.
+    const addTokenToWallet = useCallback(async () => {
+        if (!detailData?.tokenAddress) return
+        const provider: any = evmProvider ?? (typeof window !== 'undefined' ? (window as any).ethereum : null)
+        if (!provider?.request) {
+            toast.error('Connect a wallet first')
+            return
+        }
+        // wallet_watchAsset adds the token to whatever network the wallet is
+        // currently on, with no chain argument to correct it — so without this
+        // guard the token silently lands on the wrong network and shows a zero
+        // balance the user cannot explain.
+        if (tokenNetwork && activeNetwork && activeNetwork.caipNetworkId !== tokenNetwork.caipNetworkId) {
+            toast.error(`Switch to ${tokenNetwork.name} first`)
+            return
+        }
+        const logo = detailData.tokenImage
+        const image = !logo ? undefined : logo.startsWith('http') ? logo : `${FILE_ENDPOINT}/${logo}`
+        try {
+            const added = await provider.request({
+                method: 'wallet_watchAsset',
+                params: {
+                    type: 'ERC20',
+                    options: {
+                        address: detailData.tokenAddress,
+                        // MetaMask rejects symbols over 11 characters outright.
+                        symbol: String(detailData.tokenSymbol ?? '').toUpperCase().slice(0, 11),
+                        // Every launchpad token is 18dp — the curve math is fixed at 1e18.
+                        decimals: 18,
+                        image,
+                    },
+                },
+            })
+            if (added) toast.success(`${detailData.tokenSymbol} added to your wallet`)
+        } catch (e: any) {
+            // 4001 is the user closing the wallet prompt. That is a decision, not
+            // a failure, so it gets no error toast.
+            if (e?.code !== 4001) toast.error('Could not add the token to your wallet')
+        }
+    }, [detailData, evmProvider, tokenNetwork, activeNetwork])
 
     // Chat: fetch messages
     const fetchChats = useCallback(async () => {
@@ -1190,6 +1238,15 @@ export default function Token() {
                         }}>
                             <CopyIcon sx={{ color: "#9E9E9E", width: 14, height: 14 }} />
                         </IconButton>
+                        {detailData?.tokenAddress && (
+                            <IconButton
+                                sx={{ width: 'fit-content', opacity: 0.85, '&:hover': { opacity: 1 } }}
+                                title="Add token to wallet"
+                                onClick={addTokenToWallet}
+                            >
+                                <img src="/images/metamask.svg" alt="Add token to wallet" width={16} height={16} />
+                            </IconButton>
+                        )}
                         {address && detailData?.tokenAddress && (
                             <IconButton sx={{ width: 'fit-content' }} title="Add to watchlist" onClick={() => toggleWatch(detailData.tokenAddress, detailData.network)}>
                                 {isWatched(detailData.tokenAddress)

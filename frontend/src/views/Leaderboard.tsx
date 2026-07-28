@@ -136,6 +136,59 @@ export default function Leaderboard() {
             </Box>
 
 
+            {/* Rewards explainer — sits between the pot and the rankings. */}
+            <Box
+                sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: '16px',
+                    p: { xs: 2.5, sm: 3 },
+                    mb: 3,
+                    border: '1px solid rgba(191,209,67,0.25)',
+                    background: 'rgba(191,209,67,0.06)',
+                }}
+            >
+                <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <PaidIcon sx={{ fontSize: 30, color: 'var(--citron)', flexShrink: 0 }} />
+                    <Box>
+                        <Typography fontSize={{ xs: 17, sm: 19 }} fontWeight={800} color="var(--bone)" fontFamily="var(--font-body)" letterSpacing="-0.01em">
+                            Trade. Earn points. Get paid every week.
+                        </Typography>
+                        <Typography fontSize={13.5} color="rgba(234,230,218,0.75)" mt={0.75} lineHeight={1.6}>
+                            Every buy and sell carries a flat <b style={{ color: 'var(--citron)' }}>1% fee</b> — and 30% of it flows
+                            straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 you hold for a full
+                            round</b> — hold half the week and you earn half — so only real, held positions count and wash trading earns
+                            nothing.
+                            Each week we pool <b style={{ color: 'var(--citron)' }}>30% of all platform fees</b> and pay it out in{' '}
+                            <b style={{ color: 'var(--citron)' }}>BNB</b>, split by your share of points. Only the{' '}
+                            <b style={{ color: 'var(--citron)' }}>top 100 traders</b> on this board qualify for a cut — so climb and
+                            hold your spot. And every week <b style={{ color: 'var(--citron)' }}>one random qualifying trader wins 10% of
+                            the entire pool</b>, on top of their points share. Trade more, hold your conviction, and claim a bigger weekly cut.
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                            {['1 pt / $1 held per round', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Top 100 only', '10% random winner', 'Paid in BNB'].map((chip) => (
+                                <Box
+                                    key={chip}
+                                    sx={{
+                                        fontSize: 11.5,
+                                        fontWeight: 600,
+                                        fontFamily: 'var(--font-data)',
+                                        color: 'var(--citron)',
+                                        border: '1px solid rgba(191,209,67,0.3)',
+                                        background: 'rgba(191,209,67,0.06)',
+                                        borderRadius: '100px',
+                                        px: 1.25,
+                                        py: 0.4,
+                                    }}
+                                >
+                                    {chip}
+                                </Box>
+                            ))}
+                        </Box>
+                    </Box>
+                </Box>
+            </Box>
+
             {rows === null ? (
                 <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
             ) : rows.length === 0 ? (
@@ -181,59 +234,6 @@ export default function Leaderboard() {
                     ))}
                 </Box>
             )}
-            {/* Rewards explainer — below the table: the rankings are what the
-                page is for, and this is the detail you read after them. */}
-            <Box
-                sx={{
-                    position: 'relative',
-                    overflow: 'hidden',
-                    borderRadius: '16px',
-                    p: { xs: 2.5, sm: 3 },
-                    mt: 3,
-                    border: '1px solid rgba(191,209,67,0.25)',
-                    background: 'rgba(191,209,67,0.06)',
-                }}
-            >
-                <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                    <PaidIcon sx={{ fontSize: 30, color: 'var(--citron)', flexShrink: 0 }} />
-                    <Box>
-                        <Typography fontSize={{ xs: 17, sm: 19 }} fontWeight={800} color="var(--bone)" fontFamily="var(--font-body)" letterSpacing="-0.01em">
-                            Trade. Earn points. Get paid every week.
-                        </Typography>
-                        <Typography fontSize={13.5} color="rgba(234,230,218,0.75)" mt={0.75} lineHeight={1.6}>
-                            Every buy and sell carries a flat <b style={{ color: 'var(--citron)' }}>1% fee</b> — and 30% of it flows
-                            straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 you hold for a full
-                            round</b> — hold half the week and you earn half — so only real, held positions count and wash trading earns
-                            nothing.
-                            Each week we pool <b style={{ color: 'var(--citron)' }}>30% of all platform fees</b> and pay it out in{' '}
-                            <b style={{ color: 'var(--citron)' }}>BNB</b>, split by your share of points. Only the{' '}
-                            <b style={{ color: 'var(--citron)' }}>top 100 traders</b> on this board qualify for a cut — so climb and
-                            hold your spot. And every week <b style={{ color: 'var(--citron)' }}>one random qualifying trader wins 10% of
-                            the entire pool</b>, on top of their points share. Trade more, hold your conviction, and claim a bigger weekly cut.
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                            {['1 pt / $1 held per round', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Top 100 only', '10% random winner', 'Paid in BNB'].map((chip) => (
-                                <Box
-                                    key={chip}
-                                    sx={{
-                                        fontSize: 11.5,
-                                        fontWeight: 600,
-                                        fontFamily: 'var(--font-data)',
-                                        color: 'var(--citron)',
-                                        border: '1px solid rgba(191,209,67,0.3)',
-                                        background: 'rgba(191,209,67,0.06)',
-                                        borderRadius: '100px',
-                                        px: 1.25,
-                                        py: 0.4,
-                                    }}
-                                >
-                                    {chip}
-                                </Box>
-                            ))}
-                        </Box>
-                    </Box>
-                </Box>
-            </Box>
         </PageBox>
     )
 }
