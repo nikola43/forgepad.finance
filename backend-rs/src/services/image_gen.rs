@@ -330,11 +330,13 @@ async fn generate_openai(
 
     // Reference photos lift likeness far above text-only, which retreats to a
     // generic face for named real people. Look one up per character in parallel
-    // (Wikipedia). The real OpenAI Images API doesn't accept reference_images,
-    // so skip the lookup there.
-    let refs: Vec<String> = if is_real_openai {
-        Vec::new()
-    } else {
+    // (Wikipedia).
+    //
+    // Both providers support references, by DIFFERENT means: Together takes a
+    // `reference_images` array of URLs on /images/generations, while OpenAI takes
+    // the actual image bytes as multipart on /images/edits. This lookup is shared;
+    // the request build below branches.
+    let refs: Vec<String> = {
         let (r1, r2) = tokio::join!(
             fetch_reference_image(&client, character1),
             fetch_reference_image(&client, character2),
@@ -365,6 +367,44 @@ async fn generate_openai(
     // a rejected reference flips this off mid-loop — so build them per attempt.
     let mut use_refs = !refs.is_empty();
     let mut attempt: u32 = 0;
+
+    // OpenAI wants the reference BYTES as multipart on /images/edits; Together
+    // wants URLs in the JSON body. Download once, outside the retry loop, so a
+    // moderation re-roll doesn't re-fetch Wikipedia every time. A download that
+    // fails simply leaves the list short and the request degrades to text-only.
+    let ref_bytes: Vec<(String, Vec<u8>)> = if is_real_openai && use_refs {
+        let mut v = Vec::new();
+        for (i, url) in refs.iter().enumerate() {
+            let got = client
+                .get(url)
+                .header(
+                    reqwest::header::USER_AGENT,
+                    "fyuz-fusion/1.0 (https://fyuz.fun)",
+                )
+                .send()
+                .await;
+            match got {
+                Ok(r) if r.status().is_success() => match r.bytes().await {
+                    Ok(b) if !b.is_empty() => {
+                        let png = url.to_lowercase().ends_with(".png");
+                        v.push((
+                            format!("ref{i}.{}", if png { "png" } else { "jpg" }),
+                            b.to_vec(),
+                        ));
+                    }
+                    _ => tracing::warn!("reference image {url} had no body"),
+                },
+                _ => tracing::warn!("reference image {url} could not be downloaded"),
+            }
+        }
+        v
+    } else {
+        Vec::new()
+    };
+    if is_real_openai && use_refs && ref_bytes.is_empty() {
+        tracing::warn!("no reference bytes downloaded; falling back to text-only");
+        use_refs = false;
+    }
 
     loop {
         attempt += 1;
@@ -403,13 +443,45 @@ async fn generate_openai(
             }
         }
 
-        let resp = client
-            .post(format!("{base}/images/generations"))
-            .bearer_auth(&api_key)
-            .json(&req_body)
-            .send()
-            .await
-            .context("OpenAI image request failed")?;
+        // OpenAI blends reference photos through /images/edits (multipart, the raw
+        // image bytes) — there is no reference_images field on /images/generations,
+        // which is why references used to be skipped entirely on real OpenAI and
+        // named faces came back generic. Everything else still goes as JSON.
+        let openai_edit = is_real_openai && use_refs && !ref_bytes.is_empty();
+        let resp = if openai_edit {
+            let mut form = reqwest::multipart::Form::new()
+                .text("model", model.clone())
+                .text("prompt", prompt.clone())
+                .text("n", "1")
+                .text("size", format!("{dim}x{dim}"));
+            for (fname, bytes) in &ref_bytes {
+                let mime = if fname.ends_with(".png") {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                };
+                let part = reqwest::multipart::Part::bytes(bytes.clone())
+                    .file_name(fname.clone())
+                    .mime_str(mime)
+                    .context("bad reference image mime")?;
+                // gpt-image-1 accepts several inputs under the image[] field.
+                form = form.part("image[]", part);
+            }
+            client
+                .post(format!("{base}/images/edits"))
+                .bearer_auth(&api_key)
+                .multipart(form)
+                .send()
+                .await
+        } else {
+            client
+                .post(format!("{base}/images/generations"))
+                .bearer_auth(&api_key)
+                .json(&req_body)
+                .send()
+                .await
+        }
+        .context("OpenAI image request failed")?;
 
         let status = resp.status();
         let body: serde_json::Value = resp
@@ -433,20 +505,27 @@ async fn generate_openai(
             let lower = msg.to_lowercase();
             let err_detail = format!("({status}): {msg}");
 
+            let moderated = code == "content_policy_violation"
+                || lower.contains("moderation")
+                || lower.contains("content policy");
+
             // A rejected reference image (bad/oversized thumbnail) — drop the
             // references and retry text-only rather than failing the create.
             // Happens at most once (use_refs never flips back on), so it can't
             // loop, and it doesn't consume the moderation-retry budget.
-            if use_refs && lower.contains("reference image") {
-                tracing::warn!("reference image rejected, falling back to text-only: {msg}");
+            //
+            // The OpenAI edits path gets the same escape hatch for ANY
+            // non-moderation error: /images/edits rejects requests plain
+            // generation would accept (a param it does not take, an input photo
+            // it will not edit), and a create must not fail just because the
+            // likeness upgrade was unavailable. Moderation still re-rolls with
+            // the references intact — those are worth retrying for.
+            if use_refs && (lower.contains("reference image") || (openai_edit && !moderated)) {
+                tracing::warn!("reference blending unavailable, falling back to text-only: {msg}");
                 use_refs = false;
                 attempt -= 1;
                 continue;
             }
-
-            let moderated = code == "content_policy_violation"
-                || lower.contains("moderation")
-                || lower.contains("content policy");
             if moderated && attempt < max_attempts {
                 tracing::warn!(
                     "fusion image flagged by content moderation (attempt {attempt}/{max_attempts}), re-rolling"

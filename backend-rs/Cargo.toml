@@ -79,7 +79,7 @@ chrono = { version = "0.4", features = ["serde"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 uuid = { version = "1", features = ["v4"] }
-reqwest = { version = "0.13.2", features = ["json"] }
+reqwest = { version = "0.13.2", features = ["json", "multipart"] }
 regex-lite = "0.1.9"
 base64 = "0.22"
 futures = "0.3.32"
