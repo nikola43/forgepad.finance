@@ -14,7 +14,7 @@ Seasons are Fyuz's grand tournaments — longer arcs layered on top of the weekl
 | | Weekly rounds | Seasons |
 | --- | --- | --- |
 | Length | ~1 week | Weeks to months |
-| Pot | 0.2% of all trade volume, continuously | Fixed headline prize |
+| Pot | 0.3% of all trade volume, continuously | Fixed headline prize |
 | Winners | Top 100 + 1 lottery winner | Top 50 |
 | Resets | Every distribution | Every season |
 

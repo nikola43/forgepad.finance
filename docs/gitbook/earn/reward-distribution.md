@@ -4,7 +4,7 @@ This is where points become BNB. Every round, the rewards pot pays out on-chain 
 
 ## Where the pot comes from
 
-**0.2% of every single trade** on Fyuz flows into the Distributor smart contract. The pot grows with every buy and sell on the platform, all round long.
+**0.3% of every single trade** on Fyuz flows into the Distributor smart contract. The pot grows with every buy and sell on the platform, all round long.
 
 ## How a round pays out
 
@@ -23,7 +23,7 @@ That's by design — the pro-rata 90% rewards grinding, the 10% rewards *showing
 
 ## Why you can trust it
 
-* **The pot is on-chain.** The 0.2% fee lands in the contract with every trade — check the balance yourself.
+* **The pot is on-chain.** The 0.3% fee lands in the contract with every trade — check the balance yourself.
 * **The winner is on-chain random.** Chainlink VRF generates the random number with a cryptographic proof that nobody — not even the Fyuz team — can predict or manipulate.
 * **The payout is public.** Every round emits events: pot size, every recipient, every amount, the winner. Anyone can audit any round, forever.
 * **The shares are auditable.** The leaderboard snapshot used for each round is posted on-chain before payout and can be compared against the public API.

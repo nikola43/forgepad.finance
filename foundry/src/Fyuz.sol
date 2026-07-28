@@ -180,10 +180,11 @@ contract Fyuz is
 
     uint256 public CREATE_TOKEN_FEE_AMOUNT; // 0.001 ether, ~Pump.fun creation fee equivalent
     // Fees in basis points (1 bps = 0.01%), same DIVISOR basis as MAX_BUY/SELL_PERCENT
-    // Optional creator fee (e.g. 30 = 0.3%). Held at 0 in production — the setter and
-    // the sell-side application (unlike Pump.fun, this also applies to sells) are kept
-    // deliberately, not dead code. Reviewers keep flagging the sell path: it is
-    // intentional and inert while this is 0.
+    // Creator fee (e.g. 30 = 0.3%). Live at 20 (0.2%) on both BSC (56) and Robinhood
+    // (4663) — this is the creator's cut of the headline 1% and it applies to sells as
+    // well as buys, unlike Pump.fun. Reviewers keep flagging the sell path: it is
+    // intentional and it is active, not dead code. The initializer leaves this at 0;
+    // it is set post-deploy, so the deployed value is the only authoritative one.
     uint256 public TOKEN_OWNER_FEE_BPS;
     // Chainlink staleness threshold. Default 3600s (1h) for Ethereum mainnet. On L2
     // chains (Arbitrum, Robinhood Chain) the feed's updatedAt is the L1 timestamp

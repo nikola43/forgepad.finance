@@ -7,7 +7,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Fyuz leaderboard fee Distributor (BSC)
-/// @notice Receives the protocol's 0.2% leaderboard fee stream (BNB) from Fyuz
+/// @notice Receives the protocol's 0.3% leaderboard fee stream (BNB) from Fyuz
 ///         and periodically distributes it to leaderboard participants:
 ///           - 90% pro-rata by leaderboard share (points in the round window)
 ///           - 10% to ONE participant picked uniformly by Chainlink VRF —
@@ -125,7 +125,7 @@ contract Distributor is VRFConsumerBaseV2Plus, Pausable {
     /// round past the block gas limit and freeze the pot.
     uint256 public constant MAX_HOLDERS = 100;
 
-    /// @notice Fyuz streams the 0.2% leaderboard fee here on every trade.
+    /// @notice Fyuz streams the 0.3% leaderboard fee here on every trade.
     receive() external payable {}
 
     /// @notice Balance that may be paid into a round: everything except what is

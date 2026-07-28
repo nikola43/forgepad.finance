@@ -4,8 +4,11 @@
  * Two reagent discs overlap; the intersection ignites. A Venn diagram turned
  * explosive — the entire brand idea in three circles. Survives a 16px favicon.
  *
- * Never rotate, stretch, gradient, glow, recolor off-palette, or set the
- * wordmark as the app icon (§07 NEVER panel).
+ * Never rotate, stretch, gradient, glow, or recolor off-palette (§07 NEVER panel).
+ *
+ * Note: the app icon / favicon is the wordmark avatar, matching the @fyuzfun
+ * profile image. Keep using the symbol below any size where the wordmark stops
+ * being readable — small in-app avatars and watermarks.
  */
 
 type MarkProps = {

@@ -10,7 +10,9 @@ export default function manifest(): MetadataRoute.Manifest {
       "The cultural launchpad where the internet fuses personalities, narratives and communities into live meme markets.",
     start_url: "/",
     display: "standalone",
-    // The chamber (§08 moss black) — the app icon is the symbol, never the wordmark (§07).
+    // The chamber (§08 moss black). The app icon is the wordmark avatar — the same
+    // mark used as the @fyuzfun profile image, so install prompts and social cards
+    // match the account people arrive from.
     background_color: "#131208",
     theme_color: "#131208",
     icons: [

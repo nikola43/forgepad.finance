@@ -9,11 +9,11 @@ The main contract: an upgradeable proxy that owns every bonding curve.
 * **Token factory** — deploys each fusion token with 1B fixed supply
 * **Bonding curve engine** — deterministic pricing; buys and sells settle in the same transaction
 * **Graduation** — at **$30,000 market cap** (Chainlink BNB/USD on BSC, ETH/USD on Robinhood, both staleness-checked), the curve closes and liquidity is seeded into the creator's chosen V2/V3 pool via a liquidity manager behind a **timelock** (graduation funds can't be redirected instantly, even by the owner)
-* **Fee splitter** — the 1% trade fee splits in-transaction: 0.6% treasury / 0.2% Distributor / 0.2% creator
+* **Fee splitter** — the 1% trade fee splits in-transaction: 0.5% treasury / 0.3% Distributor / 0.2% creator
 
 ## Distributor (the rewards engine)
 
-Receives the 0.2% fee stream and pays it back out in rounds:
+Receives the 0.3% fee stream and pays it back out in rounds:
 
 | Function | What it does |
 | --- | --- |
