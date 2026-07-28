@@ -20,6 +20,7 @@ import Loading from "@/components/loading";
 import {
   bsc,
   defineChain,
+  type AppKitNetwork,
 } from "@reown/appkit/networks";
 import { projectId, FYUZ_WEBSITE_URL } from "@/config";
 import { WagmiProvider } from "wagmi";
@@ -114,15 +115,31 @@ interface MainContextProps {
 
 // localhost.id = 56;
 
+// Robinhood stays defined but OFF the UI until its contracts are deployed and
+// BSC has been tested end to end. Set NEXT_PUBLIC_ENABLE_ROBINHOOD=true to turn
+// it back on — nothing else needs editing, and NEXT_PUBLIC_* is baked at build
+// time so the frontend must be rebuilt after changing it.
+//
+// This gates the whole surface: the wallet's network switcher below, and the
+// chain list from /config that drives the create-page picker, the Discover
+// filters and token lookups. Gating only one of the two would leave a chain the
+// user can select but not transact on, or vice versa.
+export const ROBINHOOD_ENABLED =
+  (process.env.NEXT_PUBLIC_ENABLE_ROBINHOOD ?? "false") === "true";
+
+const enabledNetworks = (
+  ROBINHOOD_ENABLED ? [bsc, robinhoodNetwork] : [bsc]
+) as [AppKitNetwork, ...AppKitNetwork[]];
+
 const wagmiAdapter = new WagmiAdapter({
   ssr: false,
   projectId,
-  networks: [bsc, robinhoodNetwork],
+  networks: enabledNetworks,
 });
 const appKit = createAppKit({
   adapters: [wagmiAdapter],
   projectId,
-  networks: [bsc, robinhoodNetwork],
+  networks: enabledNetworks,
   // networks: [localhost, mainnet, base, bsc, solana],
   // metadata,
   // BSC has a built-in AppKit icon; the custom Robinhood chain needs its logo
@@ -216,7 +233,11 @@ function ContextProvider({ children }: { children: ReactNode }) {
         // })
         // setAppKit(modal)
         setInitialized(true);
-        setChains(data.chains);
+        setChains(
+          ROBINHOOD_ENABLED
+            ? data.chains
+            : (data.chains ?? []).filter((c: any) => c.network !== "robinhood")
+        );
       })
       .catch((error) => {
         console.error("Failed to initialize app config:", error);
