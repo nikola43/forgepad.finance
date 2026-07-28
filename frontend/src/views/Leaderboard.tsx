@@ -88,14 +88,11 @@ export default function Leaderboard() {
                 <Typography fontSize={28} fontWeight={700} color="var(--bone)" fontFamily="var(--font-display)" display="flex" alignItems="center" gap={1}>
                     <EmojiEventsIcon sx={{ fontSize: 26 }} /> The Rankings
                 </Typography>
-                <Typography fontSize={13} color="var(--muted)">
-                    Points = the average position you HOLD across the round, plus bonus points from quests and referrals, projected to the round&apos;s close if you keep holding. Holding earns; buying just before the close does not. Rewards = your share of the live pot, split 90% by points and 10% to one random holder.
-                </Typography>
             </Box>
 
             {/* Live pot — the first thing on the page, because it is the reason to
-                read the rest of it. Sits above the rankings; the explainer below
-                the table carries the detail. */}
+                read the rest of it. How points and rewards work is explained once,
+                in the card below; it is not repeated here. */}
             <Box
                 sx={{
                     borderRadius: '16px',
