@@ -21,6 +21,7 @@ diesel = { version = "2.3.7", features = [
     "serde_json",
 ] }
 diesel-async = { version = "0.8.0", features = ["postgres", "deadpool"] }
+diesel_migrations = { version = "2.2", features = ["postgres"] }
 deadpool = "0.13.0"
 
 # Redis

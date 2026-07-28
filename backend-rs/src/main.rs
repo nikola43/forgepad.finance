@@ -5,9 +5,33 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 use forgepad_backend::config::{chains, database, redis};
+use forgepad_backend::handlers;
 use forgepad_backend::middleware::rate_limit;
 use forgepad_backend::services::{self, ws};
 use forgepad_backend::AppState;
+
+pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations =
+    diesel_migrations::embed_migrations!("migrations");
+
+/// Apply any pending migrations with a short-lived synchronous connection
+/// (diesel_migrations has no async harness). Panics on failure.
+fn run_migrations(database_url: &str) {
+    use diesel::Connection;
+    use diesel_migrations::MigrationHarness;
+
+    let mut conn = diesel::PgConnection::establish(database_url)
+        .expect("migrations: cannot connect to DATABASE_URL");
+    let applied = conn
+        .run_pending_migrations(MIGRATIONS)
+        .expect("migrations: failed to apply");
+    if applied.is_empty() {
+        tracing::info!("schema up to date");
+    } else {
+        for m in &applied {
+            tracing::info!("applied migration {m}");
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -39,6 +63,17 @@ async fn main() -> anyhow::Result<()> {
     let chain_configs = chains::default_chains();
     tracing::info!("Loaded {} chain(s): {}", chain_configs.len(), chain_configs.iter().map(|c| format!("{}({})", c.name, c.chain_id)).collect::<Vec<_>>().join(", "));
 
+    // Schema migrations run at startup, before anything touches the DB.
+    //
+    // They previously ran NOWHERE: __diesel_schema_migrations did not exist,
+    // diesel_migrations was not even a dependency, and the schema had only ever
+    // been applied by hand. That meant a fresh deploy — or a restore from a dump
+    // taken before a fix — silently came up on an older schema, and code written
+    // against the newer one failed at runtime rather than at boot. Failing to
+    // migrate is fatal on purpose: serving on an unknown schema is worse than
+    // not serving.
+    run_migrations(&database_url);
+
     // API key (fail-closed: refuse to start without it). `.expect` only catches
     // an ABSENT var; an empty API_KEY= would otherwise make every api-key-gated
     // endpoint compare against "" and accept a missing/empty header — reject it.
@@ -49,6 +84,23 @@ async fn main() -> anyhow::Result<()> {
 
     // Create app state
     let state = AppState::new(db_pool, redis_client, chain_configs.clone(), api_key).await;
+
+    // Reward sweeper: backstop for rewards the trade indexer cannot see (token
+    // creation, graduation, streaks) and for anything earned before auto-granting
+    // existed. Idempotent, so it only ever fills gaps. Runs immediately on boot,
+    // then every 5 minutes.
+    {
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            loop {
+                match handlers::rewards::sweep_grants(&state_clone).await {
+                    Ok(n) => tracing::debug!("reward sweep: synced {n} user(s)"),
+                    Err(e) => tracing::warn!("reward sweep failed: {e}"),
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            }
+        });
+    }
 
     // Spawn blockchain listeners
     for chain in chain_configs {
