@@ -190,6 +190,14 @@ const CurrencyInput = styled(Box)`
     font-weight: 500;
     font-family: var(--font-data);
   }
+  & span.usd {
+    align-self: flex-end;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-data);
+    line-height: 1;
+  }
   & input {
     font-size: 20px;
     background: transparent;
@@ -531,6 +539,26 @@ const SwapContent = ({
             <CircularProgress />
         </Box>
 
+    // USD equivalents for the trade panel. `ethPrice` is the native coin in USD
+    // and `price` is the token quoted in the native coin, so a token's USD value
+    // is the product. Both already ride along on tokenDetails — no extra request.
+    const nativeUsd = Number(detailData.ethPrice ?? 0)
+    const tokenUsd = Number(detailData.price ?? 0) * nativeUsd
+    // The input is denominated in the native coin ONLY when buying with an exact
+    // native amount. Buying by token amount, and every sell, is denominated in the
+    // token. The estimate is always the opposite side of whatever the input is.
+    const inputIsNative = exactInput && tradeType === "buy"
+    const usdValue = (amount?: string, isNative?: boolean) => {
+        const n = Number(amount)
+        const rate = isNative ? nativeUsd : tokenUsd
+        // No rate yet (price still loading) means no figure at all, rather than a
+        // confident "$0" against an amount the user has actually typed.
+        if (!n || !rate || !Number.isFinite(n)) return null
+        return `$${priceFormatter(n * rate, 2)}`
+    }
+    const inputUsd = usdValue(amountIn, inputIsNative)
+    const estimateUsd = usdValue(estimateAmount, !inputIsNative)
+
     return <>
         <Box display="flex" alignContent="center" justifyContent="space-between" width="100%">
             {tradeType === "buy" && (
@@ -568,6 +596,9 @@ const SwapContent = ({
                         }}
                     />
                 </Box>
+                {!!inputUsd && (
+                    <Typography component="span" className="usd">≈ {inputUsd}</Typography>
+                )}
             </CurrencyInput>
         </FormControl>
         {(exactInput || tradeType === "sell") && (
@@ -640,7 +671,7 @@ const SwapContent = ({
         }
         {!!estimateAmount && (
             <SmallButton>
-                You will receive ~{priceFormatter(estimateAmount)} {exactInput && tradeType === "buy" ? detailData.tokenSymbol.toUpperCase() : caipNetwork?.nativeCurrency.symbol}
+                You will receive ~{priceFormatter(estimateAmount)} {exactInput && tradeType === "buy" ? detailData.tokenSymbol.toUpperCase() : caipNetwork?.nativeCurrency.symbol}{estimateUsd ? ` (≈ ${estimateUsd})` : ''}
             </SmallButton>
         )}
         {!!estimateAmount && !!amountIn && (() => {
@@ -649,7 +680,10 @@ const SwapContent = ({
             if (!inputVal || !outputVal || inputVal <= 0) return null
             // Approximate price impact: for sell, compare ETH-out/token-in vs current price
             // For buy, compare token-out/ETH-in vs current price
-            const currentPrice = parseFloat(detailData?.tokenPrice || '0')
+            // `price` — tokenDetails has never carried a `tokenPrice` field (only
+            // Jupiter TRADES do), so this read was always undefined and the price
+            // impact warning below could never render.
+            const currentPrice = parseFloat(detailData?.price || '0')
             if (!currentPrice) return null
             let priceImpact = 0
             if (tradeType === 'buy' && exactInput) {
