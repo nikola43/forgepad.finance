@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+use crate::errors::Query;
 use axum::Json;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Double, Integer, Nullable, Text};
+use diesel::sql_types::{BigInt, Bool, Double, Integer, Nullable, Text};
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{AppError, AppResult};
+use crate::handlers::rewards::{active_referral_sql, REFERRAL_MIN_REFEREE_USD};
 use crate::AppState;
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,10 @@ struct RefereeRow {
     avatar: Option<String>,
     #[diesel(sql_type = Double)]
     volume_usd: f64,
+    #[diesel(sql_type = Double)]
+    net_bought_usd: f64,
+    #[diesel(sql_type = Bool)]
+    active: bool,
 }
 
 #[derive(Serialize)]
@@ -50,6 +56,10 @@ pub struct Referee {
     username: Option<String>,
     avatar: Option<String>,
     volume_usd: f64,
+    /// Buys minus sells, in USD — progress toward the activation floor.
+    net_bought_usd: f64,
+    /// Whether this referral has cleared the floor and actually counts.
+    active: bool,
 }
 
 #[derive(Serialize)]
@@ -57,7 +67,12 @@ pub struct Referee {
 pub struct ReferralSummary {
     address: String,
     referral_code: Option<String>,
+    /// ACTIVE referrals only — this is the number that earns and ranks.
     referral_count: i64,
+    /// Signed up through the link but still under the floor.
+    pending_referral_count: i64,
+    /// Net USD a referee must buy to activate, so the UI need not hardcode it.
+    min_referee_usd: f64,
     referee_volume_usd: f64,
     points_from_referrals: f64,
     referees: Vec<Referee>,
@@ -82,6 +97,8 @@ pub async fn get_summary(
                 address,
                 referral_code: None,
                 referral_count: 0,
+                pending_referral_count: 0,
+                min_referee_usd: REFERRAL_MIN_REFEREE_USD,
                 referee_volume_usd: 0.0,
                 points_from_referrals: 0.0,
                 referees: vec![],
@@ -97,12 +114,20 @@ pub async fn get_summary(
     .optional()?
     .map(|c| c.referral_code);
 
+    // Pending referees are still listed — the referrer should be able to see who
+    // is short of the floor — but they are flagged, not counted.
     let referees: Vec<RefereeRow> = diesel::sql_query(format!(
         "SELECT u.address, u.username, u.avatar, \
-           COALESCE((SELECT SUM(t.eth_amount::float8 * t.eth_price::float8) FROM trades t WHERE t.swapper_id = u.id), 0) AS volume_usd \
+           COALESCE((SELECT SUM(t.eth_amount::float8 * t.eth_price::float8) FROM trades t WHERE t.swapper_id = u.id), 0) AS volume_usd, \
+           COALESCE((SELECT SUM(CASE WHEN t.trade_type = 'buy' \
+                                     THEN t.eth_amount::float8 * t.eth_price::float8 \
+                                     ELSE -(t.eth_amount::float8 * t.eth_price::float8) END) \
+                     FROM trades t WHERE t.swapper_id = u.id), 0) AS net_bought_usd, \
+           ({active}) AS active \
          FROM referrals r JOIN users u ON u.id = r.referee_id \
          WHERE r.referrer_id = {uid} \
-         ORDER BY volume_usd DESC"
+         ORDER BY active DESC, volume_usd DESC",
+        active = active_referral_sql("r")
     ))
     .load(&mut conn)
     .await?;
@@ -121,12 +146,15 @@ pub async fn get_summary(
     .total;
 
     let referee_volume_usd = referees.iter().map(|r| r.volume_usd).sum();
-    let referral_count = referees.len() as i64;
+    let referral_count = referees.iter().filter(|r| r.active).count() as i64;
+    let pending_referral_count = referees.len() as i64 - referral_count;
 
     Ok(Json(ReferralSummary {
         address,
         referral_code: code,
         referral_count,
+        pending_referral_count,
+        min_referee_usd: REFERRAL_MIN_REFEREE_USD,
         referee_volume_usd,
         points_from_referrals,
         referees: referees
@@ -136,6 +164,8 @@ pub async fn get_summary(
                 username: r.username,
                 avatar: r.avatar,
                 volume_usd: r.volume_usd,
+                net_bought_usd: r.net_bought_usd,
+                active: r.active,
             })
             .collect(),
     }))
@@ -179,14 +209,18 @@ pub async fn get_leaderboard(
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
     let limit = params.limit.unwrap_or(100).clamp(1, 500);
 
+    // Active referrals only. Ranking on raw signups made the board a wallet-count
+    // contest — free to farm and won by whoever scripted the most connections.
     let rows: Vec<LeaderRow> = diesel::sql_query(format!(
         "SELECT u.address, u.username, u.avatar, \
            COUNT(r.id)::bigint AS referral_count, \
            COALESCE(SUM((SELECT SUM(t.eth_amount::float8 * t.eth_price::float8) FROM trades t WHERE t.swapper_id = r.referee_id)), 0) AS referee_volume_usd \
          FROM referrals r JOIN users u ON u.id = r.referrer_id \
+         WHERE {active} \
          GROUP BY u.id, u.address, u.username, u.avatar \
          ORDER BY referral_count DESC, referee_volume_usd DESC \
-         LIMIT {limit}"
+         LIMIT {limit}",
+        active = active_referral_sql("r")
     ))
     .load(&mut conn)
     .await?;

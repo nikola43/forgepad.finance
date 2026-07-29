@@ -7,33 +7,69 @@
 // contract paid on.
 //
 // ---------------------------------------------------------------------------
-// WHY TIME-WEIGHTED
+// WHY VOLUME
 //
-// The old score was `max(0, buy_usd - sell_usd)` summed over the round window.
-// Three things were wrong with it, all exploitable:
+//     points = USD volume traded in the window, buys AND sells alike
 //
-//   1. It measured the CLOSING balance, not the position actually held. A wallet
-//      could buy $30k one minute before the weekly snapshot, be scored for the
-//      full $30k, and sell the moment the round opened — the sell landed in the
-//      NEXT window where, having no buys, it was floored to zero and cost
-//      nothing. Leaderboard weight was purchasable for ~2 cents per point with
-//      seconds of market exposure.
-//   2. The `max(0, ...)` floor was applied per-window, so a loss never carried.
-//      Exiting a position was always free.
-//   3. It ignored trades before the window entirely, so a genuine long-term
-//      holder who simply held scored ZERO while a boundary-timer scored full.
+// Every trade is scored the moment it lands and it is never taken away. Holding
+// is not required, exiting does not burn what you earned, and a round-trip earns
+// on both legs — the same way an AMM pays its liquidity providers on every swap
+// in either direction, which is the model this deliberately mirrors.
 //
-// Time-weighting fixes all three at once, because it prices TIME, which cannot
-// be bought back:
+// The predecessor scored a time-weighted average of the position still held:
 //
-//     points = (1/T) * ∫ max(0, net_position(t)) dt   over the window [from, to]
+//     points = (1/T) * ∫ max(0, net_position(t)) dt
 //
-// where net_position(t) is the running sum of (buys - sells) over the user's
-// ENTIRE history up to t — not just the window. A position held all week scores
-// its full USD value; the same position held for 60 seconds around the snapshot
-// scores 60/604800 of it, i.e. essentially nothing. A holder who bought months
-// ago and never sold scores in full every week, which is the behaviour the
-// product actually wants to reward.
+// That priced TIME, which cannot be bought back, and so it was robust against
+// snapshot-timing. But it also priced exactly the thing this product does not
+// want to tax: selling. A trader who bought on Monday and took profit on Tuesday
+// scored a fraction of a trader who bought the same size and sat on it, despite
+// paying MORE in fees (a sell is charged the same 1% as a buy). It rewarded
+// inactivity on a platform whose pot is funded by activity.
+//
+// ---------------------------------------------------------------------------
+// WHY VOLUME IS NOT A WASH-TRADING FAUCET
+//
+// The obvious objection to scoring volume is that volume is self-manufacturable:
+// buy, sell, repeat, farm the board. It is not profitable here, and the reason is
+// structural rather than a heuristic that has to be tuned or policed.
+//
+// The pot is funded from the SAME volume it rewards. On BSC (Fyuz.sol):
+//
+//     PLATFORM_BUY_FEE_BPS / PLATFORM_SELL_FEE_BPS = 80    (0.80%)
+//     TOKEN_OWNER_FEE_BPS                          = 20    (0.20%)
+//     platformTreasuryShareBps                     = 6250  → 62.5% treasury,
+//                                                    leaving 0.30% of volume
+//                                                    to the Distributor pot
+//
+// charged on BOTH sides of every trade. So $1 of self-dealt volume costs the
+// farmer $0.0100 and adds $0.0030 to the pot. Even if that farmer were 100% of
+// all platform volume — the best case for them, since shares are pro-rata — they
+// can recover at most 90% of what they put in (the other 10% is the VRF lottery):
+//
+//     paid    0.0100 per $1 of volume
+//     recover 0.0027 per $1 of volume   (0.9 x 0.0030)
+//     net    -0.0073 per $1 of volume
+//
+// Wash trading is therefore lossy by a factor of ~3.7x, and it stays lossy at any
+// volume, at any share of the board, and at any pot size, because both sides of
+// the ratio scale with volume — it cannot be grown out of. A token creator
+// self-dealing their own token recovers their 0.20% owner fee and so pays 0.80%
+// instead of 1.00%, which is still ~3x more than they can take back.
+//
+// The invariant to preserve if these numbers are ever retuned:
+//
+//     leaderboard_share_of_fee x 0.9  <  total_fee_charged
+//
+// It holds with enormous margin today (0.30% x 0.9 = 0.27% vs 1.00%). If the
+// leaderboard's cut of the fee were ever raised above ~90% of the total fee, or
+// points were credited for anything not charged a fee, farming would flip
+// positive and this whole model would have to be revisited.
+//
+// What volume scoring genuinely does cost: it is a DILUTION vector rather than a
+// profit vector. A farmer who is happy to lose 0.73% of their churn can buy a
+// larger slice of the pot and shrink everyone else's. They pay real money to the
+// treasury for the privilege, which is the trade being accepted here.
 //
 // ---------------------------------------------------------------------------
 // WHY GRANTS ARE CAPPED
@@ -43,14 +79,14 @@
 // funded solely by the 0.3% leaderboard fee. Uncapped, a wallet that never
 // traded could mint a claim on real BNB — a faucet paid for by people who did
 // trade. Grants are therefore capped at GRANT_CAP_RATIO x the user's earned
-// (time-weighted) points: bonuses AMPLIFY real participation instead of
-// substituting for it, and a zero-position wallet scores zero no matter how many
-// quests it completes.
+// (volume) points: bonuses AMPLIFY real participation instead of substituting
+// for it, and a wallet that never traded scores zero no matter how many quests
+// it completes.
 //
 // Tune GRANT_CAP_RATIO to change how much bonuses can matter; set it very high
 // to restore the old uncapped behaviour (and the faucet with it).
 
-/// Grants may contribute at most this multiple of a user's time-weighted points.
+/// Grants may contribute at most this multiple of a user's traded-volume points.
 ///
 /// INFINITY = uncapped: quest/achievement/referral points count in full, so the
 /// leaderboard always equals the Rewards Hub and a user who completes a quest
@@ -63,12 +99,12 @@
 /// can create a token (no minimum buy) and make one dust trade to bank ~38 points
 /// for gas — roughly $0.10 — and 100 such wallets claim ~3,800 points against a
 /// pot other people paid for. Nothing else in the system prices that: the payout
-/// floor is 1 point, and time-weighting only constrains the POSITION half of the
-/// score, not grants.
+/// floor is 1 point, and the fee argument above constrains only the VOLUME half of
+/// the score — a grant is credited without any fee having been paid.
 ///
-/// Set this to a finite number to re-tie grants to held capital (10.0 => holding
-/// $10 unlocks up to 100 points of grants; a zero-position wallet unlocks nothing
-/// at any finite ratio). That is the single lever if sybil farming appears.
+/// Set this to a finite number to re-tie grants to real trading (10.0 => $10 of
+/// volume unlocks up to 100 points of grants; a wallet that never traded unlocks
+/// nothing at any finite ratio). That is the single lever if sybil farming appears.
 pub const GRANT_CAP_RATIO: f64 = f64::INFINITY;
 
 /// Minimum final points to appear in a payout round. Below this a holder is
@@ -99,11 +135,10 @@ pub fn min_payout_points() -> f64 {
 /// Clamp a window start to something meaningful.
 ///
 /// `epoch_start()` returns 0 until the first round is paid, and the airdrop asks
-/// for a lifetime window starting at 0. Feeding 0 into a TIME-WEIGHTED average is
-/// not merely imprecise, it is catastrophic: the divisor becomes (now - 1970) =
-/// ~56 years, so a real $100 position held for a real week scores 100 * 7/20440
-/// = 0.03 points and every single user rounds to zero. The whole leaderboard
-/// would silently empty out and no round could ever pay anyone.
+/// for a lifetime window starting at 0. Volume scoring tolerates that far better
+/// than the time-weighted average did (there is no window-length divisor to blow
+/// up any more), but the anchor still matters: it decides which trades are in
+/// scope, and it keeps the half-open (from, to] window honest at the boundary.
 ///
 /// Anchoring to the first trade the platform ever saw makes the bootstrap window
 /// [first trade, now], which is both finite and the honest meaning of "all time".
@@ -137,60 +172,74 @@ pub async fn clamp_window_start(
     Ok(f.t)
 }
 
-/// CTE defining `twa(uid, pts)` — each user's time-weighted average net USD
-/// position across [`from`, `to`].
+/// Points per $1 of USD volume traded. Buys and sells score identically — both
+/// are charged the same fee, so both fund the pot they are scored against.
+///
+/// This is a pure scale factor: shares are pro-rata, so changing it re-scales
+/// every user equally and moves nobody's payout. The only thing it genuinely
+/// moves is where users sit relative to `min_payout_points()` and to the flat
+/// quest/referral grants in `points_ledger`, which are denominated in the same
+/// unit — at 1.0, the +25 for an active referral is worth $25 of trading.
+pub const POINTS_PER_USD_VOLUME: f64 = 1.0;
+
+/// CTE defining `earned(uid, pts)` — each user's traded USD volume across
+/// (`from`, `to`], both sides counted.
 ///
 /// `from` / `to` are unix seconds and MUST be caller-controlled i64s (never user
 /// input) since they are inlined; every call site passes either a compile-time
 /// constant or a value derived from our own DB / the chain.
 ///
 /// Implementation notes:
-///   - The running balance is taken over ALL trades up to `to`, so a position
-///     opened before the window still counts while it is held.
-///   - `ORDER BY traded_at, id` makes the running sum deterministic when several
-///     trades share a timestamp (same block); ties produce zero-length segments
-///     which contribute nothing.
-///   - Each trade starts a segment that runs until the next trade, or until `to`
-///     for the last one. Segments are clamped to the window before weighting, so
-///     a trade before `from` contributes only its overlap.
+///   - `eth_amount * eth_price` is the USD notional of the trade. `trade_type` is
+///     deliberately NOT filtered: a sell moves the same notional as a buy, pays
+///     the same fee, and so earns the same points.
+///   - The window is half-open, (from, to], matching every other window in this
+///     module — `epoch_start()` returns the last paid round's `time_end`, and a
+///     trade must land in exactly one round, never two.
+///   - Volume is banked per trade and never revalued, so nothing here depends on
+///     what the user does afterwards. Selling, transferring out, or the token
+///     graduating cannot retroactively change points already earned.
+pub fn volume_cte(from: i64, to: i64) -> String {
+    format!(
+        "earned AS ( \
+           SELECT swapper_id AS uid, \
+                  SUM(eth_amount::float8 * eth_price::float8) * {rate} AS pts \
+           FROM trades \
+           WHERE traded_at > {from} AND traded_at <= {to} \
+           GROUP BY swapper_id \
+         )",
+        rate = POINTS_PER_USD_VOLUME
+    )
+}
+
+/// CTE defining `pos(uid, held)` — the USD a user is holding right now, valued at
+/// their weighted-average acquisition cost.
+///
+/// DISPLAY ONLY. This no longer scores anything; it is the "Holding" column on
+/// the leaderboard, kept because it is genuinely informative next to volume. It
+/// is expensive (a window function over every trade and transfer), so it is
+/// deliberately NOT part of `points_with()` — only the one endpoint that renders
+/// the column pays for it, via `points_with_held()`.
+///
+/// Implementation notes, retained from when this drove scoring:
 ///   - Tokens that LEAVE a wallet by plain ERC20 transfer are subtracted, but
-///     tokens that ARRIVE by transfer are deliberately NOT added. A transfer
-///     therefore destroys points rather than moving them. That asymmetry is the
-///     point: the receiver paid nothing, so crediting them at the sender's cost
-///     basis would let a position be laundered between wallets indefinitely —
-///     buy, send, sell from the second wallet, repeat. Destroying on transfer
-///     makes the laundering strictly lossy.
-///   - Position is measured in TOKENS HELD per (user, token), valued at the
-///     user's weighted-average acquisition cost — NOT as net USD cash flow.
-///     Cash flow was wrong in both directions: a wallet that bought $100 and
-///     dumped at a loss for $50 kept a permanent +$50 "position" while holding
-///     nothing, and a wallet that sold half at a profit scored ZERO while still
-///     holding the other half. Token units cannot drift like that: sell
-///     everything and the balance is zero, keep half and half is counted.
-///   - A position stops earning the moment its token GRADUATES to a DEX. Trades
-///     on the DEX are not indexed, so after graduation the derived balance would
-///     freeze at whatever it was and keep scoring forever regardless of what the
-///     holder actually did — buy on the curve, graduate, dump on PancakeSwap, and
-///     the phantom position pays out every round. Clamping each token's segments
-///     at `launched_at` means only time spent on the bonding curve — the part we
-///     can actually observe — is ever scored.
-///   - Valued at COST, deliberately, not at the live mark. On a bonding curve a
-///     creator can move the price of their own illiquid token at will, so
-///     marking to market would let anyone mint unbounded points by pumping a
-///     token they hold. Cost basis measures capital actually committed, which is
-///     what the reward is for, and it cannot be manipulated by price.
-///   - The running balance is floored at zero AT EVERY STEP, not just when it is
-///     valued. Flooring only at valuation time (`GREATEST(toks, 0)`) stopped the
-///     score going negative but left the negative balance itself in the running
-///     sum, where it became a permanent DEBT against that token. A wallet that
-///     received 1000 tokens by transfer (deliberately not credited) and sold them
-///     carried -1000 forever, so a later, entirely genuine $500 buy scored ZERO
-///     until it had re-bought the full 1000. The same trap caught anyone holding
-///     tokens acquired before indexing began. `s - LEAST(MIN(s) OVER (...), 0)`
-///     is the closed form of `b_i = max(0, b_{i-1} + d_i)` — it clears the debt at
-///     the instant it is incurred, without a recursive CTE. You cannot hold a
-///     negative number of tokens, so no honest history can produce one.
-pub fn twa_cte(from: i64, to: i64) -> String {
+///     tokens that ARRIVE by transfer are deliberately NOT added — the receiver
+///     paid nothing, so crediting them at the sender's cost basis would overstate
+///     capital committed.
+///   - Position is measured in TOKENS HELD per (user, token), valued at cost, not
+///     as net USD cash flow: a wallet that bought $100 and dumped at a loss for
+///     $50 would otherwise show a permanent +$50 "position" while holding nothing.
+///   - Valued at COST, not at the live mark. On a bonding curve a creator can move
+///     the price of their own illiquid token at will, so marking to market would
+///     let anyone inflate this number by pumping a token they hold.
+///   - A token drops out once it GRADUATES to a DEX: trades on the DEX are not
+///     indexed, so the derived balance would freeze and misreport forever.
+///   - The running balance is floored at zero AT EVERY STEP.
+///     `s - LEAST(MIN(s) OVER (...), 0)` is the closed form of
+///     `b_i = max(0, b_{i-1} + d_i)` — it clears at the instant a debt is
+///     incurred, without a recursive CTE. Flooring only at valuation time left the
+///     negative in the running sum as a permanent debt against that token.
+pub fn held_cte(to: i64) -> String {
     format!(
         "moves AS ( \
            SELECT swapper_id AS uid, token_id, traded_at AS t, id AS tid, \
@@ -243,14 +292,6 @@ pub fn twa_cte(from: i64, to: i64) -> String {
              LEFT JOIN basis b ON b.uid = r.uid AND b.token_id = r.token_id \
              LEFT JOIN grad g ON g.id = r.token_id \
          ), \
-         twa AS ( \
-           SELECT uid, \
-                  SUM(val * GREATEST(LEAST(t1, {to}) - GREATEST(t0, {from}), 0)) \
-                    / NULLIF({to} - {from}, 0)::float8 AS pts \
-           FROM seg \
-           WHERE t1 > {from} AND t0 < {to} \
-           GROUP BY uid \
-         ), \
          pos AS ( \
            SELECT uid, SUM(val) AS held FROM ( \
              SELECT DISTINCT ON (uid, token_id) uid, token_id, \
@@ -262,7 +303,7 @@ pub fn twa_cte(from: i64, to: i64) -> String {
 }
 
 /// CTE defining `grants(uid, pts)` — bonus points from points_ledger inside the
-/// window. Kept separate from `twa` so the cap can be applied between them.
+/// window. Kept separate from `earned` so the cap can be applied between them.
 pub fn grants_cte(from: i64, to: i64) -> String {
     format!(
         "grants AS ( \
@@ -274,15 +315,15 @@ pub fn grants_cte(from: i64, to: i64) -> String {
     )
 }
 
-/// The scored value for a user, given `twa`/`grants` joined as `tw`/`gr`.
+/// The scored value for a user, given `earned`/`grants` joined as `ea`/`gr`.
 ///
-/// `earned + min(grants, ratio * earned)`, rounded to whole points.
+/// `volume + min(grants, ratio * volume)`, rounded to whole points.
 ///
 /// Rounded via ::numeric because Postgres `round(double precision)` is
 /// half-to-even (10.5 -> 10), which is not what "round" means to a user — and
 /// this value is a payout weight, not just a label.
 pub fn points_expr() -> String {
-    format!("round((COALESCE(tw.pts, 0) + {})::numeric)::float8", granted_expr())
+    format!("round((COALESCE(ea.pts, 0) + {})::numeric)::float8", granted_expr())
 }
 
 /// The grant component after the cap. Emitted as a bare sum when uncapped —
@@ -293,13 +334,13 @@ fn granted_expr() -> String {
         "COALESCE(gr.pts, 0)".to_string()
     } else {
         format!(
-            "LEAST(COALESCE(gr.pts, 0), {ratio} * COALESCE(tw.pts, 0))",
+            "LEAST(COALESCE(gr.pts, 0), {ratio} * COALESCE(ea.pts, 0))",
             ratio = GRANT_CAP_RATIO
         )
     }
 }
 
-/// TOTAL points earned — time-weighted position plus ALL grants, uncapped.
+/// TOTAL points earned — traded volume plus ALL grants, uncapped.
 ///
 /// This is a DISPLAY figure only. It is what a user has accumulated, and it is
 /// what the Rewards Hub counts, so showing it on the ranking page keeps the two
@@ -308,49 +349,35 @@ fn granted_expr() -> String {
 /// nothing mint a claim on the pot. `points_expr()` remains the only value the
 /// Distributor is served.
 pub fn points_total_expr() -> String {
-    "round((COALESCE(tw.pts, 0) + COALESCE(gr.pts, 0))::numeric)::float8".to_string()
+    "round((COALESCE(ea.pts, 0) + COALESCE(gr.pts, 0))::numeric)::float8".to_string()
 }
 
-/// `FROM users u LEFT JOIN twa ... LEFT JOIN grants ...` — the joins
+/// `FROM users u LEFT JOIN earned ... LEFT JOIN grants ...` — the joins
 /// `points_expr()` expects. LEFT so a user with grants but no trades still
 /// appears (scoring zero, by design), keeping displayed and paid sets identical.
 pub const POINTS_JOINS: &str =
-    " LEFT JOIN twa tw ON tw.uid = u.id LEFT JOIN grants gr ON gr.uid = u.id \
-      LEFT JOIN pos po ON po.uid = u.id ";
+    " LEFT JOIN earned ea ON ea.uid = u.id LEFT JOIN grants gr ON gr.uid = u.id ";
 
-/// The USD value a user is holding RIGHT NOW. Updates the instant a trade lands,
-/// so the UI has something real-time to show while time-weighted points accrue.
+/// Extra join for the holdings column. Only valid alongside `points_with_held()`.
+pub const HELD_JOIN: &str = " LEFT JOIN pos po ON po.uid = u.id ";
+
+/// The USD value a user is holding RIGHT NOW, at cost. Display only — points no
+/// longer depend on it. Requires `HELD_JOIN`.
 pub const HELD_NOW_EXPR: &str = "COALESCE(po.held, 0)";
 
-/// Points the user will have AT ROUND CLOSE if they hold their current position
-/// until then.
+/// Points the user will have at round close.
 ///
-/// This is the number to lead with in the UI. Raw accrued points are honest but
-/// unreadable to a human: someone who buys $2.25 three minutes into a window has
-/// genuinely earned ~0.04 points, and telling them "0" reads as broken even
-/// though it is correct. The projection answers the question they are actually
-/// asking — "what is this position worth to me?" — and it responds the instant
-/// they buy.
+/// Under volume scoring this is simply the points they already have: volume is
+/// banked the instant a trade lands and nothing further accrues by waiting, so
+/// there is nothing left to project. It was a real forecast under the old
+/// time-weighted model, where an unheld position was worth a fraction of a held
+/// one and a fresh buyer would otherwise have seen a demoralising 0.
 ///
-///     projected = (accrued_so_far * (to - from) + held_now * (end - to))
-///                 / (end - from)
-///
-/// i.e. the integral already banked, plus the rectangle they will bank by
-/// holding, over the full round. Payouts are still computed from ACCRUED points
-/// at snapshot time (`points_expr`); this is guidance, and must be labelled as
-/// such wherever it is shown.
-pub fn points_projected_expr(from: i64, to: i64, end: i64) -> String {
-    let twa_proj = format!(
-        "((COALESCE(tw.pts, 0) * ({to} - {from}) + {held} * ({end} - {to})) \
-          / NULLIF({end} - {from}, 0)::float8)",
-        held = HELD_NOW_EXPR
-    );
-    let granted = if GRANT_CAP_RATIO.is_infinite() {
-        "COALESCE(gr.pts, 0)".to_string()
-    } else {
-        format!("LEAST(COALESCE(gr.pts, 0), {GRANT_CAP_RATIO} * {twa_proj})")
-    };
-    format!("round(({twa_proj} + {granted})::numeric)::float8")
+/// Kept as a distinct function so the leaderboard and Rewards Hub payloads do not
+/// have to change shape; both now show the same number in both fields, which is
+/// the honest answer.
+pub fn points_projected_expr(_from: i64, _to: i64, _end: i64) -> String {
+    points_expr()
 }
 
 /// Unix timestamp of the next round close: the same Monday-08:00-UTC schedule
@@ -367,9 +394,25 @@ pub fn next_round_end(now: i64) -> i64 {
     SCHEDULE_ANCHOR + ((now - SCHEDULE_ANCHOR) / SCHEDULE_PERIOD + 1) * SCHEDULE_PERIOD
 }
 
-/// Full `WITH twa AS (...), grants AS (...)` prefix for a scoring query.
+/// Full `WITH earned AS (...), grants AS (...)` prefix for a scoring query.
+/// Pair with `POINTS_JOINS`.
 pub fn points_with(from: i64, to: i64) -> String {
-    format!("WITH {}, {} ", twa_cte(from, to), grants_cte(from, to))
+    format!("WITH {}, {} ", volume_cte(from, to), grants_cte(from, to))
+}
+
+/// As `points_with`, plus the CTEs behind `HELD_NOW_EXPR`. Pair with
+/// `POINTS_JOINS` AND `HELD_JOIN`.
+///
+/// Only for the surface that actually renders a holdings column — the position
+/// machinery is several window functions over every trade and transfer, and no
+/// payout depends on it any more.
+pub fn points_with_held(from: i64, to: i64) -> String {
+    format!(
+        "WITH {}, {}, {} ",
+        held_cte(to),
+        volume_cte(from, to),
+        grants_cte(from, to)
+    )
 }
 
 // ---------------------------------------------------------------------------

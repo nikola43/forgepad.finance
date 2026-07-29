@@ -36,7 +36,7 @@ struct QuestDef {
 const QUESTS: &[QuestDef] = &[
     QuestDef { key: "first_buy", title: "First Buy", description: "Make your first token buy", kind: "oneoff", target: 1.0, points: 5.0 },
     QuestDef { key: "launch_token", title: "Launch a Token", description: "Create your first token", kind: "oneoff", target: 1.0, points: 20.0 },
-    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer your first trader to Fyuz — and every referred trader keeps earning you +25 automatically", kind: "oneoff", target: 1.0, points: 25.0 },
+    QuestDef { key: "refer_trader", title: "Bring a Friend", description: "Refer a trader who buys $50+ — and every active referral keeps earning you +25 automatically", kind: "oneoff", target: 1.0, points: 25.0 },
     QuestDef { key: "daily_trade", title: "Daily Trader", description: "Make at least one trade today", kind: "daily", target: 1.0, points: 3.0 },
     QuestDef { key: "daily_volume", title: "Volume Runner", description: "Trade $10 of volume today", kind: "daily", target: 10.0, points: 10.0 },
 ];
@@ -221,10 +221,11 @@ async fn compute_metrics(state: &AppState, uid: i32) -> AppResult<Metrics> {
            COALESCE(SUM(CASE WHEN t.trade_type = 'buy' AND to_timestamp(t.traded_at) AT TIME ZONE 'UTC' >= date_trunc('day', now() AT TIME ZONE 'UTC') THEN 1 ELSE 0 END), 0)::bigint AS trades_today, \
            COALESCE(SUM(CASE WHEN t.trade_type = 'buy' AND to_timestamp(t.traded_at) AT TIME ZONE 'UTC' >= date_trunc('day', now() AT TIME ZONE 'UTC') THEN t.eth_amount::float8 * t.eth_price::float8 ELSE 0 END), 0) AS volume_today, \
            (SELECT COUNT(*) FROM tokens WHERE creator_id = {uid})::bigint AS tokens_created, \
-           (SELECT COUNT(*) FROM referrals WHERE referrer_id = {uid})::bigint AS referral_count, \
+           (SELECT COUNT(*) FROM referrals r WHERE r.referrer_id = {uid} AND {active_ref})::bigint AS referral_count, \
            (SELECT COUNT(*) FROM holders h JOIN tokens tk ON tk.id = h.token_id \
               WHERE h.user_id = {uid} AND h.amount > 0 AND tk.launched_at IS NOT NULL)::bigint AS holds_graduated \
-         FROM trades t WHERE t.swapper_id = {uid}"
+         FROM trades t WHERE t.swapper_id = {uid}",
+        active_ref = active_referral_sql("r")
     ))
     .get_result(&mut conn)
     .await?;
@@ -344,17 +345,37 @@ async fn grant(state: &AppState, uid: i32, source: &str, amount: f64, reference:
     Ok(n)
 }
 
-/// Points granted per referred trader (once they make their first trade).
+/// Points granted per active referred trader.
 const REFERRAL_POINTS: f64 = 25.0;
 
 /// Minimum net USD a referee must have bought (and still hold) before the
-/// referrer is paid for them. "Made one trade" was too cheap a bar: a dust buy
-/// costs cents, so 25 points per wallet was a faucet priced far below the pot
-/// share those points claim.
-const REFERRAL_MIN_REFEREE_USD: f64 = 50.0;
+/// referral counts for anything. "Signed up" and even "made one trade" were too
+/// cheap a bar: a wallet costs nothing and a dust buy costs cents, so 25 points
+/// per referral was a faucet priced far below the pot share those points claim.
+pub const REFERRAL_MIN_REFEREE_USD: f64 = 50.0;
 
-/// Referees of `uid` who are real traders: net USD bought (buys minus sells)
-/// at or above REFERRAL_MIN_REFEREE_USD. Self-referrals are excluded outright.
+/// SQL boolean over a `referrals` row aliased `r`: this referral is ACTIVE.
+///
+/// One definition, used by every count, leaderboard and grant, so a referral
+/// that is worth nothing in points is also worth nothing on the leaderboard, in
+/// the quest, and on the profile. A referral is active when:
+///   * it is not a self-referral, and
+///   * the referee has bought at least REFERRAL_MIN_REFEREE_USD *net* — buys
+///     minus sells, so funding a wallet, buying, and dumping back out does not
+///     qualify, and a referee who exits drops back below the floor.
+pub fn active_referral_sql(r: &str) -> String {
+    format!(
+        "{r}.referee_id <> {r}.referrer_id AND COALESCE(( \
+               SELECT SUM(CASE WHEN rt.trade_type = 'buy' \
+                               THEN rt.eth_amount::float8 * rt.eth_price::float8 \
+                               ELSE -(rt.eth_amount::float8 * rt.eth_price::float8) END) \
+               FROM trades rt WHERE rt.swapper_id = {r}.referee_id \
+             ), 0) >= {min_usd}",
+        min_usd = REFERRAL_MIN_REFEREE_USD
+    )
+}
+
+/// Referees of `uid` whose referral is active — see `active_referral_sql`.
 async fn traded_referees(state: &AppState, uid: i32) -> AppResult<Vec<i32>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
     #[derive(QueryableByName)]
@@ -363,15 +384,8 @@ async fn traded_referees(state: &AppState, uid: i32) -> AppResult<Vec<i32>> {
         referee_id: i32,
     }
     let rows: Vec<T> = diesel::sql_query(format!(
-        "SELECT r.referee_id FROM referrals r WHERE r.referrer_id = {uid} \
-         AND r.referee_id <> {uid} \
-         AND COALESCE(( \
-               SELECT SUM(CASE WHEN t.trade_type = 'buy' \
-                               THEN t.eth_amount::float8 * t.eth_price::float8 \
-                               ELSE -(t.eth_amount::float8 * t.eth_price::float8) END) \
-               FROM trades t WHERE t.swapper_id = r.referee_id \
-             ), 0) >= {min_usd}",
-        min_usd = REFERRAL_MIN_REFEREE_USD
+        "SELECT r.referee_id FROM referrals r WHERE r.referrer_id = {uid} AND {active}",
+        active = active_referral_sql("r")
     ))
     .load(&mut conn)
     .await?;

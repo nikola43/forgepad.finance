@@ -153,17 +153,17 @@ export default function Leaderboard() {
                         </Typography>
                         <Typography fontSize={13.5} color="rgba(234,230,218,0.75)" mt={0.75} lineHeight={1.6}>
                             Every buy and sell carries a flat <b style={{ color: 'var(--citron)' }}>1% fee</b> — and 30% of it flows
-                            straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 you hold for a full
-                            round</b> — hold half the week and you earn half — so only real, held positions count and wash trading earns
-                            nothing.
+                            straight back to traders. You earn <b style={{ color: 'var(--citron)' }}>1 point per $1 traded</b>, on buys{' '}
+                            <i>and</i> sells alike — points land the moment the trade does, you don&apos;t have to hold, and taking profit
+                            never costs you what you already earned.
                             Each week we pool <b style={{ color: 'var(--citron)' }}>30% of all platform fees</b> and pay it out in{' '}
                             <b style={{ color: 'var(--citron)' }}>BNB</b>, split by your share of points. Only the{' '}
                             <b style={{ color: 'var(--citron)' }}>top 100 traders</b> on this board qualify for a cut — so climb and
                             hold your spot. And every week <b style={{ color: 'var(--citron)' }}>one random qualifying trader wins 10% of
-                            the entire pool</b>, on top of their points share. Trade more, hold your conviction, and claim a bigger weekly cut.
+                            the entire pool</b>, on top of their points share. Trade more, both ways, and claim a bigger weekly cut.
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                            {['1 pt / $1 held per round', 'No wash-trade farming', '1% flat fee', '30% shared weekly', 'Top 100 only', '10% random winner', 'Paid in BNB'].map((chip) => (
+                            {['1 pt / $1 traded', 'Buys and sells both earn', 'No holding required', '1% flat fee', '30% shared weekly', 'Top 100 only', '10% random winner', 'Paid in BNB'].map((chip) => (
                                 <Box
                                     key={chip}
                                     sx={{
@@ -195,7 +195,7 @@ export default function Leaderboard() {
                     <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, px: 2, py: 1.5, background: 'rgba(234,230,218,0.03)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, fontFamily: 'var(--font-data)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         <Box>#</Box>
                         <Box>Trader</Box>
-                        <Box textAlign="right">Holding</Box>
+                        <Box textAlign="right">Volume</Box>
                         <Box textAlign="right">Points</Box>
                         <Box textAlign="right">Reward</Box>
                     </Box>
@@ -217,8 +217,8 @@ export default function Leaderboard() {
                                 </Typography>
                             </Box>
                             <Box textAlign="right">
-                                <Typography color="var(--bone)" fontSize={14} fontFamily="var(--font-data)">${priceFormatter(r.heldUsd ?? 0, 2)}</Typography>
-                                <Typography color="var(--text-muted)" fontSize={11} fontFamily="var(--font-data)">${priceFormatter(r.volumeUsd, 2)} traded</Typography>
+                                <Typography color="var(--bone)" fontSize={14} fontFamily="var(--font-data)">${priceFormatter(r.volumeUsd, 2)}</Typography>
+                                <Typography color="var(--text-muted)" fontSize={11} fontFamily="var(--font-data)">${priceFormatter(r.heldUsd ?? 0, 2)} held</Typography>
                             </Box>
                             <Typography textAlign="right" color="var(--citron)" fontSize={14} fontWeight={600} fontFamily="var(--font-data)">{priceFormatter(r.pointsProjected ?? r.points, 2)}</Typography>
                             <Box textAlign="right">

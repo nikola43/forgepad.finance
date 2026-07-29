@@ -7,12 +7,20 @@ export type Referee = {
     username?: string
     avatar?: string
     volumeUsd: number
+    /** Buys minus sells, in USD — progress toward the activation floor. */
+    netBoughtUsd: number
+    /** Cleared the floor, so this referral actually earns and ranks. */
+    active: boolean
 }
 
 export type ReferralSummary = {
     address: string
     referralCode?: string | null
+    /** Active referrals only. */
     referralCount: number
+    pendingReferralCount: number
+    /** Net USD a referee must buy before their referral counts. */
+    minRefereeUsd: number
     refereeVolumeUsd: number
     pointsFromReferrals: number
     referees: Referee[]

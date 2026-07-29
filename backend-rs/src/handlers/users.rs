@@ -1,4 +1,5 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+use crate::errors::Query;
 use axum::Json;
 use chrono::Utc;
 use diesel::prelude::*;
@@ -82,7 +83,7 @@ pub struct UserProfileResponse {
     pub referral_count: i64,
     pub points: i32,
     // Trading rewards — same model as the leaderboard: trading_points is the
-    // time-weighted position plus unlocked grants (handlers/points.rs), and
+    // USD volume traded plus unlocked grants (handlers/points.rs), and
     // reward_eth is this user's slice of the LIVE pot:
     //   90% x distributor balance x (your points / payout-set points).
     // There is deliberately no fixed BNB-per-point rate; see points.rs.
@@ -376,12 +377,11 @@ pub async fn create_user(
 
 // ---------------------------------------------------------------------------
 // GET /users/leaderboard
-// Points = net USD invested = max(0, USD bought - USD sold). Net volume rewards
-// only the capital that stays in, so wash trading (buy $X then sell $X) nets ~0
-// points instead of being profitable, and exiting a position burns the points
-// it earned. Each point is worth POINT_REWARD_BNB (default 0.00001 BNB ≈ 0.57%
-// of net volume at $569/BNB — meaningful but below the 1% protocol fee, so
-// farming points always costs more than it pays), distributed manually.
+// Points = USD volume traded in the round, buys and sells alike — see
+// handlers/points.rs for the definition and for why manufactured volume is
+// structurally lossy rather than farmable. Holding is not required and selling
+// does not burn what a trade already earned. Rewards are a pro-rata share of the
+// live Distributor pot, not a fixed rate per point.
 // ---------------------------------------------------------------------------
 
 /// BNB paid per leaderboard/bonus point. Env-tunable so the rate can track BNB
@@ -492,8 +492,12 @@ pub async fn get_leaderboard(
          WHERE {points} > 0 OR {points_projected} > 0 \
          ORDER BY points_projected DESC, points DESC, u.address ASC \
          LIMIT {limit}",
-        with = crate::handlers::points::points_with(epoch, now),
-        joins = crate::handlers::points::POINTS_JOINS,
+        with = crate::handlers::points::points_with_held(epoch, now),
+        joins = format!(
+            "{}{}",
+            crate::handlers::points::POINTS_JOINS,
+            crate::handlers::points::HELD_JOIN
+        ),
         points_total = crate::handlers::points::points_total_expr(),
         points_projected = crate::handlers::points::points_projected_expr(epoch, now, round_end),
         held = crate::handlers::points::HELD_NOW_EXPR,
@@ -651,12 +655,21 @@ pub async fn get_user_profile(
         .get_result(&mut conn)
         .await?;
 
-    // Referral count
-    let referral_count: i64 = referrals::table
-        .filter(referrals::referrer_id.eq(user.id))
-        .count()
-        .get_result(&mut conn)
-        .await?;
+    // Referral count — active referrals only, the same bar the points use, so the
+    // profile can't advertise referrals that earned nothing.
+    #[derive(QueryableByName)]
+    struct RefCount {
+        #[diesel(sql_type = BigInt)]
+        n: i64,
+    }
+    let referral_count: i64 = diesel::sql_query(format!(
+        "SELECT COUNT(*)::bigint AS n FROM referrals r WHERE r.referrer_id = {uid} AND {active}",
+        uid = user.id,
+        active = crate::handlers::rewards::active_referral_sql("r")
+    ))
+    .get_result::<RefCount>(&mut conn)
+    .await?
+    .n;
 
     // Points (from referral_info earnings)
     let points: i32 = referral_info::table
@@ -666,7 +679,7 @@ pub async fn get_user_profile(
         .await
         .unwrap_or(0);
 
-    // Trading rewards — net-volume model, identical to get_leaderboard, scoped to
+    // Trading rewards — volume model, identical to get_leaderboard, scoped to
     // this user. user.id is an integer from the DB, so inlining it is injection-safe.
     #[derive(QueryableByName)]
     struct TradeAgg {

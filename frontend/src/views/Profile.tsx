@@ -665,7 +665,7 @@ export default function Profile() {
                         className="animate-fade-in"
                         clickable={isOwnProfile ? 1 : 0}
                         onClick={isOwnProfile ? () => router.push('/referrals') : undefined}
-                        title={isOwnProfile ? 'Open your referral link — every referred trader earns you +25 points' : undefined}
+                        title={isOwnProfile ? `Open your referral link — every referral who buys $${referralSummary?.minRefereeUsd ?? 50}+ earns you +25 points` : undefined}
                         sx={isOwnProfile ? { transition: 'all 0.2s ease', '&:hover': { borderColor: 'rgba(191,209,67,0.3)' } } : undefined}
                     >
                         <Typography fontSize={20} fontWeight={700} color="var(--bone)" fontFamily="var(--font-display)">

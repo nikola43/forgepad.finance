@@ -15,7 +15,7 @@ use crate::AppState;
 //
 // Frames a user's accrued points as their indicative weight in a hypothetical
 // future token distribution. Points are computed exactly the same way as the
-// leaderboard: net USD invested (max(0, buy - sell)) plus any bonus points
+// leaderboard: USD volume traded (buys and sells alike) plus any bonus points
 // recorded in `points_ledger` (quests, streaks, achievements, referrals).
 //
 // `sharePct` is `yourPoints / totalPoints * 100`, where `totalPoints` is the

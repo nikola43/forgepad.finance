@@ -19,6 +19,9 @@ export default function Referrals() {
     const { entries } = useReferralLeaderboard(100)
     const router = useRouter()
 
+    // The activation floor is owned by the backend; 50 is only the pre-load default.
+    const minUsd = summary?.minRefereeUsd ?? 50
+
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://fyuz.fun'
     const link = summary?.referralCode ? `${origin}/?ref=${summary.referralCode}` : ''
 
@@ -41,7 +44,7 @@ export default function Referrals() {
                     <GroupAddIcon sx={{ fontSize: 26 }} /> Referrals
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Invite friends with your link — every friend who joins and trades earns you +25 points, and points push you up the leaderboard.
+                    Invite friends with your link — every friend who joins and buys ${minUsd}+ earns you +25 points, and points push you up the leaderboard.
                 </Typography>
             </Box>
 
@@ -50,7 +53,7 @@ export default function Referrals() {
                 {[
                     { step: '1', title: 'Share your link', text: 'Copy your personal referral link below and send it to friends or post it on X.' },
                     { step: '2', title: 'They join through it', text: 'When someone opens your link and connects their wallet, they’re registered as your referral — permanently.' },
-                    { step: '3', title: 'You earn points', text: 'The moment each referral makes their first trade, you get +25 points. 10 friends = +250 points, 100 friends = +2,500.' },
+                    { step: '3', title: 'They buy $' + minUsd + '+', text: `A referral goes active once they've bought $${minUsd} net (buys minus sells). That's when you get +25 points — 10 active friends = +250.` },
                 ].map((s) => (
                     <Box key={s.step} sx={{ p: 2, borderRadius: '14px', border: '1px solid var(--border)', background: 'rgba(234,230,218,0.02)' }}>
                         <Typography fontSize={12} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)" mb={0.5}>STEP {s.step}</Typography>
@@ -61,7 +64,7 @@ export default function Referrals() {
             </Box>
             <Box sx={{ p: 1.75, mb: 3, borderRadius: '12px', border: '1px solid rgba(191,209,67,0.2)', background: 'rgba(191,209,67,0.04)' }}>
                 <Typography fontSize={12.5} color="var(--muted)">
-                    <b style={{ color: 'var(--citron)' }}>Why it matters:</b> referral points are added to your season score alongside your trading volume — the more friends you bring, the higher you rank on the leaderboard and the bigger your share of the season prize pot. There&apos;s no limit: every active referral keeps counting.
+                    <b style={{ color: 'var(--citron)' }}>Why it matters:</b> referral points are added to your season score alongside your trading volume — the more friends you bring, the higher you rank on the leaderboard and the bigger your share of the season prize pot. There&apos;s no limit: every active referral keeps counting. Only referrals that buy ${minUsd}+ net count anywhere — empty wallets earn nothing, so the pot goes to people who actually bring traders.
                 </Typography>
             </Box>
 
@@ -78,7 +81,10 @@ export default function Referrals() {
                         <Button onClick={share} sx={{ textTransform: 'none', color: 'var(--bone)', border: '1px solid rgba(234,230,218,0.2)', borderRadius: '10px', px: 2 }}>Share on X</Button>
                     </Box>
                     <Box display="flex" gap={3} mt={2} flexWrap="wrap">
-                        <Box><Typography fontSize={22} fontWeight={800} color="var(--bone)" fontFamily="var(--font-data)">{summary?.referralCount ?? 0}</Typography><Typography fontSize={11} color="var(--muted)" fontFamily="var(--font-data)">Referrals</Typography></Box>
+                        <Box><Typography fontSize={22} fontWeight={800} color="var(--bone)" fontFamily="var(--font-data)">{summary?.referralCount ?? 0}</Typography><Typography fontSize={11} color="var(--muted)" fontFamily="var(--font-data)">Active referrals</Typography></Box>
+                        {!!summary?.pendingReferralCount && (
+                            <Box><Typography fontSize={22} fontWeight={800} color="var(--muted)" fontFamily="var(--font-data)">{summary.pendingReferralCount}</Typography><Typography fontSize={11} color="var(--muted)" fontFamily="var(--font-data)">Pending (&lt;${minUsd})</Typography></Box>
+                        )}
                         <Box><Typography fontSize={22} fontWeight={800} color="var(--bone)" fontFamily="var(--font-data)">${priceFormatter(summary?.refereeVolumeUsd ?? 0, 2)}</Typography><Typography fontSize={11} color="var(--muted)" fontFamily="var(--font-data)">Referee volume</Typography></Box>
                         <Box><Typography fontSize={22} fontWeight={800} color="var(--citron)" fontFamily="var(--font-data)">{priceFormatter(summary?.pointsFromReferrals ?? 0, 0)}</Typography><Typography fontSize={11} color="var(--muted)" fontFamily="var(--font-data)">Points earned</Typography></Box>
                     </Box>
@@ -94,6 +100,16 @@ export default function Referrals() {
                             <Box key={r.address} onClick={() => router.push(`/profile?address=${r.address}`)} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1.25, borderTop: '1px solid rgba(234,230,218,0.05)', cursor: 'pointer', '&:hover': { background: 'rgba(234,230,218,0.03)' } }}>
                                 <Avatar src={r.avatar || undefined} sx={{ width: 26, height: 26 }} />
                                 <Typography color="var(--bone)" fontSize={14} flex={1} noWrap>{r.username || short(r.address)}</Typography>
+                                {r.active ? (
+                                    <Typography sx={{ px: 1, py: 0.25, borderRadius: '6px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--citron)', background: 'rgba(191,209,67,0.12)' }}>ACTIVE</Typography>
+                                ) : (
+                                    <Typography
+                                        title={`Needs $${minUsd} net bought to activate`}
+                                        sx={{ px: 1, py: 0.25, borderRadius: '6px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--muted)', background: 'rgba(234,230,218,0.06)' }}
+                                    >
+                                        ${priceFormatter(Math.max(r.netBoughtUsd, 0), 2)} / ${minUsd}
+                                    </Typography>
+                                )}
                                 <Typography color="var(--muted)" fontSize={13} fontFamily="var(--font-data)">${priceFormatter(r.volumeUsd, 2)}</Typography>
                             </Box>
                         ))}
@@ -108,7 +124,7 @@ export default function Referrals() {
             ) : (
                 <Box sx={{ border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: '48px 1fr 110px 130px', gap: 1, px: 2, py: 1.5, background: 'rgba(234,230,218,0.03)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, fontFamily: 'var(--font-data)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        <Box>#</Box><Box>Referrer</Box><Box textAlign="right">Referrals</Box><Box textAlign="right">Referee vol</Box>
+                        <Box>#</Box><Box>Referrer</Box><Box textAlign="right">Active refs</Box><Box textAlign="right">Referee vol</Box>
                     </Box>
                     {entries.map((e) => (
                         <Box key={e.address} onClick={() => router.push(`/profile?address=${e.address}`)} sx={{ display: 'grid', gridTemplateColumns: '48px 1fr 110px 130px', gap: 1, px: 2, py: 1.5, alignItems: 'center', borderTop: '1px solid rgba(234,230,218,0.05)', cursor: 'pointer', '&:hover': { background: 'rgba(234,230,218,0.03)' } }}>
