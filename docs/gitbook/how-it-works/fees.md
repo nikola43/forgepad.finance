@@ -19,5 +19,5 @@ Every buy and sell on a Fyuz bonding curve pays a **1% protocol fee**, split on-
 * **Everyone:** there are no deposit fees, no withdrawal fees, no "premium tiers." The 1% is the whole story.
 
 {% hint style="info" %}
-Point rewards are calibrated to stay **below** the fee take (currently 0.00001 BNB per point ≈ 0.57% of net volume) — so farming points by wash-trading always costs more in fees than it earns. The math protects honest traders' pot.
+The pot is funded by the same volume it rewards, which is what makes wash-trading structurally unprofitable rather than something we have to police. $1 of self-dealt volume pays **1%** in fees and adds 0.3% to the pot, of which 90% is payable pro-rata — so even a farmer who *was* 100% of platform volume gets back at most **0.27%**. Farming loses ~3.7x, at any size.
 {% endhint %}

@@ -27,11 +27,12 @@ That's by design — the pro-rata 90% rewards grinding, the 10% rewards *showing
 * **The winner is on-chain random.** Chainlink VRF generates the random number with a cryptographic proof that nobody — not even the Fyuz team — can predict or manipulate.
 * **The payout is public.** Every round emits events: pot size, every recipient, every amount, the winner. Anyone can audit any round, forever.
 * **The shares are auditable.** The leaderboard snapshot used for each round is posted on-chain before payout and can be compared against the public API.
+* **Nothing depends on us pressing a button.** **Chainlink Automation** drives the round — opening it, distributing it, retrying VRF, cancelling a stalled one. Every one of those entrypoints is also public and re-checks its own conditions on-chain, so if the upkeep were ever unfunded or paused, anyone could call them and the round still pays.
 
 ## After the round: reset
 
 The moment a round pays out, **the leaderboard clears**. Everyone starts the next round at zero points. New week, new race, new jackpot.
 
 {% hint style="success" %}
-You don't need to claim anything. Payouts are pushed straight to your wallet in BNB the moment the round distributes.
+You don't need to claim anything. Payouts are pushed straight to your wallet in BNB the moment the round distributes. If your wallet is a contract that rejects the transfer, your BNB is credited to `claimable` on the Distributor instead and you can pull it any time with `claim()` — one refusing recipient can never stall the round.
 {% endhint %}

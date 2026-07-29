@@ -8,7 +8,7 @@ The Rewards Hub is your daily checklist. Everything here pays leaderboard points
 | --- | --- | --- |
 | 🩸 **First Buy** — make your first token buy | One-time | +5 |
 | 🏗️ **Launch a Token** — create your first fusion | One-time | +20 |
-| 🤝 **Bring a Friend** — refer your first trader | One-time | +25 |
+| 🤝 **Bring a Friend** — refer a trader who buys $50+ | One-time | +25 |
 | ⚡ **Daily Trader** — make at least one trade today | Daily | +3 |
 | 📊 **Volume Runner** — trade $10 of volume today | Daily | +10 |
 

@@ -10,9 +10,9 @@ Fyuz is a memecoin launchpad on **BNB Smart Chain** and **Robinhood Chain** with
 
 📈 **Fair-launch bonding curve** — every token launches on a bonding curve with 1B supply. No presales, no team allocations. Price is set by the curve until the token *graduates* at a $30K market cap and its liquidity moves to PancakeSwap.
 
-🏆 **Get paid to trade** — every trade earns points. Points climb the leaderboard, and the leaderboard pays **real BNB**: 90% of the rewards pot is split pro-rata among the top 100 every round, and 10% goes to **one random participant** picked by Chainlink VRF — a provably fair on-chain lottery where the smallest trader has the same ticket as a whale.
+🏆 **Get paid to trade** — every trade earns points, buys *and* sells, banked the moment it lands. Points climb the leaderboard, and the leaderboard pays **real BNB**: 90% of the rewards pot is split pro-rata among the top 100 every round, and 10% goes to **one random participant** picked by Chainlink VRF — a provably fair on-chain lottery where the smallest trader has the same ticket as a whale.
 
-🤝 **Referrals that compound** — every friend you bring earns you +25 points the moment they make their first trade. No cap. Your network is your score.
+🤝 **Referrals that compound** — every friend you bring earns you +25 points once they've bought $50+. No cap. Your network is your score.
 
 💰 **Creators earn too** — 0.2% of every trade on your token flows back to you, plus bonus points when your token graduates.
 

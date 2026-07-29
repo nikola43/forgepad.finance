@@ -21,7 +21,7 @@ Tokens live on the chain they were launched on — a fusion created on BNB Smart
 
 Open a token page, enter an amount in the chain's gas token (BNB or ETH), hit **Buy**. The bonding curve quotes your price instantly — no order books, no slippage games, no waiting for liquidity. Selling works the same way, in reverse.
 
-Your first buy also unlocks the **First Buy** quest (+5 points). Every dollar of net buying earns you a leaderboard point — see [Points & Leaderboard](../earn/points-and-leaderboard.md).
+Your first buy also unlocks the **First Buy** quest (+5 points). Every dollar you trade — buying *or* selling — earns you a leaderboard point — see [Points & Leaderboard](../earn/points-and-leaderboard.md).
 
 ## 4. Track your position
 

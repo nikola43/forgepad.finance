@@ -95,7 +95,7 @@ export default function Rewards() {
                             <CardGiftcardIcon sx={{ fontSize: 17 }} /> Points count toward the future airdrop
                         </Typography>
                         <Typography fontSize={12.5} color="rgba(234,230,218,0.7)" mt={0.5} lineHeight={1.55}>
-                            Every point you earn — from net trading volume, quests, streaks, referrals and graduations — builds your share of the reward pool today and your weight in any future token distribution. Trade, complete quests, and keep your streak alive to stack more.
+                            Every point you earn — from trading volume, quests, streaks, referrals and graduations — builds your share of the reward pool today and your weight in any future token distribution. Trade, complete quests, and keep your streak alive to stack more.
                         </Typography>
                     </Box>
 

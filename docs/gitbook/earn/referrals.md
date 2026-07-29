@@ -12,23 +12,30 @@ Grab your personal link from the **Referrals** page (or the Referrals box on you
 
 When someone opens your link and connects their wallet, they're bound to you as your referral — **permanently**. No takebacks, no re-assignment.
 
-### Step 3 — You earn, automatically
+### Step 3 — They buy $50, you earn
 
-The moment each referral makes their **first trade**, +25 points land in your account. No claiming, no forms — it's automatic and idempotent (each referral pays exactly once).
+Once a referral has bought at least **$50 net** (their buys minus their sells), the referral goes **active** and +25 points land in your account. No claiming, no forms — automatic and idempotent (each referral pays exactly once).
+
+Referees who haven't crossed $50 yet still show on your Referrals page with their progress toward the floor — they just don't count anywhere until they get there.
 
 ## The math
 
-| Friends who trade | Points | ≈ BNB (at 0.00001/pt) |
-| --- | --- | --- |
-| 1 | 25 | 0.00025 |
-| 10 | 250 | 0.0025 |
-| 100 | 2,500 | 0.025 |
+| Active referrals | Points |
+| --- | --- |
+| 1 | 25 |
+| 10 | 250 |
+| 100 | 2,500 |
 
 And that's just the direct bonus — referral points also count toward your **leaderboard rank**, which is what decides your slice of the 90% pro-rata payout and your ticket in the 10% lottery every round.
 
 ## Anti-abuse
 
-Referral points are **gated on real activity**: a referral who signs up but never trades earns you nothing. Bot armies of empty wallets are worth exactly zero points.
+One definition of "active" is used everywhere — the grant, the referral count, the referral leaderboard, your profile. A referral counts only when:
+
+* it isn't a **self-referral**, and
+* the referee has bought **≥ $50 net**.
+
+Net means buys minus sells, so funding a wallet, buying and dumping straight back out doesn't qualify, and a referee who exits their position drops back below the floor. Bot armies of empty wallets are worth exactly zero.
 
 {% hint style="success" %}
 There is **no cap**. Every active referral counts, forever. The referral leaderboard on the Referrals page shows who's building the biggest network.

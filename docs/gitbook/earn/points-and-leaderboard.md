@@ -6,19 +6,27 @@ Points are Fyuz's score — and they're worth real BNB.
 
 | Source | Points |
 | --- | --- |
-| **Trading** | 1 point per $1 of *net* buying (buys − sells, never below 0) |
-| **Referrals** | +25 per friend who joins your link and makes their first trade |
+| **Trading** | 1 point per $1 of volume traded — **buys and sells both count** |
+| **Referrals** | +25 per friend who joins your link and buys **$50+** (net) |
 | **Quests** | +3 to +25 per quest — see [Quests & Achievements](quests-and-achievements.md) |
 | **Achievements** | +10 to +20 one-time badges |
 | **Creator bonus** | +50 for every token you created that graduates |
 
 {% hint style="info" %}
-**Net** buying is the anti-wash-trading rule: buy $500 and sell $500, and your trading points are zero. Points reward capital that stays in, not volume churned in circles. Exiting a position burns the points it earned.
+Points are **banked when the trade lands** and never taken away. There is no holding requirement and no penalty for taking profit — a round-trip earns on both legs, the same way an AMM pays its LPs on every swap in either direction.
 {% endhint %}
+
+Wash trading isn't a loophole, it's just expensive: the pot is funded by the same volume it pays for. Every $1 of self-dealt volume costs you **1%** in fees and returns at most **0.27%** even if you were the entire leaderboard — a ~3.7x loss that no amount of volume grows out of.
 
 ## What points are worth
 
-Every point is currently worth **0.00001 BNB** in rewards. A $1,000 net position = 1,000 points ≈ 0.01 BNB earned back — before quests, referrals, and the lottery.
+Your points are a **share of the pot**, not a fixed rate:
+
+```
+your reward = 90% of the round's pot × (your points ÷ all points in the payout set)
+```
+
+The other 10% is the [lottery](reward-distribution.md). The Rewards page shows your live estimate from the Distributor's actual BNB balance — so it moves as fees flow in and as other traders score.
 
 ## The leaderboard resets every round
 
@@ -32,7 +40,7 @@ That means:
 
 ## Climbing strategy
 
-1. **Hold, don't churn** — net buys score, round-trips don't.
-2. **Recruit** — every new referral who trades is +25 points; keep sharing your link and the bonuses keep landing round after round.
+1. **Trade both ways** — every buy and every sell banks points the moment it lands; exiting never costs you what you earned.
+2. **Recruit** — every referral who buys $50+ is +25 points; keep sharing your link and the bonuses keep landing round after round.
 3. **Clear dailies** — Daily Trader + Volume Runner = up to +13/day.
 4. **Launch things** — a graduated token is +50, plus its 0.2% fee stream.

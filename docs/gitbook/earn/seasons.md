@@ -6,7 +6,7 @@ Seasons are Fyuz's grand tournaments — longer arcs layered on top of the weekl
 
 * A time-boxed competition with a live countdown on the **Season** page
 * **Prize pot: 1 BNB** for the season's top performers
-* Season score = your **net trading volume** during the season window **plus** every bonus point you earned in it (quests, referrals, achievements, creator bonuses)
+* Season score = your **trading volume** (buys and sells) during the season window **plus** every bonus point you earned in it (quests, referrals, achievements, creator bonuses)
 * The **top 50** with positive scores make the season board
 
 ## How seasons differ from rounds
