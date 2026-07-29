@@ -91,6 +91,10 @@
   --micro: 150ms;                                    /* UI micro-motion 120–180ms */
 
   --tv-color-pane-background: #1E1C10;
+
+  /* Height of the site-wide promo strip. PromoBanner overwrites this while it
+     is on screen; the header, sidebar and page padding offset by it. */
+  --promo-h: 0px;
 }
 
 /* The chamber is flat and constant. No scenes, no vignette washes. */

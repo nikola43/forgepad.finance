@@ -2,6 +2,7 @@ import styled from "styled-components"
 import TwitterIcon from '@/assets/images/x.svg';
 import { FYUZ_TWITTER_URL } from "@/config";
 import { FyuzLockup } from "../brand/FyuzMark";
+import ChainlinkMark from "../brand/ChainlinkMark";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -185,6 +186,7 @@ export default function Footer() {
                     </LinkGroup>
                     <LinkGroup>
                         <span className="group-title">Resources</span>
+                        <Link href="/fees">Fees &amp; Commercials</Link>
                         <Link href={FYUZ_TWITTER_URL} target="_blank">Twitter / X</Link>
                     </LinkGroup>
                 </FooterLinks>
@@ -193,10 +195,8 @@ export default function Footer() {
             <FooterBottom>
                 <span className="copyright">&copy; {new Date().getFullYear()} Fyuz. All rights reserved.</span>
                 <ChainlinkBadge href="https://chain.link" target="_blank" rel="noopener noreferrer">
-                    <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true">
-                        <path fill="#375BD2" d="M16 0l-3.2 1.8-8 4.9L1.6 8.5v15l3.2 1.8 8.9 4.9 3.2 1.8 3.2-1.8 8.7-4.9 3.2-1.8v-15l-3.2-1.8-8.8-4.9L16 0zm-8 19.9v-7.8L16 7.6l8 4.5v7.8l-8 4.5-8-4.5z" />
-                    </svg>
-                    Integrates Chainlink
+                    <ChainlinkMark size={16} />
+                    Powered by Chainlink
                 </ChainlinkBadge>
                 <span className="built-with">Two icons enter. One market leaves.</span>
             </FooterBottom>

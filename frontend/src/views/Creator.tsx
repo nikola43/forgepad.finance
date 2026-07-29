@@ -8,6 +8,7 @@ import { priceFormatter } from "@/utils/price"
 import { useAppKitAccount } from "@reown/appkit/react"
 import { useCreatorDashboard } from "@/hooks/creator"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
@@ -30,7 +31,7 @@ export default function Creator() {
                     <BarChartIcon sx={{ fontSize: 26 }} /> Promoter Dashboard
                 </Typography>
                 <Typography fontSize={13} color="var(--muted)">
-                    Performance of the tokens you&apos;ve created. Fees are the 1% platform fee collected on your tokens&apos; trades — and every token that graduates to the DEX earns you +50 bonus points.
+                    Performance of the tokens you&apos;ve created. Fees are your creator cut of every buy and sell on your tokens, paid to your wallet as it happens (<Link href="/fees" style={{ color: 'var(--citron)' }}>see the rates</Link>) — and every token that graduates to the DEX earns you +50 bonus points.
                 </Typography>
             </Box>
 

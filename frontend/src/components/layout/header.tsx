@@ -23,7 +23,8 @@ import { priceFormatter } from "@/utils/price";
 
 const HeaderBox = styled(Box)`
     position: fixed;
-    top: 0;
+    /* Sits under the promo strip when one is running (--promo-h is 0 otherwise). */
+    top: var(--promo-h, 0px);
     left: var(--sidebar-w, 0px);
     right: 0;
     transition: left 0.2s ease;

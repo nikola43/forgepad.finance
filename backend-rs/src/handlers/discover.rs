@@ -100,8 +100,11 @@ pub struct DiscoverToken {
     graduation_pct: f64,
 }
 
-// Graduation target market cap (USD) — matches chains.rs target_market_cap.
-const GRADUATION_TARGET_USD: f64 = 20_000.0;
+// Fallback graduation target (USD) when no chain config is loaded. The real
+// value comes from chains.rs `target_market_cap` per request — the constant
+// that used to live here had drifted to $20k while both chains graduate at
+// $30k, overstating every progress bar by 50%.
+const GRADUATION_TARGET_FALLBACK_USD: f64 = 30_000.0;
 
 // GET /discover
 pub async fn discover(
@@ -110,6 +113,21 @@ pub async fn discover(
 ) -> AppResult<Json<Vec<DiscoverToken>>> {
     let mut conn = state.db.get().await.map_err(|e| AppError::Pool(e.to_string()))?;
     let limit = p.limit.unwrap_or(50).clamp(1, 200);
+
+    // Graduation target for the progress column: the filtered network's own
+    // value, else the first configured chain (every chain currently graduates
+    // at the same cap).
+    let graduation_target = p
+        .network
+        .as_deref()
+        .filter(|n| *n != "all")
+        .and_then(|n| state.chains.iter().find(|c| c.network == n))
+        // .iter().next(), not .first(): diesel's prelude puts a `first` query
+        // method in scope that shadows the slice one here.
+        .or_else(|| state.chains.iter().next())
+        .map(|c| c.target_market_cap)
+        .filter(|t| *t > 0.0)
+        .unwrap_or(GRADUATION_TARGET_FALLBACK_USD);
 
     // WHERE clauses (all values parsed/sanitized → safe to inline).
     let mut wheres: Vec<String> = vec!["tk.category = 'normal'".to_string()];
@@ -179,7 +197,7 @@ pub async fn discover(
          {having_sql} \
          ORDER BY {order_sql} \
          LIMIT {limit}",
-        target = GRADUATION_TARGET_USD,
+        target = graduation_target,
     );
 
     let rows: Vec<Row> = diesel::sql_query(sql).load(&mut conn).await?;

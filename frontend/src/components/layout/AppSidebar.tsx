@@ -27,14 +27,18 @@ import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOu
 import TravelExploreOutlinedIcon from '@mui/icons-material/TravelExploreOutlined'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined'
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import { usePathname, useRouter } from 'next/navigation'
 
 const drawerWidth = 240
 const HEADER = 64
+// The drawer starts below the header, which itself starts below the promo strip
+// (--promo-h, published by PromoBanner; 0 when no banner is showing).
+const TOP_OFFSET = `calc(${HEADER}px + var(--promo-h, 0px))`
 
 const paperBase = {
-    top: HEADER,
-    height: `calc(100% - ${HEADER}px)`,
+    top: TOP_OFFSET,
+    height: `calc(100% - ${HEADER}px - var(--promo-h, 0px))`,
     background: '#131208',
     borderRight: '1px solid rgba(234,230,218,0.08)',
 }
@@ -89,6 +93,7 @@ const items: NavItem[] = [
     { label: 'Tier', href: '/tier', icon: <WorkspacePremiumOutlinedIcon /> },
     { label: 'Make a Match', href: '/create', icon: <AddCircleOutlineIcon /> },
     { label: 'Promoter', href: '/creator', icon: <InsightsOutlinedIcon /> },
+    { label: 'Fees', href: '/fees', icon: <ReceiptLongOutlinedIcon /> },
     { label: 'Profile', href: '/profile', target: '/profile?address=me', icon: <PersonOutlineIcon /> },
 ]
 

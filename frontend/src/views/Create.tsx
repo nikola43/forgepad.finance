@@ -29,7 +29,7 @@ import { TransitionProps } from "@mui/material/transitions";
 import axios from "axios";
 import { NumericFormat } from "react-number-format";
 import PageBox from "../components/layout/pageBox";
-import { API_ENDPOINT, STYLE_PRESETS } from "@/config";
+import { API_ENDPOINT, STYLE_PRESETS, totalTradeFeeBps } from "@/config";
 import { priceFormatter, priceWithoutZero } from "@/utils/price";
 import CloseIcon from "@mui/icons-material/Close";
 import {
@@ -347,8 +347,11 @@ export default function Create() {
 
   const tokenAmountOut = useMemo(() => {
     if (chain && initBuyAmount) {
-      // Apply 3% platform buy fee to match contract's getAmountOut
-      const amountInWithFee = Number(initBuyAmount) * 0.97;
+      // Net of the same total trade fee getAmountOut applies on-chain
+      // (PLATFORM_BUY_FEE_BPS + TOKEN_OWNER_FEE_BPS). Hardcoding 3% here
+      // over-quoted the fee and under-quoted the tokens received.
+      const amountInWithFee =
+        Number(initBuyAmount) * (1 - totalTradeFeeBps() / 10_000);
       return (
         (amountInWithFee * Number(chain.virtualTokenAmount)) /
         (Number(chain.virtualEthAmount) + amountInWithFee)

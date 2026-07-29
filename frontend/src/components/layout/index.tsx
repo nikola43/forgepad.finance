@@ -9,6 +9,7 @@ import MobileMenu from "./menu";
 import { Toaster } from "react-hot-toast"
 import ErrorBoundary from "@/components/ErrorBoundary"
 import { ScrollRestoration, ScrollToTopButton } from "@/components/ScrollToTop"
+import PromoBanner from "@/components/PromoBanner"
 
 // The chamber is the constant: moss black, flat (§11). The animated noise
 // shader that used to sit here is retired — no noise, no glows, no 3D (§10).
@@ -16,9 +17,9 @@ import { ScrollRestoration, ScrollToTopButton } from "@/components/ScrollToTop"
 const Main = styled('div')`
     position: relative;
     min-height: 100vh;
-    padding-top: 90px;
+    padding-top: calc(90px + var(--promo-h, 0px));
     ${({ theme }) => theme.breakpoints.down(800)} {
-        padding-top: 72px;
+        padding-top: calc(72px + var(--promo-h, 0px));
     }
 `
 
@@ -36,6 +37,7 @@ function MainLayout({ children }: { children: ReactNode }) {
 
     return (
         <>
+            <PromoBanner />
             {isMobile ? (
                 <Main>
                     <Header />
