@@ -765,6 +765,7 @@ export default function Token() {
     // const [tokenAllowance, setTokenAllowance] = React.useState(0n);
     const pageSize = isMobile ? 5 : 10
     const [showSlipaggeDialog, setShowSlipaggeDialog] = React.useState(false);
+    const [showImageDialog, setShowImageDialog] = React.useState(false);
     const [slippage, setSlippage] = React.useState(1);
 
     // Check if this is a Solana token
@@ -917,6 +918,12 @@ export default function Token() {
             setChatSending(false)
         }
     }, [chatComment, id, network, address, evmProvider, chatReplyTo])
+
+    // Same resolution TokenLogo does — relative paths live behind FILE_ENDPOINT.
+    const tokenImageUrl = useMemo(() => {
+        const logo = detailData?.tokenImage
+        return !logo ? undefined : logo.startsWith('http') ? logo : `${FILE_ENDPOINT}/${logo}`
+    }, [detailData])
 
     const marketCap = useMemo(() => Number(detailData?.marketcap ?? 0), [detailData])
     const prevMarketCap = useRef(0)
@@ -1262,7 +1269,7 @@ export default function Token() {
                         </IconButton>
                     </Box>
                     <Box display="flex" gap="8px" alignItems="center" width="100%" position="relative">
-                        <TokenLogo logo={detailData?.tokenImage} size={isMobile ? "75px" : "120px"} />
+                        <TokenLogo logo={detailData?.tokenImage} size={isMobile ? "75px" : "120px"} onClick={tokenImageUrl ? () => setShowImageDialog(true) : undefined} />
                         {
                             streamStatus?.isLive &&
                             <Box onClick={() => setMode("live")}
@@ -1665,7 +1672,7 @@ export default function Token() {
                             {
                                 mode === "info" &&
                                 <Box bgcolor="rgba(30, 28, 16, 0.6)" border="1px solid rgba(234, 230, 218, 0.05)" borderRadius="16px" display="flex" gap="16px" padding="24px" my="1.5em">
-                                    <TokenLogo logo={detailData?.tokenImage} size="120px" />
+                                    <TokenLogo logo={detailData?.tokenImage} size="120px" onClick={tokenImageUrl ? () => setShowImageDialog(true) : undefined} />
                                     <Box>
                                         <Box display="flex" gap="0.2rem">
                                             <Typography fontSize={24} fontFamily="var(--font-display)" color="var(--bone)">{detailData?.tokenName}</Typography>
@@ -1991,6 +1998,23 @@ export default function Token() {
                         />
                     </Box>
                 </DialogContent>
+            </Dialog>
+            <Dialog
+                open={showImageDialog}
+                maxWidth="md"
+                onClose={() => setShowImageDialog(false)}
+                PaperProps={{ sx: { background: 'transparent', boxShadow: 'none', overflow: 'visible', m: 2 } }}
+            >
+                <Box position="relative" display="flex" onClick={() => setShowImageDialog(false)} sx={{ cursor: 'pointer' }}>
+                    <IconButton onClick={() => setShowImageDialog(false)} sx={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)' }}>
+                        <CloseIcon sx={{ color: 'var(--bone)' }} />
+                    </IconButton>
+                    <img
+                        src={tokenImageUrl}
+                        alt={detailData?.tokenName ?? 'token image'}
+                        style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '16px', display: 'block' }}
+                    />
+                </Box>
             </Dialog>
         </PageBox>
     );
