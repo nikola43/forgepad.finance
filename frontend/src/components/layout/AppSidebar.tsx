@@ -28,6 +28,7 @@ import TravelExploreOutlinedIcon from '@mui/icons-material/TravelExploreOutlined
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
 import { usePathname, useRouter } from 'next/navigation'
 
 const drawerWidth = 240
@@ -73,7 +74,7 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     }),
 )
 
-type NavItem = { label: string; href: string; target?: string; icon: React.ReactNode }
+type NavItem = { label: string; href: string; target?: string; external?: boolean; icon: React.ReactNode }
 
 // `target` overrides the navigation destination while `href` stays the active-
 // state match (so /profile?address=me still highlights on /profile).
@@ -95,6 +96,7 @@ const items: NavItem[] = [
     { label: 'Promoter', href: '/creator', icon: <InsightsOutlinedIcon /> },
     { label: 'Fees', href: '/fees', icon: <ReceiptLongOutlinedIcon /> },
     { label: 'Profile', href: '/profile', target: '/profile?address=me', icon: <PersonOutlineIcon /> },
+    { label: 'Docs', href: 'https://docs.fyuz.fun/', external: true, icon: <MenuBookOutlinedIcon /> },
 ]
 
 export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
@@ -114,7 +116,15 @@ export default function AppSidebar({ open, onToggle }: { open: boolean; onToggle
                     return (
                         <ListItem key={item.href} disablePadding sx={{ display: 'block' }}>
                             <ListItemButton
-                                onClick={() => router.push(item.target ?? item.href)}
+                                onClick={() =>
+                                    // router.push treats an absolute URL as a route and
+                                    // fails to leave the app, so off-site items open in
+                                    // a new tab instead. noopener/noreferrer because the
+                                    // opened page must not get a handle on window.opener.
+                                    item.external
+                                        ? window.open(item.href, '_blank', 'noopener,noreferrer')
+                                        : router.push(item.target ?? item.href)
+                                }
                                 sx={{
                                     minHeight: 48,
                                     px: 2,
