@@ -1,4 +1,5 @@
-use axum::extract::{Query, State};
+use axum::extract::State;
+use crate::errors::Query;
 use axum::Json;
 use bigdecimal::ToPrimitive;
 use diesel::prelude::*;

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+use crate::errors::Query;
 use axum::Json;
 use diesel::prelude::*;
 use diesel::sql_types::{Bool, Integer, Nullable, Text, Timestamptz};

@@ -129,15 +129,25 @@ async fn run_listener_once(
     distributor_address: Option<Address>,
 ) -> anyhow::Result<()> {
     // Server-side indexing RPC. This must support large `eth_getLogs` ranges
-    // (BSC public dataseed nodes cap the range — typically ~5k blocks — and
-    // QuikNode/Alchemy free tiers cap at a few blocks, so point ETH_RPC_URL at a
-    // provider with a generous getLogs limit), so it is deliberately separate
-    // from `chain.rpc_url` — the
-    // browser-facing endpoint exposed via /config, which only needs to be
-    // reachable + CORS-enabled from browsers. Matches the eth_call helpers, which
-    // already prefer ETH_RPC_URL.
+    // (BSC public dataseed nodes cap the range — typically ~5k blocks; keep
+    // INDEXER_CHUNK_SIZE at or under whatever this provider allows), so it is
+    // deliberately separate from `chain.rpc_url` — the browser-facing endpoint
+    // exposed via /config, which only needs to be reachable + CORS-enabled from
+    // browsers.
+    //
+    // The server-side vars must be checked BEFORE `<NET>_RPC_URL`: that one is
+    // browser-facing and is normally set, so looking at it first meant the
+    // server-side endpoint was silently never used. Put a private provider
+    // (keyed URL, IP-allowlisted) in `<NET>_SERVER_RPC_URL` — never in
+    // `<NET>_RPC_URL`, which is published to browsers via /config.
+    //
+    // Both chain-scoped vars MUST outrank the generic `ETH_RPC_URL`: that one is
+    // a single-chain legacy fallback, so on a multi-chain deploy it holds one
+    // chain's URL and ranking it higher points every OTHER chain's indexer at the
+    // wrong network (it then reads that chain's head and "backfills" against it).
     let net_upper = chain.network.to_uppercase();
-    let indexer_rpc = std::env::var(format!("{net_upper}_RPC_URL"))
+    let indexer_rpc = std::env::var(format!("{net_upper}_SERVER_RPC_URL"))
+        .or_else(|_| std::env::var(format!("{net_upper}_RPC_URL")))
         .or_else(|_| std::env::var("ETH_RPC_URL".to_string()))
         .unwrap_or_else(|_| chain.rpc_url.clone());
     let url = indexer_rpc
@@ -182,8 +192,16 @@ async fn run_listener_once(
     // task only signals; it never touches the cursor or processes logs, so the
     // single consumer below stays the only place catch_up runs (dedup by design).
     // `_ws_guard` aborts the task when this function returns.
+    // Server-side WS, mirroring the HTTP split above: `chain.ws_url` is the
+    // browser-facing endpoint published via /config, which a private provider
+    // (keyed URL, IP-allowlisted) must never be put in. Falls back to it so
+    // deployments that set only the one var keep working. Chain-scoped only —
+    // a generic ETH_WS_URL would subscribe this chain to another chain's heads.
     let (wake_tx, mut wake_rx) = tokio::sync::mpsc::channel::<()>(8);
-    let _ws_guard = chain.ws_url.clone().filter(|u| !u.is_empty()).map(|ws_url| {
+    let indexer_ws = std::env::var(format!("{net_upper}_SERVER_WS_URL"))
+        .ok()
+        .or_else(|| chain.ws_url.clone());
+    let _ws_guard = indexer_ws.filter(|u| !u.is_empty()).map(|ws_url| {
         let wake_tx = wake_tx.clone();
         let network = chain.network.clone();
         AbortOnDrop(tokio::spawn(async move {

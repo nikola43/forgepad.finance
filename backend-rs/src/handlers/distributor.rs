@@ -8,7 +8,8 @@
 // the newest round's time_end becomes the start of the next leaderboard
 // window, which is what "clears" the leaderboard after every payout.
 
-use axum::extract::{Query, State};
+use axum::extract::State;
+use crate::errors::Query;
 use axum::http::HeaderMap;
 use axum::Json;
 use diesel::prelude::QueryableByName;

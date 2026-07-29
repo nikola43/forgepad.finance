@@ -625,11 +625,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolve_style_blank_picks_curated() {
+    fn resolve_style_blank_uses_neutral_default() {
+        // Blank deliberately does NOT pick a random curated style any more: doing
+        // so repainted both source faces into that universe (a Dragon Ball Z draw
+        // turned anyone into a generic Goku). Blank must stay face-preserving.
         for input in [None, Some(""), Some("  ")] {
             let s = resolve_style(input);
-            assert!(STYLES.iter().any(|(label, _)| *label == s.label));
+            assert_eq!(s.label, NEUTRAL_STYLE.0);
             assert!(!s.clause.is_empty());
+            assert!(!STYLES.iter().any(|(label, _)| *label == s.label));
         }
     }
 
@@ -646,7 +650,7 @@ mod tests {
         assert_eq!(s.label, "cyberpunk noir");
         assert!(s.clause.contains("cyberpunk noir"));
         // Free text is used verbatim, and the prompt embeds the style clause.
-        let p = fusion_prompt("A", "B", Some("AB"), &s.clause);
+        let p = fusion_prompt("A", "B", Some("AB"), &s.clause, false);
         assert!(p.contains(&s.clause));
         assert!(!p.contains("not anime"));
     }

@@ -57,9 +57,15 @@ services:
       BSC_PUBLIC_RPC_URL: ${BSC_PUBLIC_RPC_URL:-${BSC_RPC_URL:-https://bsc-dataseed.bnbchain.org}}
       # Server-side RPC: indexing getLogs + eth_call, resolved from inside the
       # container. Supports large ranges the browser-facing provider does not.
-      ETH_RPC_URL: ${BSC_SERVER_RPC_URL:-https://bsc-dataseed.bnbchain.org}
+      # Chain-scoped on purpose — the generic ETH_RPC_URL applies to EVERY chain,
+      # so putting a BSC URL there points other chains' indexers at BSC.
+      BSC_SERVER_RPC_URL: ${BSC_SERVER_RPC_URL:-https://bsc-dataseed.bnbchain.org}
       # WS newHeads subscription (browser-facing, same reachability caveat).
       BSC_WS_URL: ${BSC_WS_URL:-wss://bsc-ws-node.nariox.org}
+      # Server-side WS for the indexer's newHeads nudge, resolved from inside the
+      # container. Separate from BSC_WS_URL for the same reason BSC_SERVER_RPC_URL
+      # is separate from BSC_RPC_URL: only this one may hold a private/keyed URL.
+      BSC_SERVER_WS_URL: ${BSC_SERVER_WS_URL:-${BSC_WS_URL:-wss://bsc-ws-node.nariox.org}}
       BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://bscscan.com}
       # BNB Smart Chain. chains.rs reads CHAIN_ID first, so this drives what /config
       # advertises — it must match the chain the RPC actually serves, or every wallet
@@ -77,6 +83,9 @@ services:
       # Reorg confirmation depth for the indexer (0 = index at head; localnet fork
       # sets 0, production should use a safe lag like 12).
       INDEXER_CONFIRMATIONS: ${INDEXER_CONFIRMATIONS:-12}
+      # getLogs range per catch-up request. Must not exceed the server RPC's cap
+      # or every wider catch-up fails (QuickNode: 10k, public dataseed: ~5k).
+      INDEXER_CHUNK_SIZE: ${INDEXER_CHUNK_SIZE:-10000}
       PORT: "5001"
       # :3000 = npm-dev frontend, :3002 = the dockerised frontend service below.
       CORS_ORIGINS: "https://fyuz.fun,https://www.fyuz.fun,https://fyuz.host-ia.online,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8080"
