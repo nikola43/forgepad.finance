@@ -208,6 +208,11 @@ contract Fyuz is
     ///      trusted: skewing a shallow pair is cheap.
     uint256 public constant MIN_FALLBACK_WETH_LIQUIDITY = 50 ether;
     uint256 private constant DIVISOR = 10_000;
+    /// @dev Gas stipend for ETH sends to UNTRUSTED recipients (token creators).
+    ///      Owner-configured recipients (feeAddress, distributorAddress) keep the
+    ///      full frame on purpose — a multisig or fee splitter there can legitimately
+    ///      need more than this, and those addresses are trusted by definition.
+    uint256 private constant UNTRUSTED_SEND_GAS = 30000;
 
     uint256 public MAX_BUY_PERCENT; // DIVISOR = 100%
     uint256 public MAX_SELL_PERCENT; // DIVISOR = 100%
@@ -986,7 +991,10 @@ contract Fyuz is
                 : tokenOwnerLPFee;
             uint256 platformFee = remainingEthReserve - ownerFee;
             if (ownerFee > 0) {
-                if (!_transferETHTolerant(poolOwner, ownerFee))
+                // Capped: poolOwner is the untrusted creator, and this runs inside
+                // the graduating buyer's transaction — an uncapped send would let a
+                // creator burn that buyer's gas and block graduation.
+                if (!_transferETHTolerantCapped(poolOwner, ownerFee))
                     _transferETHTolerant(feeAddress, ownerFee);
             }
             if (platformFee > 0) _transferETHTolerant(feeAddress, platformFee);
@@ -1115,11 +1123,28 @@ contract Fyuz is
         return ok;
     }
 
+    /// @dev Best-effort ETH send with a BOUNDED stipend, for UNTRUSTED recipients
+    ///      (token creators). The uncapped variant hands the callee the whole frame:
+    ///      a creator contract can burn it, and since the 1/64 rule leaves the outer
+    ///      frame only gasleft()/64, a trade sent with a normal gas limit then dies
+    ///      of OOG. That is a honeypot — a creator can grief sells of its own token
+    ///      (distinguishing them by reading tokenReserve in a reentrant view call)
+    ///      while buys still work. The cap removes the lever; reentrancy itself is
+    ///      already blocked by nonReentrant on every entrypoint.
+    function _transferETHTolerantCapped(
+        address to,
+        uint256 amount
+    ) internal returns (bool) {
+        if (to == address(0) || amount == 0) return false;
+        (bool ok, ) = payable(to).call{value: amount, gas: UNTRUSTED_SEND_GAS}("");
+        return ok;
+    }
+
     /// @dev Pay the token creator's fee; if the (untrusted) creator refuses ETH,
     ///      route it to the platform instead of reverting the trade (anti-honeypot).
     function _payTokenOwnerFee(address owner_, uint256 fee) private {
         if (fee == 0) return;
-        if (!_transferETHTolerant(owner_, fee)) {
+        if (!_transferETHTolerantCapped(owner_, fee)) {
             _transferETHTolerant(feeAddress, fee);
         }
     }

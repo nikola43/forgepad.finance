@@ -81,7 +81,9 @@ contract FyuzLiquidityManager is
     /// @dev Tick spacing for pool positions
     int24 private constant TICK_SPACING = 60;
 
-    /// @dev Default pool fee (0.1%)
+    /// @dev Default pool fee. Uniswap/Pancake V3 fees are millionths, so 100 is
+    ///      0.01% — NOT 0.1%, as this said before. Both Uniswap V3 and PancakeSwap
+    ///      V3 enable the 100 tier on BSC, so createPool works on either.
     uint24 private constant POOL_FEE = 100;
     /// @dev Default deadline buffer for transactions
     uint256 private constant DEADLINE_BUFFER = 10 minutes;
@@ -95,6 +97,10 @@ contract FyuzLiquidityManager is
     uint256 internal constant PRICE_TOLERANCE_BPS = 500; // 5%
     /// @dev Slippage floor (bps) applied to concentrated-liquidity mint amounts.
     uint256 internal constant MINT_SLIPPAGE_BPS = 500; // 5%
+    /// @dev Gas stipend for ETH sends to UNTRUSTED recipients (token creators).
+    ///      Enough for a normal receive()/fallback, far too little to burn the
+    ///      caller's frame and grief a co-recipient's payout.
+    uint256 internal constant UNTRUSTED_SEND_GAS = 30000;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -534,17 +540,32 @@ contract FyuzLiquidityManager is
         IERC20(weth).safeTransfer(pairAddress, ethAmountToLP);
 
         // Size the token side to the pool's TOTAL WETH (our deposit + any donation)
-        // so it opens at the target market cap. A donation can only push the opening
-        // price ABOVE target (never below, which would bleed the burned LP to
-        // arbitrage); the griefer's WETH is locked into the burned LP. Cap at the
-        // tokens we actually hold.
+        // so it opens at the target market cap. A WETH donation can only push the
+        // opening price ABOVE target; the griefer's WETH is locked into the burned
+        // LP. Cap at the tokens we actually hold.
         uint256 poolWeth = IERC20(weth).balanceOf(pairAddress);
-        uint256 tokenForPool = (poolWeth * totalSupply) / 1e18;
-        tokenForPool = (tokenForPool * ethPriceUSD) / targetMarketCap;
+        uint256 tokenTarget = (poolWeth * totalSupply) / 1e18;
+        tokenTarget = (tokenTarget * ethPriceUSD) / targetMarketCap;
+        // A TOKEN-side donation is the mirror case and it pushes the opening price
+        // BELOW target, bleeding the burned LP to arbitrage. It is reachable: the
+        // pre-launch transfer gate in Token.sol permits sends to any address with
+        // no code yet, and a V2 pair address is CREATE2-derived, so tokens can be
+        // parked at the future pair before it is deployed. Price is set by the
+        // pair's TOTAL token balance, so credit whatever is already sitting there
+        // against what we owe rather than adding on top of it.
+        uint256 donatedTokens = IERC20(token).balanceOf(pairAddress);
+        uint256 tokenForPool = tokenTarget > donatedTokens ? tokenTarget - donatedTokens : 0;
         if (tokenForPool > tokenAmount) tokenForPool = tokenAmount;
-        if (tokenForPool <= 0) revert ZeroCalculatedTokenAmount();
+        // Only a pair with NO token side at all is unmintable. Do not revert when a
+        // donation already covers the target: reverting here would brick graduation
+        // permanently for a few gwei, which is the exact failure this direct-mint
+        // path exists to avoid. Mint on the donation alone instead — the price is
+        // then at or above target, never below.
+        if (tokenForPool == 0 && donatedTokens == 0) revert ZeroCalculatedTokenAmount();
 
-        IERC20(token).safeTransfer(pairAddress, tokenForPool);
+        if (tokenForPool > 0) {
+            IERC20(token).safeTransfer(pairAddress, tokenForPool);
+        }
         IUniswapV2Pair(pairAddress).mint(recipient);
 
         // Transfer any remaining tokens to dead address
@@ -1110,8 +1131,20 @@ contract FyuzLiquidityManager is
         if (ethFees > 0) {
             IWETH(weth).withdraw(ethFees);
             uint256 creatorEth = ethFees / 2;
-            _sendETH(creator, creatorEth);
-            _sendETH(platform, ethFees - creatorEth); // remainder: no dust stranded
+            uint256 platformEth = ethFees - creatorEth; // remainder: no dust stranded
+            // The creator is UNTRUSTED — any address that called createToken. A
+            // reverting creator used to take the WHOLE collect down with it, so the
+            // platform's half was frozen too and the fees stayed unrealised inside
+            // the Uniswap position with no way to reach them (the revert happens
+            // before any ETH lands, so recoverETH could not help either). Reroute
+            // instead of reverting, and cap the stipend so the creator cannot burn
+            // the frame to grief the platform's half.
+            if (!_trySendETHCapped(creator, creatorEth)) {
+                platformEth += creatorEth;
+            }
+            // Platform is owner-configured: full frame, and if even this fails the
+            // ETH just stays here for recoverETH() rather than reverting the collect.
+            _trySendETH(platform, platformEth);
         }
         if (tokenFees > 0) {
             uint256 creatorTokens = tokenFees / 2;
@@ -1148,13 +1181,22 @@ contract FyuzLiquidityManager is
         );
     }
 
-    /// ponytail: reverts if a recipient rejects ETH, which also blocks the other
-    /// half's payout. Claiming blocks nobody else, so a pull-based split is only
-    /// worth it if a creator contract actually turns out to reject ETH.
-    function _sendETH(address to, uint256 amount) internal {
-        if (amount == 0) return;
+    /// @dev Best-effort ETH send: returns false instead of reverting, so one hostile
+    ///      recipient can never freeze another party's payout. Returns true for a
+    ///      zero amount so callers can treat "nothing owed" as delivered.
+    function _trySendETH(address to, uint256 amount) internal returns (bool) {
+        if (amount == 0) return true;
         (bool ok, ) = payable(to).call{value: amount}("");
-        if (!ok) revert TransferFailed();
+        return ok;
+    }
+
+    /// @dev As _trySendETH, but with a bounded stipend for UNTRUSTED recipients
+    ///      (token creators). Without the cap a creator contract can burn the
+    ///      calling frame and take the co-recipient's payout down with it.
+    function _trySendETHCapped(address to, uint256 amount) internal returns (bool) {
+        if (amount == 0) return true;
+        (bool ok, ) = payable(to).call{value: amount, gas: UNTRUSTED_SEND_GAS}("");
+        return ok;
     }
 
     /**
@@ -1167,7 +1209,8 @@ contract FyuzLiquidityManager is
     ) public pure returns (int24 tickSpacing) {
         if (fee == 100) return 1; // 0.01%
         if (fee == 500) return 10; // 0.05%
-        if (fee == 3000) return 60; // 0.3%
+        if (fee == 2500) return 50; // 0.25% — PancakeSwap V3's tier, absent upstream
+        if (fee == 3000) return 60; // 0.3%  — Uniswap V3's equivalent tier
         if (fee == 10000) return 200; // 1%
         revert InvalidFeeTier();
     }

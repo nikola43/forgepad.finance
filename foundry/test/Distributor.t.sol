@@ -36,6 +36,32 @@ contract StipendBurner {
     }
 }
 
+/// Holder that re-enters distributeBatch from its payout hook. The stored cursor
+/// is stale until the payout loop finishes, so an unguarded _distribute would read
+/// it, pay this holder a SECOND time, and hand it a surplus drawn from the winner's
+/// share and the next round's fees. Uses a low-level call so the guard's revert is
+/// observed rather than propagated — the outer push must still report success.
+contract ReentrantHolder {
+    address public dist;
+    uint256 public rid;
+    bool public attempted;
+    bool public reentrySucceeded;
+
+    function arm(address _dist, uint256 _rid) external {
+        dist = _dist;
+        rid = _rid;
+        attempted = false;
+        reentrySucceeded = false;
+    }
+
+    receive() external payable {
+        if (attempted || dist == address(0)) return;
+        attempted = true;
+        (bool ok,) = dist.call(abi.encodeWithSignature("distributeBatch(uint256,uint16)", rid, uint16(1)));
+        reentrySucceeded = ok;
+    }
+}
+
 contract DistributorTest is Test {
     VRFCoordinatorV2_5Mock coordinator;
     Distributor distributor;
@@ -935,5 +961,97 @@ contract DistributorTest is Test {
     function test_startRoundRejectsEmptyPot() public {
         vm.expectRevert(Distributor.NothingToDistribute.selector);
         distributor.startRound();
+    }
+
+    // ---- reentrancy regressions -------------------------------------------
+
+    /// A holder re-entering distributeBatch from its payout hook must not be paid
+    /// twice off the stale cursor, and the round must still pay out exactly the pot.
+    function test_reentrantDistributeCannotDoublePay() public {
+        ReentrantHolder attacker = new ReentrantHolder();
+
+        fundPot(10 ether);
+        performUpkeep(A_START);
+        uint256 rid = distributor.roundId();
+
+        // Attacker is holder 0 with 50%; two EOAs take the rest.
+        bytes memory packed =
+            abi.encodePacked(address(attacker), uint32(HALF), bob, uint32(QUARTER), carol, uint32(QUARTER));
+        postShares(rid, packed);
+        fulfill(rid, 1); // random % 3 == 1 -> bob wins, keeps the assertions simple
+        attacker.arm(address(distributor), rid);
+
+        uint256 balanceBefore = address(distributor).balance;
+        distributor.distribute(rid);
+
+        assertTrue(attacker.attempted(), "attacker hook never ran");
+        assertFalse(attacker.reentrySucceeded(), "reentrancy was NOT blocked");
+
+        // Paid exactly its 50% of the 90% distribute leg, once.
+        assertEq(address(attacker).balance, 4.5 ether, "attacker double-paid");
+        assertEq(roundStatus(rid), 2, "round should have closed");
+
+        // No surplus left the contract: 90% distributed + 10% to the winner.
+        assertEq(balanceBefore - address(distributor).balance, 10 ether, "paid out more than the pot");
+        assertEq(distributor.totalClaimable(), 0, "nothing should have failed into claimable");
+    }
+
+    /// The guard must not break the legitimate resumable path: a holder that simply
+    /// receives ETH (no reentry) is still paid across successive batches.
+    function test_guardDoesNotBlockSequentialBatches() public {
+        fundPot(10 ether);
+        performUpkeep(A_START);
+        uint256 rid = distributor.roundId();
+        postShares(rid, packedShares3());
+        fulfill(rid, 0);
+
+        distributor.distributeBatch(rid, 1);
+        distributor.distributeBatch(rid, 1);
+        distributor.distributeBatch(rid, 1);
+
+        assertEq(roundStatus(rid), 2, "three batches should close a 3-holder round");
+        // random 0 -> 0 % 3 == 0, so holder 0 (alice) also takes the 10% winner leg.
+        assertEq(alice.balance, 4.5 ether + 1 ether, "alice: 50% share + winner draw");
+        assertEq(bob.balance, 2.25 ether);
+        assertEq(carol.balance, 2.25 ether);
+    }
+
+    // ---- partial-cancel window regression ---------------------------------
+
+    /// Cancelling a round that already paid someone must advance the window, or the
+    /// paid holders get scored again and paid a second time from the next pot.
+    function test_cancelAfterPartialPayoutAdvancesWindow() public {
+        fundPot(10 ether);
+        performUpkeep(A_START);
+        uint256 rid = distributor.roundId();
+        postShares(rid, packedShares3());
+        fulfill(rid, 0);
+
+        distributor.distributeBatch(rid, 1); // alice paid, cursor = 1
+        (,,, uint16 cursor,, , uint64 timeEnd,) = roundHeader(rid);
+        assertEq(cursor, 1, "expected a half-paid round");
+
+        vm.prank(poster);
+        distributor.cancelRound();
+
+        assertEq(roundStatus(rid), 3);
+        assertEq(distributor.windowStart(), timeEnd, "partial payout must advance the window");
+    }
+
+    /// The unpaid case keeps the original roll-forward behaviour: nobody was paid,
+    /// so the whole window folds into the next round.
+    function test_cancelBeforeAnyPayoutKeepsWindow() public {
+        uint64 windowBefore = distributor.windowStart();
+
+        fundPot(10 ether);
+        performUpkeep(A_START);
+        uint256 rid = distributor.roundId();
+        postShares(rid, packedShares3());
+
+        vm.prank(poster);
+        distributor.cancelRound();
+
+        assertEq(roundStatus(rid), 3);
+        assertEq(distributor.windowStart(), windowBefore, "untouched round must roll its window forward");
     }
 }

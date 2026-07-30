@@ -5,6 +5,12 @@ pragma solidity ^0.8.26;
 // OwnableUpgradeable inherits ContextUpgradeable, and Solidity refuses the
 // ambiguous _msgSender/_msgData that results.
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+// OZ >=5.5 ReentrancyGuard is proxy-safe and adds NO sequential storage: it is
+// @custom:stateless and keeps its flag in one ERC-7201 namespaced slot. That is
+// what makes it safe to add to an ALREADY-DEPLOYED proxy here — the layout below
+// does not shift. The guard also trips only on `== ENTERED` (2), so the live
+// proxy's zero-valued slot reads as not-entered on the first call after upgrade.
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {VRFConsumerBaseV2PlusUpgradeable} from "./VRFConsumerBaseV2PlusUpgradeable.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {AutomationCompatibleInterface} from
@@ -63,7 +69,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///      below it was appended by the upgrade that introduced this file, and
 ///      `Round` grew new fields at the END for the same reason. Reordering any of
 ///      it silently repoints live storage. Add new variables at the bottom only.
-contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, AutomationCompatibleInterface {
+contract Distributor is
+    VRFConsumerBaseV2PlusUpgradeable,
+    ReentrancyGuard,
+    PausableUpgradeable,
+    AutomationCompatibleInterface
+{
     // ---- errors ------------------------------------------------------------
 
     error BpsTooHigh();
@@ -368,7 +379,7 @@ contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, A
 
     /// @notice Automation execution hook. Executes whatever action the contract
     ///         itself says is due — performData is never trusted.
-    function performUpkeep(bytes calldata) external override whenNotPaused {
+    function performUpkeep(bytes calldata) external override whenNotPaused nonReentrant {
         address _forwarder = automationForwarder;
         if (_forwarder != address(0) && msg.sender != _forwarder) revert NotForwarder();
 
@@ -535,13 +546,26 @@ contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, A
     /// @dev Permissionless — every input is already committed on-chain and every
     ///      precondition is re-checked, so an untrusted caller (the Automation
     ///      forwarder, a cron, a human) can only pay a round that was payable.
-    function distribute(uint256 _roundId) external whenNotPaused {
+    ///
+    ///      `nonReentrant` IS LOAD-BEARING, do not remove it. The payout cursor is
+    ///      committed once after the loop (banking it per holder would cost an
+    ///      SSTORE each and defeat the gas-aware batching), so mid-loop the stored
+    ///      cursor is stale. A holder that re-entered distributeBatch(rid, 1) would
+    ///      read that stale cursor and be paid a SECOND time: ~13k gas covers the
+    ///      re-entrant call for a modest holder set, comfortably inside the 30k
+    ///      push stipend, so the stipend alone was never a sufficient guard. The
+    ///      surplus payout came out of the winner's 10% and the next round's fees,
+    ///      and once the balance ran short the winner's push failed into
+    ///      `claimable`, pushing totalClaimable above the real balance and
+    ///      permanently zeroing distributable() — a bricked contract, not just a
+    ///      theft. See test_reentrantDistributeCannotDoublePay.
+    function distribute(uint256 _roundId) external whenNotPaused nonReentrant {
         _distribute(_roundId, distributeBatchSize);
     }
 
     /// @notice distribute() with an explicit batch size, for manual recovery when
     ///         the configured size does not fit the caller's gas budget.
-    function distributeBatch(uint256 _roundId, uint16 _max) external whenNotPaused {
+    function distributeBatch(uint256 _roundId, uint16 _max) external whenNotPaused nonReentrant {
         if (_max == 0) revert ZeroBatchSize();
         _distribute(_roundId, _max);
     }
@@ -621,9 +645,15 @@ contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, A
         r.status = 3;
         // A cancelled round paid (almost) nobody, so it must not consume the
         // period: leaving lastRoundTime in place would cost holders a full extra
-        // period on top of the outage itself. windowStart is deliberately NOT
-        // advanced — this window's holders get folded into the next round.
+        // period on top of the outage itself.
         lastRoundTime = 0;
+        // windowStart normally stays put so this window's holders are folded into
+        // the next round. But if the payout loop already paid someone, the window
+        // is PARTIALLY SETTLED: re-scoring it would pay those holders a second
+        // time out of the next round's pot. Advance the window in that case. The
+        // holders past the cursor forfeit this window rather than everyone before
+        // it being double-paid, and the unspent pot still rolls forward.
+        if (r.cursor > 0) windowStart = r.timeEnd;
         emit RoundCancelled(_roundId, r.cursor);
     }
 
@@ -658,7 +688,7 @@ contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, A
     }
 
     /// @notice Withdraw funds credited to you by a failed payout push.
-    function claim() external {
+    function claim() external nonReentrant {
         uint256 _amount = claimable[msg.sender];
         if (_amount == 0) revert NothingToClaim();
         claimable[msg.sender] = 0;
@@ -803,7 +833,7 @@ contract Distributor is VRFConsumerBaseV2PlusUpgradeable, PausableUpgradeable, A
     ///      keep a cursor pointing into a pot that no longer exists, and the
     ///      remaining pushes would fail into `claimable`, inflating totalClaimable
     ///      past the real balance.
-    function emergencyWithdraw(address _to) external onlyOwner whenPaused {
+    function emergencyWithdraw(address _to) external onlyOwner whenPaused nonReentrant {
         if (rounds[roundId].status == 1) _cancelRound(roundId);
         (bool _success,) = payable(_to).call{value: distributable()}("");
         if (!_success) revert WithdrawFailed();
