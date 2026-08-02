@@ -1907,7 +1907,7 @@ export default function Token() {
                                             <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                         </Link>
                                     </Box>
-                                    <Typography noWrap fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                    <Typography noWrap fontFamily="var(--font-data)">{curvePercent === null ? '—' : `${priceFormatter(curvePercent, 2)} %`}</Typography>
                                 </Box>
                                 {
                                     holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
