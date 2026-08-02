@@ -30,6 +30,8 @@ import TwitterIcon from "@/assets/images/x.svg"
 import { ChainController } from "@reown/appkit-controllers"
 
 import PageBox from "@/components/layout/pageBox"
+import ClaimableBanner from "@/components/ClaimableBanner"
+import { useAddressPayouts, weiToBnb } from "@/hooks/payouts"
 import { getProfilePic, UserAvatar, UserName } from "@/components/cards/user"
 import TokenLogo from "@/components/tokenLogo"
 import { ProfileSkeleton, ListSkeleton } from "@/components/Skeleton"
@@ -267,6 +269,8 @@ export default function Profile() {
     const { profile, reloadProfile } = useUserProfile(profileAddress)
     const { rewards: profileRewards } = useRewards(profileAddress)
     const { summary: referralSummary } = useReferralSummary(profileAddress)
+    // Lifetime BNB this wallet has actually been paid out, across settled rounds.
+    const { payouts: myPayouts } = useAddressPayouts(profileAddress)
     const router = useRouter()
 
     const [tab, setTab] = useState(0)
@@ -687,7 +691,30 @@ export default function Profile() {
                             Reward{ethUsd != null ? ` · $${((profile?.rewardEth ?? 0) * ethUsd).toFixed(2)}` : ''}
                         </Typography>
                     </StatBox>
+                    {/* The tile above is a projection of the CURRENT round; this one
+                        is money that has already landed in the wallet. Only shown
+                        once there is a settled payout to point at, so a new trader
+                        never sees a "0 BNB paid" tile next to their projection. */}
+                    {(myPayouts?.roundsPaid ?? 0) > 0 && (
+                        <StatBox
+                            className="animate-fade-in"
+                            clickable={1}
+                            onClick={() => router.push('/payouts')}
+                            title="Every weekly payout this wallet has received — see the on-chain receipts"
+                            sx={{ transition: 'all 0.2s ease', '&:hover': { borderColor: 'rgba(191,209,67,0.3)' } }}
+                        >
+                            <Typography fontSize={16} fontWeight={700} color="#3FA968" fontFamily="var(--font-data)">
+                                {priceFormatter(weiToBnb(myPayouts?.totalWei), 6)} BNB
+                            </Typography>
+                            <Typography fontSize={11} color="#6F6F68" fontWeight={500} textTransform="uppercase" letterSpacing="2px" fontFamily="var(--font-data)">
+                                Paid out · {myPayouts?.roundsPaid} round{myPayouts?.roundsPaid === 1 ? '' : 's'}
+                            </Typography>
+                        </StatBox>
+                    )}
                 </Box>
+
+                {/* Only on your own profile — nobody else can claim your balance. */}
+                {isOwnProfile && <Box mt={2}><ClaimableBanner /></Box>}
 
                 {/* Achievement badges */}
                 {!!profileRewards?.achievements?.some((a) => a.earned) && (

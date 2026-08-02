@@ -29,6 +29,7 @@ import { ChainController } from "@reown/appkit-controllers";
 import toast from "react-hot-toast";
 import CircularProgress from "@mui/material/CircularProgress";
 import ActivityTicker from "@/components/ActivityTicker";
+import PaybackStrip from "@/components/PaybackStrip";
 import { TokenCardSkeleton, KingCardSkeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 
@@ -427,6 +428,9 @@ export default function Home() {
                     The pump.fun of BNB Chain.
                 </p>
             </div>
+            {/* The payback claim, above the fold: what has actually been paid out,
+                linked to the round-by-round receipts. */}
+            <PaybackStrip />
             {/* Main Event Section (highest market cap spotlight) */}
             {king === undefined ? (
                 <Box my={2}>

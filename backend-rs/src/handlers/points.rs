@@ -470,6 +470,107 @@ pub async fn distributor_pot_bnb(state: &crate::AppState) -> Option<f64> {
     Some(bnb)
 }
 
+/// Total points across the current payout set — the denominator every reward
+/// share is divided by.
+///
+/// Served so a client can price a point without re-deriving the scoring rules:
+/// one more point is worth `pot * DISTRIBUTE_BPS/10000 / (total + 1)`. The
+/// leaderboard already computes this inline per request (`handlers::users`); this
+/// is the same number for the surfaces that need only the denominator.
+///
+/// Redis-cached for 60s. The query walks every trade in the window, so it must
+/// not run once per page view.
+pub async fn payout_total_points(state: &crate::AppState) -> Option<f64> {
+    use diesel::sql_types::Double;
+    use diesel_async::RunQueryDsl;
+    use redis::AsyncCommands;
+
+    const CACHE_KEY: &str = "distributor:payout_total_points";
+    let mut redis = state.redis_conn.clone();
+    if let Ok(v) = redis.get::<_, f64>(CACHE_KEY).await {
+        return Some(v);
+    }
+
+    let now = chrono::Utc::now().timestamp();
+    let epoch = crate::handlers::distributor::epoch_start(state).await.ok()?;
+    let epoch = clamp_window_start(state, epoch).await.ok()?;
+    let floor = min_payout_points();
+
+    let mut conn = state.db.get().await.ok()?;
+    #[derive(diesel::QueryableByName)]
+    struct T {
+        #[diesel(sql_type = Double)]
+        total: f64,
+    }
+    // Same shape as the leaderboard's payout_set CTE: the top 100 clearing the
+    // floor, which is exactly the set the contract is served.
+    let t: T = diesel::sql_query(format!(
+        "{with}, payout_set AS ( \
+           SELECT {points} AS p FROM users u {joins} \
+           WHERE {points} >= {floor} ORDER BY p DESC LIMIT 100 \
+         ) \
+         SELECT COALESCE(SUM(p), 0)::float8 AS total FROM payout_set",
+        with = points_with(epoch, now),
+        points = points_expr(),
+        joins = POINTS_JOINS,
+        floor = floor,
+    ))
+    .get_result(&mut conn)
+    .await
+    .ok()?;
+
+    let _: Result<(), _> = redis.set_ex(CACHE_KEY, t.total, 60).await;
+    Some(t.total)
+}
+
+/// The contract's own `nextRoundAt()` — when the next round is actually due.
+///
+/// `next_round_end` below computes the same slot from `SCHEDULE_ANCHOR` /
+/// `SCHEDULE_PERIOD`, which are a hand-copied mirror of the contract's
+/// `scheduleAnchor` / `period`. They agree today, but `setSchedule` can move the
+/// on-chain cadence at any time and nothing would tell the constants — the
+/// countdown would simply start lying. Reading the contract makes the displayed
+/// time correct by construction; the constants stay as the offline fallback.
+///
+/// Redis-cached for 5 minutes: the schedule changes approximately never, and this
+/// sits on the leaderboard request path.
+pub async fn distributor_next_round_at(state: &crate::AppState) -> Option<i64> {
+    use alloy::primitives::{keccak256, Address, U256};
+    use alloy::providers::{Provider, ProviderBuilder};
+    use alloy::rpc::types::{TransactionInput, TransactionRequest};
+    use redis::AsyncCommands;
+
+    const CACHE_KEY: &str = "distributor:next_round_at";
+    let mut redis = state.redis_conn.clone();
+    if let Ok(v) = redis.get::<_, i64>(CACHE_KEY).await {
+        return Some(v);
+    }
+
+    let addr: Address = std::env::var("DISTRIBUTOR_ADDRESS").ok()?.parse().ok()?;
+    let chain = state
+        .chains
+        .iter()
+        .find(|c| c.network == "bsc")
+        .or_else(|| state.chains.first())?;
+    let provider = ProviderBuilder::new().connect_http(chain.rpc_url.parse().ok()?);
+
+    let selector = keccak256(b"nextRoundAt()")[..4].to_vec();
+    let req = TransactionRequest::default()
+        .to(addr)
+        .input(TransactionInput::new(selector.into()));
+    let out = provider.call(req).await.ok()?;
+    if out.len() < 32 {
+        return None;
+    }
+    let at = i64::try_from(U256::from_be_slice(&out[..32])).ok()?;
+    if at <= 0 {
+        return None;
+    }
+
+    let _: Result<(), _> = redis.set_ex(CACHE_KEY, at, 300).await;
+    Some(at)
+}
+
 /// A user's estimated BNB for the current round.
 ///
 /// Zero unless they are actually in the payout set — below `min_payout_points()`

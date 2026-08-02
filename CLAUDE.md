@@ -11,6 +11,35 @@
 - ALWAYS read a file before editing it
 - NEVER commit secrets, credentials, or .env files
 
+## Codebase Knowledge Graph — codebase-memory-mcp
+
+Source of truth for code discovery: **https://github.com/DeusData/codebase-memory-mcp**
+(configured in `.mcp.json` as the `codebase-memory-mcp` server; binary at
+`~/.local/bin/codebase-memory-mcp`). Consult that repo's README for tool
+semantics, indexing behaviour, and Cypher/edge-type reference.
+
+- ALWAYS query the graph FIRST for any structural code question, before Grep/Glob
+- `index_repository` first if the project is not yet indexed
+- `search_graph(name_pattern | label | qn_pattern)` — find functions/classes/routes
+- `trace_path(function_name, mode=calls|data_flow|cross_service)` — call chains
+- `get_code_snippet(qualified_name)` — exact symbol source
+- `query_graph(query)` — Cypher for complex patterns
+- `get_architecture(aspects)` — project structure
+- `search_code(pattern)` — graph-augmented text search
+- Use Grep/Glob/Read directly for non-code files (configs, docs, SQL, `.env*`),
+  and always Read a file before editing it
+
+### Keep the index fresh (ALWAYS)
+
+- ALWAYS re-run `index_repository` after finishing any change that touches code —
+  added/renamed/deleted files, moved symbols, changed signatures, new routes or
+  handlers. Do it as the last step of the task, once, after the edits are done
+- A stale graph silently returns dead symbols and misses new ones, so every later
+  `search_graph` / `trace_path` / `get_code_snippet` answer inherits the staleness
+- Do NOT re-index between individual edits — batch the changes, then index once
+- If a graph query returns a symbol that no longer exists in the file, the index is
+  stale: re-index before trusting any further result
+
 ## File Organization
 
 - NEVER save to root folder — use the directories below

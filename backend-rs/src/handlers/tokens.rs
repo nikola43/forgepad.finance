@@ -89,6 +89,11 @@ pub struct TokenDetailResponse {
     pub holders_details: Vec<HolderResponse>,
     pub fifteen_min_price: Option<String>,
     pub one_day_liquidity: Option<String>,
+    /// The bonding curve's own holding, in whole tokens — the first row of the
+    /// top-holders list. `None` means the chain read failed and the share is
+    /// UNKNOWN; it never means zero. Clients must render that as "—", because a
+    /// curve that holds all of supply reading "0 %" is worse than no number.
+    pub curve_holding: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -571,9 +576,17 @@ pub async fn get_token_details(
     // Holders list
     // Cap to the top holders — a detail view never needs the full holder set,
     // and an unbounded load on a popular token is a memory/latency risk.
+    //
+    // Only positive balances count. The indexer keeps a holder row around after
+    // someone sells their whole position, zeroing `amount` instead of deleting
+    // it, so without this filter every token's top-holder list is padded with
+    // exited holders showing 0% — and on a token everyone has exited, the whole
+    // list reads 0%. `amount > 0` is the same rule the holder *counts* in
+    // discover/creator/analytics already use.
     let holder_rows: Vec<(Holder, User)> = holders::table
         .inner_join(users::table.on(users::id.eq(holders::user_id)))
         .filter(holders::token_id.eq(token.id))
+        .filter(holders::amount.gt(BigDecimal::from(0)))
         .order(holders::amount.desc())
         .limit(200)
         .load(&mut conn)
@@ -629,6 +642,12 @@ pub async fn get_token_details(
 
     let trades_count = trade_responses.len() as i64;
 
+    // Bonding curve holding, read from the chain here rather than in the browser.
+    // Cached briefly because the detail view polls every 3s per open tab and this
+    // number only moves when someone trades. A cache MISS on a failed read is
+    // deliberate: we retry next poll instead of pinning "unknown" for the TTL.
+    let curve_holding = curve_holding_cached(&state, &chain, &token.token_address).await;
+
     // Set 15-min price fields on the token response
     if let Some(ref p15) = fifteen_min_price {
         if let Ok(p15_f) = p15.parse::<f64>() {
@@ -649,7 +668,49 @@ pub async fn get_token_details(
         holders_details: holder_responses,
         fifteen_min_price,
         one_day_liquidity,
+        curve_holding,
     }))
+}
+
+/// `curve_token_balance` behind a short redis cache. Returns `None` — never
+/// `Some("0")` — when the read fails, so the client can say "unknown".
+async fn curve_holding_cached(
+    state: &AppState,
+    chain: &crate::config::chains::ChainConfig,
+    token_address: &str,
+) -> Option<String> {
+    let key = format!("curve_bal:{}:{}", chain.network, token_address);
+    let mut conn = state.redis_conn.clone();
+
+    if let Ok(hit) = redis::cmd("GET")
+        .arg(&key)
+        .query_async::<Option<String>>(&mut conn)
+        .await
+    {
+        if let Some(v) = hit {
+            return Some(v);
+        }
+    }
+
+    match crate::services::blockchain::curve_token_balance(chain, token_address).await {
+        Ok(bal) => {
+            let s = bal.to_string();
+            let _ = redis::cmd("SET")
+                .arg(&key)
+                .arg(&s)
+                .arg("EX")
+                .arg(10)
+                .query_async::<()>(&mut conn)
+                .await;
+            Some(s)
+        }
+        Err(e) => {
+            // Loud, because the browser fallback this replaces failed silently
+            // for who knows how long.
+            tracing::warn!("curve balance read failed for {token_address}: {e}");
+            None
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

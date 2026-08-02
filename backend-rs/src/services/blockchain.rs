@@ -184,6 +184,13 @@ async fn run_listener_once(
         );
     }
 
+    // Fill in receipts for rounds that settled before receipt capture existed, or
+    // while this listener was down. A no-op once every round is complete, and
+    // deliberately not fatal — trade indexing must not depend on audit data.
+    if let Some(d) = distributor_address {
+        backfill_rounds(state, chain, d).await;
+    }
+
     // Catch up to head, cursor-safe.
     last_block = catch_up(state, chain, &provider, contract_address, distributor_address, last_block).await?;
     tracing::info!("Chain {} caught up to {}, watching for new blocks", chain.network, last_block);
@@ -414,6 +421,10 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
     // Distributor payout: RoundDistributed(uint256 indexed roundId, address indexed
     // winner, uint256 winnerAmount, uint256 distributedAmount, uint256 holderCount).
     let round_distributed_sig = keccak256(b"RoundDistributed(uint256,address,uint256,uint256,uint256)");
+    // Distributor VRF: RandomFulfilled(uint256 indexed roundId, uint256 random).
+    // The lottery half of a round is only auditable if the random that picked the
+    // winner is recorded alongside the payout, so it is indexed too.
+    let random_fulfilled_sig = keccak256(b"RandomFulfilled(uint256,uint256)");
     // Plain ERC20 movement of a launchpad token between wallets.
     let transfer_sig = keccak256(b"Transfer(address,address,uint256)");
 
@@ -447,23 +458,67 @@ async fn process_log(state: &AppState, chain: &ChainConfig, log: &Log) -> anyhow
         // A payout round settled on-chain. Record it so the leaderboard epoch
         // advances (points/leaderboard reset to the new window). Idempotent.
         process_round_distributed_log(state, chain, log).await?;
+    } else if *topic == random_fulfilled_sig {
+        process_random_fulfilled_log(state, log).await?;
     }
 
     Ok(())
 }
 
+/// Handle `RandomFulfilled(uint256 indexed roundId, uint256 random)` — the VRF
+/// word that selects the round's lottery winner.
+///
+/// It arrives BEFORE the round is distributed, so the row may not exist yet; the
+/// write is therefore an upsert that only fills `vrf_random`, and
+/// `process_round_distributed_log` re-reads the value from the contract anyway.
+/// Whichever lands first, the receipt ends up complete.
+async fn process_random_fulfilled_log(state: &AppState, log: &Log) -> anyhow::Result<()> {
+    use diesel::sql_types::{BigInt, Numeric};
+    use diesel_async::RunQueryDsl;
+
+    let Some(round_topic) = log.topics().get(1) else {
+        return Ok(());
+    };
+    let round_id = i64::try_from(U256::from_be_slice(round_topic.as_slice())).unwrap_or(0);
+    if round_id <= 0 {
+        return Ok(());
+    }
+    let d = &log.data().data;
+    if d.len() < 32 {
+        return Ok(());
+    }
+    let random = raw_u256_bd(&d[0..32]);
+
+    let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+    // time_start/time_end are NOT NULL, so a placeholder row inserted ahead of the
+    // payout would have to invent a window. Update-only: if the round is not
+    // recorded yet, distribution will read the random straight off the contract.
+    diesel::sql_query("UPDATE distributor_rounds SET vrf_random = $2 WHERE round_id = $1")
+        .bind::<BigInt, _>(round_id)
+        .bind::<Numeric, _>(random)
+        .execute(&mut conn)
+        .await?;
+    Ok(())
+}
+
 /// Handle a Distributor `RoundDistributed` event: record the paid round so the
 /// leaderboard scoring window rolls forward (this is what "resets" the
-/// leaderboard and points after every payout). The event only carries the
-/// roundId in its topics, so the round's [timeStart, timeEnd] window is read back
-/// from the contract's `rounds(roundId)` getter. Fully idempotent —
-/// ON CONFLICT DO NOTHING means a reorg/replay of the same log is a no-op.
+/// leaderboard and points after every payout), AND capture the full receipt —
+/// the pot, what was actually distributed, the VRF winner and their cut, and the
+/// per-recipient split.
+///
+/// The receipt is what makes the payout auditable. The event carries the winner
+/// and the amounts; the window, pot and VRF word come from the contract's
+/// `rounds(roundId)` getter; the per-recipient lines come from `holderAt`.
+/// Everything here is derived from chain state, so re-indexing reproduces it
+/// exactly and the write is a full upsert rather than DO NOTHING — that is also
+/// what backfills rows written by the earlier, window-only code path.
 async fn process_round_distributed_log(
     state: &AppState,
     chain: &ChainConfig,
     log: &Log,
 ) -> anyhow::Result<()> {
-    use diesel::sql_types::{BigInt, Nullable, Text};
+    use diesel::sql_types::{BigInt, Integer, Nullable, Numeric, Text};
     use diesel_async::RunQueryDsl;
 
     let topics = log.topics();
@@ -481,70 +536,234 @@ async fn process_round_distributed_log(
 
     let distributor = log.inner.address;
     let tx_hash = log.transaction_hash.map(|h| format!("{h:#x}"));
+    let block_number = log.block_number.map(|b| b as i64);
+    let distributed_at = log.block_timestamp.map(|t| t as i64);
 
-    // Read the round window from the contract. rounds(uint256) returns
-    // (uint8 status, uint64 timeStart, uint64 timeEnd, bool hasRandom, ...): the
-    // two windows are static words 1 and 2 of the ABI-encoded response.
-    let (time_start, time_end) = match fetch_round_window(chain, distributor, round_id).await {
-        Some(w) => w,
+    // Indexed `address winner` sits in topics[2], right-aligned in a 32-byte word.
+    let winner_address = topics
+        .get(2)
+        .map(|t| format!("0x{}", hex::encode(&t.as_slice()[12..32])).to_lowercase());
+
+    // Non-indexed body: winnerAmount, distributedAmount, holderCount.
+    let d = &log.data().data;
+    if d.len() < 96 {
+        tracing::warn!("RoundDistributed {round_id_i64}: short data ({} bytes); skipping", d.len());
+        return Ok(());
+    }
+    let winner_amount_wei = raw_u256_bd(&d[0..32]);
+    let distributed_wei = raw_u256_bd(&d[32..64]);
+    let holder_count = i64::try_from(U256::from_be_slice(&d[64..96])).unwrap_or(0) as i32;
+
+    // Read the round from the contract for the window, the pot snapshot and the
+    // VRF word. Without a valid window the leaderboard epoch cannot advance, so
+    // a failed read is a skip rather than a partial record.
+    let round = match fetch_round(chain, distributor, round_id).await {
+        Some(r) => r,
         None => {
             tracing::warn!(
-                "RoundDistributed {round_id_i64}: could not read round window from {distributor:#x}; skipping record"
+                "RoundDistributed {round_id_i64}: could not read round from {distributor:#x}; skipping record"
             );
             return Ok(());
         }
     };
-    if time_end <= time_start {
+    if round.time_end <= round.time_start {
         tracing::warn!(
-            "RoundDistributed {round_id_i64}: invalid window [{time_start}, {time_end}]; skipping"
+            "RoundDistributed {round_id_i64}: invalid window [{}, {}]; skipping",
+            round.time_start,
+            round.time_end
         );
         return Ok(());
     }
 
     let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
-    let inserted = diesel::sql_query(
-        "INSERT INTO distributor_rounds (round_id, time_start, time_end, tx_hash) \
-         VALUES ($1, $2, $3, $4) ON CONFLICT (round_id) DO NOTHING",
+    diesel::sql_query(
+        "INSERT INTO distributor_rounds \
+           (round_id, time_start, time_end, tx_hash, pot_wei, distributed_wei, \
+            winner_address, winner_amount_wei, holder_count, vrf_random, \
+            block_number, distributed_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
+         ON CONFLICT (round_id) DO UPDATE SET \
+           time_start = EXCLUDED.time_start, \
+           time_end = EXCLUDED.time_end, \
+           tx_hash = COALESCE(EXCLUDED.tx_hash, distributor_rounds.tx_hash), \
+           pot_wei = EXCLUDED.pot_wei, \
+           distributed_wei = EXCLUDED.distributed_wei, \
+           winner_address = EXCLUDED.winner_address, \
+           winner_amount_wei = EXCLUDED.winner_amount_wei, \
+           holder_count = EXCLUDED.holder_count, \
+           vrf_random = EXCLUDED.vrf_random, \
+           block_number = COALESCE(EXCLUDED.block_number, distributor_rounds.block_number), \
+           distributed_at = COALESCE(EXCLUDED.distributed_at, distributor_rounds.distributed_at)",
     )
     .bind::<BigInt, _>(round_id_i64)
-    .bind::<BigInt, _>(time_start)
-    .bind::<BigInt, _>(time_end)
+    .bind::<BigInt, _>(round.time_start)
+    .bind::<BigInt, _>(round.time_end)
     .bind::<Nullable<Text>, _>(tx_hash)
+    .bind::<Numeric, _>(round.pot_wei)
+    .bind::<Numeric, _>(distributed_wei.clone())
+    .bind::<Nullable<Text>, _>(winner_address)
+    .bind::<Numeric, _>(winner_amount_wei)
+    .bind::<Integer, _>(holder_count)
+    .bind::<Numeric, _>(round.random)
+    .bind::<Nullable<BigInt>, _>(block_number)
+    .bind::<Nullable<BigInt>, _>(distributed_at)
     .execute(&mut conn)
     .await?;
 
-    if inserted > 0 {
-        tracing::info!(
-            "Distributor round {round_id_i64} recorded (window {time_start}..{time_end}); leaderboard reset"
-        );
-    } else {
-        tracing::debug!("Distributor round {round_id_i64} already recorded; no-op");
+    tracing::info!(
+        "Distributor round {round_id_i64} recorded (window {}..{}, {} holders); leaderboard reset",
+        round.time_start,
+        round.time_end,
+        holder_count
+    );
+
+    // Per-recipient lines. Best-effort: the round itself is already recorded and
+    // the leaderboard has rolled forward, so a failure here degrades the receipt
+    // detail rather than the payout accounting, and the next backfill retries it.
+    if let Err(e) =
+        store_round_payouts(state, chain, distributor, round_id, holder_count, &distributed_wei).await
+    {
+        tracing::warn!("Round {round_id_i64}: could not store per-holder payouts: {e}");
     }
     Ok(())
 }
 
-/// Read [timeStart, timeEnd] for a round via `rounds(uint256)`. Returns None on
-/// any RPC/parse failure so the caller can skip rather than record a bad window.
-async fn fetch_round_window(
+/// Expand a settled round's committed share set into `distributor_payouts`.
+///
+/// The contract's generated `rounds()` getter omits the struct's dynamic `bytes
+/// shares` member, so the set is read entry-by-entry through `holderAt(roundId, i)`.
+/// That is up to MAX_HOLDERS (100) `eth_call`s, once per weekly round — cheap
+/// enough to keep simple, and it reads the same committed bytes the payout loop
+/// itself walked.
+///
+/// `amount_wei` mirrors the contract: `distributed * share / 2^32`, floored. The
+/// sum over a round is therefore <= `distributed_wei`, never more.
+async fn store_round_payouts(
+    state: &AppState,
     chain: &ChainConfig,
     distributor: Address,
     round_id: U256,
-) -> Option<(i64, i64)> {
-    // rounds(uint256) selector = keccak("rounds(uint256)")[..4].
-    let selector = &keccak256(b"rounds(uint256)")[..4];
-    let mut call_data = Vec::with_capacity(4 + 32);
-    call_data.extend_from_slice(selector);
-    call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
-    let data = format!("0x{}", hex::encode(&call_data));
+    holder_count: i32,
+    distributed_wei: &BigDecimal,
+) -> anyhow::Result<()> {
+    use diesel::sql_types::{BigInt, Numeric, Text};
+    use diesel_async::RunQueryDsl;
 
-    let rpc_url = chain.rpc_url.clone();
+    if holder_count <= 0 {
+        return Ok(());
+    }
+    let round_id_i64 = i64::try_from(round_id).unwrap_or(0);
+    let two_pow_32 = BigDecimal::from_str("4294967296").unwrap();
+
+    let mut conn = state.db.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+    for i in 0..holder_count as u64 {
+        let Some((address, share)) = fetch_holder_at(chain, distributor, round_id, i).await else {
+            // A gap would silently understate someone's payout, so stop rather
+            // than write a partial set the UI would present as complete.
+            anyhow::bail!("holderAt({round_id_i64}, {i}) failed");
+        };
+        let amount = (distributed_wei * BigDecimal::from(share)) / &two_pow_32;
+        // Truncate to whole wei — the contract's integer division floors too.
+        let amount = amount.with_scale(0);
+        diesel::sql_query(
+            "INSERT INTO distributor_payouts (round_id, address, share, amount_wei) \
+             VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (round_id, address) DO UPDATE SET \
+               share = EXCLUDED.share, amount_wei = EXCLUDED.amount_wei",
+        )
+        .bind::<BigInt, _>(round_id_i64)
+        .bind::<Text, _>(address)
+        .bind::<BigInt, _>(share as i64)
+        .bind::<Numeric, _>(amount)
+        .execute(&mut conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// The parts of Distributor's `Round` a receipt needs.
+///
+/// Solidity's generated getter for `mapping(uint256 => Round) public rounds`
+/// OMITS the struct's dynamic `bytes shares` member, so every returned value is
+/// a static word at a fixed offset:
+///
+///   0 status   1 timeStart  2 timeEnd      3 hasRandom  4 pot   5 random
+///   6 vrfRequestId          7 vrfRetries   8 cursor     9 holderCount
+///   10 sharesAt
+struct RoundOnChain {
+    time_start: i64,
+    time_end: i64,
+    pot_wei: BigDecimal,
+    /// Zero until VRF fulfils; recorded as-is so the lottery draw is auditable.
+    random: BigDecimal,
+}
+
+/// Read a round via `rounds(uint256)`. Returns None on any RPC/parse failure so
+/// the caller can skip rather than record a bad window.
+async fn fetch_round(
+    chain: &ChainConfig,
+    distributor: Address,
+    round_id: U256,
+) -> Option<RoundOnChain> {
+    let mut call_data = keccak256(b"rounds(uint256)")[..4].to_vec();
+    call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
+    let words = eth_call_words(chain, distributor, call_data).await?;
+    // Need words 0..=5 (status, timeStart, timeEnd, hasRandom, pot, random).
+    if words.len() < 6 {
+        return None;
+    }
+    Some(RoundOnChain {
+        time_start: i64::try_from(U256::from_be_slice(&words[1])).ok()?,
+        time_end: i64::try_from(U256::from_be_slice(&words[2])).ok()?,
+        pot_wei: raw_u256_bd(&words[4]),
+        random: raw_u256_bd(&words[5]),
+    })
+}
+
+/// Read one committed `(address, share)` entry via `holderAt(uint256,uint256)`.
+async fn fetch_holder_at(
+    chain: &ChainConfig,
+    distributor: Address,
+    round_id: U256,
+    index: u64,
+) -> Option<(String, u32)> {
+    let mut call_data = keccak256(b"holderAt(uint256,uint256)")[..4].to_vec();
+    call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
+    call_data.extend_from_slice(&U256::from(index).to_be_bytes::<32>());
+    let words = eth_call_words(chain, distributor, call_data).await?;
+    if words.len() < 2 {
+        return None;
+    }
+    let address = format!("0x{}", hex::encode(&words[0][12..32])).to_lowercase();
+    let share = u32::try_from(U256::from_be_slice(&words[1])).ok()?;
+    Some((address, share))
+}
+
+/// Read the Distributor's current `roundId()` — the highest round ever opened.
+async fn fetch_round_id(chain: &ChainConfig, distributor: Address) -> Option<u64> {
+    let call_data = keccak256(b"roundId()")[..4].to_vec();
+    let words = eth_call_words(chain, distributor, call_data).await?;
+    // `.first()` would resolve to diesel's QueryDsl method here, not the slice one.
+    let word = words.into_iter().next()?;
+    u64::try_from(U256::from_be_slice(&word)).ok()
+}
+
+/// One `eth_call`, returning the result split into 32-byte words. None on any
+/// transport/JSON/parse failure, or when the node returns an error object —
+/// callers treat that as "unknown" and skip rather than record a wrong value.
+async fn eth_call_words(
+    chain: &ChainConfig,
+    to: Address,
+    call_data: Vec<u8>,
+) -> Option<Vec<[u8; 32]>> {
+    let data = format!("0x{}", hex::encode(&call_data));
     let client = reqwest::Client::new();
     let resp: serde_json::Value = client
-        .post(&rpc_url)
-        .json(&serde_json::json!({
+        .post(&chain.rpc_url)
+        .json(&json!({
             "jsonrpc": "2.0",
             "method": "eth_call",
-            "params": [{ "to": format!("{distributor:#x}"), "data": data }, "latest"],
+            "params": [{ "to": format!("{to:#x}"), "data": data }, "latest"],
             "id": 1
         }))
         .send()
@@ -553,16 +772,154 @@ async fn fetch_round_window(
         .json()
         .await
         .ok()?;
-    let hex = resp.get("result")?.as_str()?;
-    let trimmed = hex.trim_start_matches("0x");
-    // Static head: word0 status, word1 timeStart, word2 timeEnd, ... Need at least
-    // 3 words (192 bytes = 384 hex chars) to read both windows.
-    if trimmed.len() < 384 {
-        return None;
+    let raw = hex::decode(resp.get("result")?.as_str()?.trim_start_matches("0x")).ok()?;
+    Some(
+        raw.chunks_exact(32)
+            .map(|c| {
+                let mut w = [0u8; 32];
+                w.copy_from_slice(c);
+                w
+            })
+            .collect(),
+    )
+}
+
+/// Backfill receipts for rounds that settled before receipt capture existed (or
+/// while the indexer was down). Runs once per listener start.
+///
+/// Bounded by the contract's own `roundId()` — weekly rounds, so a handful of
+/// iterations — and skips any round whose receipt is already complete, making it
+/// a cheap no-op on every start after the first. Best-effort throughout: this is
+/// display/audit data, and failing it must never stop the listener from indexing
+/// trades.
+pub async fn backfill_rounds(state: &AppState, chain: &ChainConfig, distributor: Address) {
+    use diesel::sql_types::{BigInt, Integer, Numeric};
+    use diesel_async::RunQueryDsl;
+
+    let Some(latest) = fetch_round_id(chain, distributor).await else {
+        tracing::warn!("Round backfill: could not read roundId() from {distributor:#x}; skipping");
+        return;
+    };
+    if latest == 0 {
+        return;
     }
-    let time_start = i64::from_str_radix(&trimmed[64..128], 16).ok()?;
-    let time_end = i64::from_str_radix(&trimmed[128..192], 16).ok()?;
-    Some((time_start, time_end))
+
+    let Ok(mut conn) = state.db.get().await else {
+        tracing::warn!("Round backfill: no DB connection; skipping");
+        return;
+    };
+
+    #[derive(diesel::QueryableByName)]
+    struct Existing {
+        #[diesel(sql_type = BigInt)]
+        round_id: i64,
+    }
+    // Complete == the payout figures are present. Rows written by the old
+    // window-only path have distributed_wei NULL and are refilled here.
+    let done: std::collections::HashSet<i64> = match diesel::sql_query(
+        "SELECT round_id FROM distributor_rounds WHERE distributed_wei IS NOT NULL",
+    )
+    .load::<Existing>(&mut conn)
+    .await
+    {
+        Ok(rows) => rows.into_iter().map(|r| r.round_id).collect(),
+        Err(e) => {
+            tracing::warn!("Round backfill: cannot read existing rounds: {e}");
+            return;
+        }
+    };
+
+    let mut filled = 0usize;
+    for rid in 1..=latest {
+        if done.contains(&(rid as i64)) {
+            continue;
+        }
+        let round_u256 = U256::from(rid);
+        let Some(round) = fetch_round(chain, distributor, round_u256).await else {
+            continue;
+        };
+        // An unsettled or cancelled round has no payout to show.
+        if round.time_end <= round.time_start || round.pot_wei == BigDecimal::from(0) {
+            continue;
+        }
+
+        // The event's distributedAmount is not readable after the fact, so derive
+        // it from the pot exactly as the contract does: percentForDistribute bps
+        // of the snapshot, with the remainder the lottery winner's.
+        let distributed = (&round.pot_wei
+            * BigDecimal::from_str(&format!("{}", crate::handlers::points::DISTRIBUTE_BPS as i64))
+                .unwrap())
+            / BigDecimal::from(10000);
+        let distributed = distributed.with_scale(0);
+        let winner_amount = (&round.pot_wei - &distributed).with_scale(0);
+
+        if let Err(e) = diesel::sql_query(
+            "INSERT INTO distributor_rounds \
+               (round_id, time_start, time_end, pot_wei, distributed_wei, \
+                winner_amount_wei, vrf_random) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) \
+             ON CONFLICT (round_id) DO UPDATE SET \
+               pot_wei = EXCLUDED.pot_wei, \
+               distributed_wei = EXCLUDED.distributed_wei, \
+               winner_amount_wei = COALESCE(distributor_rounds.winner_amount_wei, EXCLUDED.winner_amount_wei), \
+               vrf_random = EXCLUDED.vrf_random",
+        )
+        .bind::<BigInt, _>(rid as i64)
+        .bind::<BigInt, _>(round.time_start)
+        .bind::<BigInt, _>(round.time_end)
+        .bind::<Numeric, _>(round.pot_wei.clone())
+        .bind::<Numeric, _>(distributed.clone())
+        .bind::<Numeric, _>(winner_amount)
+        .bind::<Numeric, _>(round.random.clone())
+        .execute(&mut conn)
+        .await
+        {
+            tracing::warn!("Round backfill {rid}: insert failed: {e}");
+            continue;
+        }
+
+        // holderCount is word 9 of the getter; re-read it rather than trusting a
+        // stored value that may be NULL on an old row.
+        let holder_count = fetch_round_holder_count(chain, distributor, round_u256)
+            .await
+            .unwrap_or(0);
+        if holder_count > 0 {
+            let _: Result<(), _> = diesel::sql_query(
+                "UPDATE distributor_rounds SET holder_count = $2 WHERE round_id = $1",
+            )
+            .bind::<BigInt, _>(rid as i64)
+            .bind::<Integer, _>(holder_count)
+            .execute(&mut conn)
+            .await
+            .map(|_| ())
+            .map_err(|e| tracing::warn!("Round backfill {rid}: holder_count update failed: {e}"));
+
+            if let Err(e) =
+                store_round_payouts(state, chain, distributor, round_u256, holder_count, &distributed)
+                    .await
+            {
+                tracing::warn!("Round backfill {rid}: payouts failed: {e}");
+            }
+        }
+        filled += 1;
+    }
+
+    if filled > 0 {
+        tracing::info!("Round backfill: filled {filled} round receipt(s) up to round {latest}");
+    }
+}
+
+/// `holderCount` (word 9) from `rounds(uint256)`.
+async fn fetch_round_holder_count(
+    chain: &ChainConfig,
+    distributor: Address,
+    round_id: U256,
+) -> Option<i32> {
+    let mut call_data = keccak256(b"rounds(uint256)")[..4].to_vec();
+    call_data.extend_from_slice(&round_id.to_be_bytes::<32>());
+    let words = eth_call_words(chain, distributor, call_data).await?;
+    let w = words.get(9)?;
+    i32::try_from(U256::from_be_slice(w)).ok()
 }
 
 async fn process_token_created_log(
@@ -980,6 +1337,79 @@ fn wei_to_bd(bytes: &[u8]) -> BigDecimal {
     let wei = U256::from_be_slice(bytes).to_string();
     BigDecimal::from_str(&wei).unwrap_or_default()
         / BigDecimal::from_str("1000000000000000000").unwrap()
+}
+
+/// Read the bonding curve's own balance of `token_address`, in WHOLE tokens.
+///
+/// This is the "Bonding Curve" line of the top-holders list. It used to be read
+/// in the browser (`balanceOf` over the public RPC in `useTokenInfo`), where
+/// three separate conditions — the `/config` chain list not being loaded yet,
+/// the wallet SDK's network list not matching the token's chain, and the RPC
+/// call itself failing — all silently collapsed to `0n` and rendered as a
+/// confident "0 %". A curve holding 100% of supply showing 0% is the single
+/// most misleading number on the page, so it is read here instead: one server,
+/// one keyed RPC endpoint, and an error that stays an error.
+///
+/// Returns Err on any RPC/decode failure. Callers must surface that as "unknown"
+/// (`null`), never as zero — that conflation is the bug this replaces.
+pub async fn curve_token_balance(
+    chain: &ChainConfig,
+    token_address: &str,
+) -> anyhow::Result<BigDecimal> {
+    let curve: Address = chain
+        .contract_address
+        .parse()
+        .map_err(|e| anyhow::anyhow!("bad curve address {}: {e}", chain.contract_address))?;
+    let token: Address = token_address
+        .parse()
+        .map_err(|e| anyhow::anyhow!("bad token address {token_address}: {e}"))?;
+
+    // Same precedence as the indexer: prefer the private, keyed server endpoint
+    // and never fall back to a browser-published URL before trying it.
+    let net_upper = chain.network.to_uppercase();
+    let rpc = std::env::var(format!("{net_upper}_SERVER_RPC_URL"))
+        .or_else(|_| std::env::var(format!("{net_upper}_RPC_URL")))
+        .or_else(|_| std::env::var("ETH_RPC_URL".to_string()))
+        .unwrap_or_else(|_| chain.rpc_url.clone());
+    let url = rpc
+        .parse()
+        .map_err(|e| anyhow::anyhow!("invalid rpc {rpc}: {e}"))?;
+    let provider = ProviderBuilder::new().connect_http(url);
+
+    // balanceOf(address) — selector + 32-byte left-padded address.
+    let mut data = Vec::with_capacity(36);
+    data.extend_from_slice(&keccak256("balanceOf(address)")[..4]);
+    data.extend_from_slice(&[0u8; 12]);
+    data.extend_from_slice(curve.as_slice());
+
+    let out = provider
+        .call(
+            alloy::rpc::types::TransactionRequest::default()
+                .to(token)
+                .input(Bytes::from(data).into()),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("balanceOf({curve:#x}) on {token:#x}: {e}"))?;
+
+    // A well-formed uint256 return is exactly 32 bytes. Anything else is not a
+    // zero balance, it is a non-ERC20 (or a reverted/empty) response — and
+    // U256::from_be_slice panics above 32 bytes.
+    if out.len() != 32 {
+        anyhow::bail!("balanceOf returned {} bytes, expected 32", out.len());
+    }
+    // Whole tokens, matching `holders.amount` — the two are divided against the
+    // same total supply on the client.
+    Ok(wei_to_bd(out.as_ref()))
+}
+
+/// Convert a 32-byte big-endian U256 to a BigDecimal in its RAW unit, no scaling.
+///
+/// Payout receipts store wei (and a VRF word, which is not a currency at all), so
+/// unlike `wei_to_bd` nothing is divided here: these values are shown as exact
+/// amounts and reconciled against the chain, and a ÷1e18 at ingest would bake a
+/// rounding decision into the stored record.
+fn raw_u256_bd(bytes: &[u8]) -> BigDecimal {
+    BigDecimal::from_str(&U256::from_be_slice(bytes).to_string()).unwrap_or_default()
 }
 
 /// Process a buy/sell event from the blockchain.

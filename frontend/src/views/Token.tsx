@@ -34,6 +34,7 @@ import WebsiteIcon from '@/assets/images/website.svg';
 import { TVChartContainer as TVChartContainerAdvanced } from '@/components/tvchart';
 import TokenAnalyticsPanel from '@/components/TokenAnalyticsPanel';
 import StreamPanel from '@/components/StreamPanel';
+import TradeEarnCue from '@/components/TradeEarnCue';
 import { useStreamStatus } from '@/hooks/stream';
 import { playBuySound, playSellSound } from '@/utils/sounds';
 import { TimeDiff } from "@/components/time";
@@ -558,6 +559,10 @@ const SwapContent = ({
     }
     const inputUsd = usdValue(amountIn, inputIsNative)
     const estimateUsd = usdValue(estimateAmount, !inputIsNative)
+    // Points are scored on the USD moved through the curve, which is always the
+    // NATIVE side of the trade — the input when buying with an exact BNB amount,
+    // the estimate in every other case (buy-by-token-out, and all sells).
+    const tradeUsdNotional = Number(inputIsNative ? amountIn : estimateAmount) * nativeUsd
 
     return <>
         <Box display="flex" alignContent="center" justifyContent="space-between" width="100%">
@@ -674,6 +679,15 @@ const SwapContent = ({
                 You will receive ~{priceFormatter(estimateAmount)} {exactInput && tradeType === "buy" ? detailData.tokenSymbol.toUpperCase() : caipNetwork?.nativeCurrency.symbol}{estimateUsd ? ` (≈ ${estimateUsd})` : ''}
             </SmallButton>
         )}
+        {/* What this trade pays YOU back. 30% of the fee it charges returns to
+            traders, and this is that trade's slice of it — quoted at the pot as
+            it stands right now. Sells earn exactly like buys, which is worth
+            showing precisely at the moment someone is about to sell. */}
+        <TradeEarnCue
+            usdNotional={tradeUsdNotional}
+            nativeSymbol={caipNetwork?.nativeCurrency.symbol}
+            tradeType={tradeType}
+        />
         {!!estimateAmount && !!amountIn && (() => {
             const inputVal = parseFloat(amountIn)
             const outputVal = parseFloat(estimateAmount)
@@ -797,6 +811,31 @@ export default function Token() {
         const sorted = [...holders].sort((a: any, b: any) => b.tokenAmount - a.tokenAmount)
         return sorted[0].tokenAmount / tokenChain.totalSupply * 100
     }, [holders, tokenChain])
+
+    // Percent-of-supply for a holder row. Returns null — rendered "—" — when the
+    // supply is unknown, i.e. `chains` from /config has not resolved. Formerly
+    // this fell back to the number 0, so a page that simply had not loaded its
+    // config yet claimed every holder owned nothing.
+    const pctOfSupply = useCallback((amount: number | string | null | undefined) => {
+        const supply = tokenChain?.totalSupply
+        if (!supply || amount == null) return null
+        return Number(amount) / supply * 100
+    }, [tokenChain])
+
+    // The bonding curve's share of supply.
+    //
+    // Prefer the server's reading (`curveHolding`, whole tokens): it comes from
+    // one keyed RPC endpoint and reports failure as null. The browser read below
+    // returns 0n on EVERY error path — wallet SDK network list not matching the
+    // token's chain, /config not loaded, a rate-limited public RPC — and each of
+    // those rendered a confident "0 %" on a curve that actually held 100% of
+    // supply. The client read is kept only as the fallback for Solana tokens,
+    // which are served by Jupiter and never hit this endpoint.
+    const curvePercent = useMemo(() => {
+        const served = tokenInfo?.curveHolding
+        if (served != null) return pctOfSupply(served)
+        return lpBalance ? pctOfSupply(ethers.formatEther(lpBalance)) : null
+    }, [tokenInfo, lpBalance, pctOfSupply])
     const { walletProvider: evmProvider } = useAppKitProvider<EVMProvider>("eip155")
     const { caipNetwork: activeNetwork } = useAppKitNetwork()
     const chatMessagesRef = useRef<HTMLDivElement>(null)
@@ -1756,7 +1795,7 @@ export default function Token() {
                                                 <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                             </Link>
                                         </Box>
-                                        <Typography noWrap fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(Number(ethers.formatEther(lpBalance ?? 0n)) / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                        <Typography noWrap fontFamily="var(--font-data)">{curvePercent === null ? '—' : `${priceFormatter(curvePercent, 2)} %`}</Typography>
                                     </Box>
                                     {
                                         holders?.length > 0 && holders.sort((a: any, b: any) => b.tokenAmount - a.tokenAmount).map((item: any, index: number) => (
@@ -1769,7 +1808,7 @@ export default function Token() {
                                                         <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                                     </Link>
                                                 </Box>
-                                                <Typography fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                                <Typography fontFamily="var(--font-data)">{(() => { const p = pctOfSupply(item.tokenAmount); return p === null ? '—' : `${priceFormatter(p, 2)} %` })()}</Typography>
                                             </Box>
                                         ))}
                                 </HolderBox>
@@ -1881,7 +1920,7 @@ export default function Token() {
                                                     <LinkIcon sx={{ color: "var(--bone)", height: 16 }} />
                                                 </Link>
                                             </Box>
-                                            <Typography fontFamily="var(--font-data)">{tokenChain?.totalSupply ? priceFormatter(item.tokenAmount / tokenChain.totalSupply * 100, 2) : 0} %</Typography>
+                                            <Typography fontFamily="var(--font-data)">{(() => { const p = pctOfSupply(item.tokenAmount); return p === null ? '—' : `${priceFormatter(p, 2)} %` })()}</Typography>
                                         </Box>
                                     ))}
                             </HolderBox>

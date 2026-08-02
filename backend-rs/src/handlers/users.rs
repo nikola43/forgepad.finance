@@ -568,12 +568,16 @@ pub async fn get_user_profile(
     user_resp.is_admin = Some(is_admin);
 
     // Holdings
+    // Positive balances only — a fully-sold position leaves its holder row
+    // behind with `amount` zeroed rather than deleted, and those are exits, not
+    // holdings. Same `amount > 0` rule the token detail holder list uses.
     let holder_rows: Vec<(Holder, (Token, User))> = holders::table
         .inner_join(
             tokens::table.on(tokens::id.eq(holders::token_id))
                 .inner_join(users::table.on(users::id.eq(tokens::creator_id))),
         )
         .filter(holders::user_id.eq(user.id))
+        .filter(holders::amount.gt(bigdecimal::BigDecimal::from(0)))
         .load(&mut conn)
         .await?;
 

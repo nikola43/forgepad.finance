@@ -28,6 +28,7 @@ import TravelExploreOutlinedIcon from '@mui/icons-material/TravelExploreOutlined
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined'
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
 import { usePathname, useRouter } from 'next/navigation'
 
@@ -87,6 +88,10 @@ const items: NavItem[] = [
     { label: 'The Undercard', href: '/discover', icon: <TravelExploreOutlinedIcon /> },
     { label: 'Portfolio', href: '/portfolio', icon: <AccountBalanceWalletOutlinedIcon /> },
     { label: 'The Rankings', href: '/leaderboard', icon: <EmojiEventsIcon /> },
+    // Directly under the rankings: the board says what you're owed, this says
+    // what has actually been paid. The receipts are the proof the board isn't
+    // theatre, so they sit next to it rather than buried further down.
+    { label: 'Payouts', href: '/payouts', icon: <PaidOutlinedIcon /> },
     { label: 'Rewards', href: '/rewards', icon: <TrackChangesIcon /> },
     { label: 'Referrals', href: '/referrals', icon: <GroupAddOutlinedIcon /> },
     { label: 'Watchlist', href: '/watchlist', icon: <StarBorderIcon /> },
