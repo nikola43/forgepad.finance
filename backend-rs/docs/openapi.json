@@ -189,12 +189,25 @@
       "get": {
         "tags": ["Market Data"],
         "summary": "Current king of the hill",
+        "description": "The leading token still on the bonding curve. A token leaves the hill the moment it graduates, so `king` is `null` whenever no token qualifies.",
         "operationId": "getKing",
         "responses": {
           "200": {
-            "description": "The current leading token",
+            "description": "Envelope carrying the current leading token, or null",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Token" } }
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["king"],
+                  "properties": {
+                    "king": {
+                      "nullable": true,
+                      "allOf": [{ "$ref": "#/components/schemas/Token" }],
+                      "description": "The leading token, or null when the hill is empty"
+                    }
+                  }
+                }
+              }
             }
           }
         }
