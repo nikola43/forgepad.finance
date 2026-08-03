@@ -1,0 +1,814 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Fyuz Public API",
+    "version": "1.0.0",
+    "description": "Public read-only API for the Fyuz launchpad on BNB Smart Chain.\n\nEvery endpoint documented here is **unauthenticated** and safe to poll. They expose\nthe same market data the Fyuz frontend renders: token listings, bonding-curve\nstate, trades, OHLCV candles, holder distribution and wallet performance.\n\n### For data partners / indexers\n\n- `GET /discover` is the highest-signal single endpoint — one row per token with\n  market cap, 24h volume, buy/sell counts, holder count and graduation progress.\n- `GET /trades/getChartData` returns OHLCV candles suitable for charting.\n- Tokens live on a bonding curve until they reach a $30,000 market cap, at which\n  point they graduate into a PancakeSwap V2 pair and `pairAddress` is populated.\n  Before graduation there is no DEX pool, so curve state must be read here.\n\n### Rate limiting\n\nRequests are limited per client IP. Exceeding the limit returns `429` with\n`{\"error\": \"Too many requests\"}`. Partners needing sustained throughput should\ncontact the Fyuz team for an allowance.\n\n### Conventions\n\n- All timestamps in `date` / `createdAt` fields are UNIX **seconds** unless the\n  field name ends in `Ms`.\n- Monetary and token amounts are returned as **decimal strings**, not floats, to\n  avoid precision loss on 18-decimal values. Analytics endpoints are the\n  exception and return floats, since they are already aggregates.\n- `network` is the chain slug, currently always `bsc`.\n- `poolType`: `1` = PancakeSwap V2, `2` = V3.\n",
+    "contact": {
+      "name": "Fyuz",
+      "url": "https://fyuz.fun"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.fyuz.fun",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    { "name": "Market Data", "description": "Token listings, discovery feed and curve state" },
+    { "name": "Trades", "description": "Trade history and OHLCV candles" },
+    { "name": "Analytics", "description": "Per-token analytics and trader performance" },
+    { "name": "Wallets", "description": "Wallet and portfolio performance" },
+    { "name": "Leaderboards", "description": "Users, referrals, kings and seasons" },
+    { "name": "Distributor", "description": "On-chain leaderboard fee distribution" },
+    { "name": "System", "description": "Health and chain configuration" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Liveness probe",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string", "example": "ok" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Supported chains and contract addresses",
+        "description": "Returns the chain configuration the frontend runs against, including chain IDs, RPC URLs and the Fyuz contract addresses.",
+        "operationId": "getConfig",
+        "responses": {
+          "200": {
+            "description": "Chain configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chains": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string", "example": "BNB Smart Chain" },
+                          "chainId": { "type": "integer", "example": 56 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Discovery feed (recommended entry point for indexers)",
+        "description": "One row per token with market cap, 24h volume, buy/sell counts, holder count, price change and graduation progress. This is the most efficient endpoint for bulk market-data ingestion.",
+        "operationId": "discover",
+        "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "description": "Preset ordering",
+            "schema": { "type": "string", "enum": ["trending", "new", "gainers", "graduating"] }
+          },
+          { "name": "network", "in": "query", "schema": { "type": "string", "example": "bsc" } },
+          { "name": "minMarketcap", "in": "query", "schema": { "type": "number" } },
+          { "name": "minVolume", "in": "query", "schema": { "type": "number" } },
+          { "name": "minHolders", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "maxAgeSecs",
+            "in": "query",
+            "description": "Only tokens created within this many seconds",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`bonding` = still on the curve, `graduated` = has a DEX pair",
+            "schema": { "type": "string", "enum": ["bonding", "graduated"] }
+          },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/DiscoverToken" }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/tokens": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "List tokens",
+        "description": "Paginated token list with sorting and search. Returns the full token record including bonding-curve virtual reserves.",
+        "operationId": "listTokens",
+        "parameters": [
+          {
+            "name": "orderType",
+            "in": "query",
+            "description": "Field to sort by (e.g. `marketcap`, `createdAt`, `score`)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "orderFlag",
+            "in": "query",
+            "description": "Sort direction",
+            "schema": { "type": "string", "enum": ["asc", "desc"] }
+          },
+          {
+            "name": "searchWord",
+            "in": "query",
+            "description": "Free-text match on name, symbol or address",
+            "schema": { "type": "string" }
+          },
+          { "name": "network", "in": "query", "schema": { "type": "string", "example": "bsc" } },
+          {
+            "name": "style",
+            "in": "query",
+            "description": "Exact-match filter on generated image style (`all` = no filter)",
+            "schema": { "type": "string" }
+          },
+          { "name": "includeNsfw", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tokenList": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Token" }
+                    },
+                    "tokenCount": {
+                      "type": "integer",
+                      "description": "Total matching rows, for pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/tokens/king": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Current king of the hill",
+        "operationId": "getKing",
+        "responses": {
+          "200": {
+            "description": "The current leading token",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Token" } }
+            }
+          }
+        }
+      }
+    },
+    "/tokens/{network}/{tokenAddress}": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Token detail",
+        "description": "Full token record plus recent trades, holder distribution, 15-minute price and 1-day liquidity.\n\n`curveHolding` is the bonding curve's own balance in whole tokens. `null` means the on-chain read failed and the value is **unknown** — it does not mean zero, and must not be rendered as `0`.",
+        "operationId": "getTokenDetails",
+        "parameters": [
+          {
+            "name": "network",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "bsc" }
+          },
+          {
+            "name": "tokenAddress",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "0x23a84ba5bf7bf3236491fa2b5a9807a274337135" }
+          },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token detail",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenDetail" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/trades/recent": {
+      "get": {
+        "tags": ["Trades"],
+        "summary": "Recent trades across all tokens",
+        "description": "Platform-wide trade feed. Pass `latestTradeId` to poll incrementally and receive only trades newer than the one you already have.",
+        "operationId": "getRecentTrades",
+        "parameters": [
+          {
+            "name": "latestTradeId",
+            "in": "query",
+            "description": "Return only trades with an id greater than this",
+            "schema": { "type": "integer" }
+          },
+          { "name": "latestTokenId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent trades and the tokens they reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trades": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Trade" }
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Token" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trades": {
+      "post": {
+        "tags": ["Trades"],
+        "summary": "Trades for a single token",
+        "description": "Unauthenticated despite being a POST — the body carries the token address rather than a mutation. Returns that token's trade history, newest first.",
+        "operationId": "getTradesByToken",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["tokenAddress"],
+                "properties": {
+                  "tokenAddress": {
+                    "type": "string",
+                    "example": "0x23a84ba5bf7bf3236491fa2b5a9807a274337135"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trades for the token",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Trade" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trades/getChartData": {
+      "get": {
+        "tags": ["Trades"],
+        "summary": "OHLCV candles",
+        "description": "Candlestick data for a token over a time range. Shaped for TradingView-style charting libraries.",
+        "operationId": "getChartData",
+        "parameters": [
+          {
+            "name": "tokenAddress",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": true,
+            "description": "Candle width, e.g. `1`, `5`, `15`, `60`, `1D` (minutes unless suffixed)",
+            "schema": { "type": "string", "example": "5" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Range start, UNIX seconds",
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "Range end, UNIX seconds",
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          { "name": "first", "in": "query", "schema": { "type": "integer" } },
+          { "name": "dex", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "countBack",
+            "in": "query",
+            "description": "Number of candles to return ending at `to`",
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candles, oldest first",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Candle" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/token/{network}/{address}": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Token analytics",
+        "description": "Holder concentration, buy/sell split, volume, graduation progress and bundle-buyer detection.",
+        "operationId": "getTokenAnalytics",
+        "parameters": [
+          { "name": "network", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics for the token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenAnalytics" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/analytics/top-traders/{network}/{address}": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Top traders for a token",
+        "description": "Ranked by total PnL, with the token creator flagged.",
+        "operationId": "getTopTraders",
+        "parameters": [
+          { "name": "network", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top traders",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TopTrader" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallet/{address}": {
+      "get": {
+        "tags": ["Wallets"],
+        "summary": "Wallet performance",
+        "description": "Average-cost PnL rolled up across every token the wallet has traded, plus win rate, volume and current holding value.",
+        "operationId": "getWallet",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wallet statistics",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/WalletStats" } }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/{address}": {
+      "get": {
+        "tags": ["Wallets"],
+        "summary": "Current holdings for an address",
+        "operationId": "getPortfolio",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Holdings" } }
+      }
+    },
+    "/users/leaderboard": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Global user leaderboard",
+        "operationId": "getUserLeaderboard",
+        "responses": { "200": { "description": "Ranked users" } }
+      }
+    },
+    "/users/profile/{address}": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Public profile for an address",
+        "operationId": "getUserProfile",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Public profile" } }
+      }
+    },
+    "/users/top/{count}": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Top holders across the platform",
+        "operationId": "getTopHolders",
+        "parameters": [
+          { "name": "count", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Top holders" } }
+      }
+    },
+    "/kings/history": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "King-of-the-hill history",
+        "operationId": "getKingsHistory",
+        "responses": { "200": { "description": "Past kings" } }
+      }
+    },
+    "/season": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Current season state",
+        "operationId": "getSeason",
+        "responses": { "200": { "description": "Season metadata and standings" } }
+      }
+    },
+    "/referrals/leaderboard": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Referral leaderboard",
+        "operationId": "getReferralLeaderboard",
+        "responses": { "200": { "description": "Top referrers" } }
+      }
+    },
+    "/tier/{address}": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Tier for an address",
+        "operationId": "getTier",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Tier and progress" } }
+      }
+    },
+    "/rewards/{address}": {
+      "get": {
+        "tags": ["Leaderboards"],
+        "summary": "Rewards earned by an address",
+        "description": "Read-only. Rewards are granted automatically by the indexer as they are earned — there is no claim step.",
+        "operationId": "getRewards",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Rewards ledger" } }
+      }
+    },
+    "/distributor/stats": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Distributor summary statistics",
+        "operationId": "getDistributorStats",
+        "responses": { "200": { "description": "Totals distributed, round count" } }
+      }
+    },
+    "/distributor/pot": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Current undistributed pot",
+        "description": "BNB accumulated from the 0.3% leaderboard fee stream awaiting the next round.",
+        "operationId": "getPot",
+        "responses": { "200": { "description": "Pot size" } }
+      }
+    },
+    "/distributor/shares": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Current share allocation",
+        "operationId": "getShares",
+        "responses": { "200": { "description": "Per-address shares of the next round" } }
+      }
+    },
+    "/distributor/rounds": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Public payout ledger",
+        "description": "Historical distribution rounds. The `POST` method on this same path records a round and is API-key gated for the internal round-runner.",
+        "operationId": "listRounds",
+        "responses": { "200": { "description": "Rounds, newest first" } }
+      }
+    },
+    "/distributor/rounds/{id}": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Single round detail",
+        "operationId": "getRound",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Round detail" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/distributor/payouts/{address}": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Payouts received by an address",
+        "operationId": "getAddressPayouts",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Payout receipts" } }
+      }
+    },
+    "/distributor/claimable/{address}": {
+      "get": {
+        "tags": ["Distributor"],
+        "summary": "Pending amount for an address",
+        "operationId": "getClaimable",
+        "parameters": [
+          { "name": "address", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Pending payout" } }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "RateLimited": {
+        "description": "Per-IP rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Too many requests" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      },
+      "CreatorInfo": {
+        "type": "object",
+        "description": "Public profile stub attached to tokens, trades and holders.",
+        "properties": {
+          "address": { "type": "string" },
+          "username": { "type": "string", "nullable": true },
+          "avatar": { "type": "string", "nullable": true }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "description": "Full token record. Amount fields are decimal strings to preserve 18-decimal precision.",
+        "properties": {
+          "id": { "type": "integer" },
+          "tokenAddress": { "type": "string" },
+          "tokenName": { "type": "string" },
+          "tokenSymbol": { "type": "string" },
+          "tokenDescription": { "type": "string", "nullable": true },
+          "imageStyle": { "type": "string", "nullable": true },
+          "tokenImage": { "type": "string", "nullable": true },
+          "tokenBanner": { "type": "string", "nullable": true },
+          "creatorAddress": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/CreatorInfo" },
+          "network": { "type": "string", "example": "bsc" },
+          "marketcap": { "type": "string", "description": "USD market cap", "example": "4472.899483094470000000" },
+          "price": { "type": "string", "description": "Token price in USD" },
+          "ethPrice": { "type": "string", "description": "BNB price in USD at last update" },
+          "volume": { "type": "string" },
+          "score": { "type": "string" },
+          "virtualEthAmount": { "type": "string", "description": "Bonding-curve virtual BNB reserve" },
+          "virtualTokenAmount": { "type": "string", "description": "Bonding-curve virtual token reserve" },
+          "pairAddress": {
+            "type": "string",
+            "nullable": true,
+            "description": "PancakeSwap pair address. `null` while the token is still on the bonding curve."
+          },
+          "poolType": { "type": "integer", "description": "1 = PancakeSwap V2, 2 = V3" },
+          "category": { "type": "string" },
+          "replies": { "type": "integer" },
+          "webLink": { "type": "string", "nullable": true },
+          "telegramLink": { "type": "string", "nullable": true },
+          "twitterLink": { "type": "string", "nullable": true },
+          "launchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Graduation timestamp. `null` means the token has not graduated."
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "creationTime": { "type": "string", "format": "date-time" },
+          "liquidity": { "type": "string", "nullable": true },
+          "progress": {
+            "type": "number",
+            "nullable": true,
+            "description": "Graduation progress toward the $30,000 target, 0-100"
+          },
+          "priceChange": { "type": "number", "nullable": true },
+          "price15m": { "type": "number", "description": "Omitted when unavailable" },
+          "priceChange15m": { "type": "number", "description": "Omitted when unavailable" }
+        }
+      },
+      "Trade": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "tokenName": { "type": "string" },
+          "tokenSymbol": { "type": "string" },
+          "tokenAddress": { "type": "string" },
+          "tokenImage": { "type": "string", "nullable": true },
+          "swapperAddress": { "type": "string" },
+          "swapperUsername": { "type": "string", "nullable": true },
+          "swapperAvatar": { "type": "string", "nullable": true },
+          "type": { "type": "string", "enum": ["buy", "sell"] },
+          "ethAmount": { "type": "string", "description": "BNB amount, decimal string" },
+          "tokenAmount": { "type": "string" },
+          "network": { "type": "string" },
+          "date": { "type": "integer", "format": "int64", "description": "UNIX seconds" },
+          "txHash": { "type": "string" },
+          "tokenPrice": { "type": "string" },
+          "ethPrice": { "type": "string" }
+        }
+      },
+      "Holder": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "tokenAddress": { "type": "string" },
+          "holderAddress": { "type": "string" },
+          "tokenAmount": { "type": "string" },
+          "tokenName": { "type": "string" },
+          "tokenSymbol": { "type": "string" },
+          "tokenImage": { "type": "string", "nullable": true },
+          "marketcap": { "type": "string" },
+          "network": { "type": "string" },
+          "creatorAddress": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/CreatorInfo" }
+        }
+      },
+      "TokenDetail": {
+        "type": "object",
+        "properties": {
+          "tokenDetails": { "$ref": "#/components/schemas/Token" },
+          "trades": { "type": "array", "items": { "$ref": "#/components/schemas/Trade" } },
+          "tradesCount": { "type": "integer" },
+          "holdersDetails": { "type": "array", "items": { "$ref": "#/components/schemas/Holder" } },
+          "fifteenMinPrice": { "type": "string", "nullable": true },
+          "oneDayLiquidity": { "type": "string", "nullable": true },
+          "curveHolding": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bonding curve's own balance in whole tokens. `null` means UNKNOWN (chain read failed) — never render as 0."
+          }
+        }
+      },
+      "Candle": {
+        "type": "object",
+        "properties": {
+          "time": { "type": "integer", "format": "int64", "description": "Candle open time, UNIX seconds" },
+          "open": { "type": "number" },
+          "high": { "type": "number" },
+          "low": { "type": "number" },
+          "close": { "type": "number" },
+          "volume": { "type": "number" }
+        }
+      },
+      "DiscoverToken": {
+        "type": "object",
+        "properties": {
+          "tokenAddress": { "type": "string" },
+          "name": { "type": "string" },
+          "symbol": { "type": "string" },
+          "image": { "type": "string", "nullable": true },
+          "network": { "type": "string" },
+          "creatorAddress": { "type": "string", "nullable": true },
+          "marketcap": { "type": "number", "description": "USD" },
+          "priceUsd": { "type": "number" },
+          "createdAt": { "type": "integer", "format": "int64", "description": "UNIX seconds" },
+          "launched": { "type": "boolean", "description": "true once graduated to a DEX pair" },
+          "volume24h": { "type": "number" },
+          "buys24h": { "type": "integer" },
+          "sells24h": { "type": "integer" },
+          "holders": { "type": "integer" },
+          "priceChange24h": { "type": "number" },
+          "graduationPct": { "type": "number", "description": "Progress toward the $30,000 graduation target, 0-100" }
+        }
+      },
+      "TokenAnalytics": {
+        "type": "object",
+        "properties": {
+          "tokenAddress": { "type": "string" },
+          "network": { "type": "string" },
+          "holderCount": { "type": "integer" },
+          "top10Pct": { "type": "number", "description": "Share of supply held by the top 10 holders" },
+          "creatorPct": { "type": "number" },
+          "buys": { "type": "integer" },
+          "sells": { "type": "integer" },
+          "volumeUsd": { "type": "number" },
+          "graduationPct": { "type": "number" },
+          "launched": { "type": "boolean" },
+          "bundleBuyers": { "type": "integer", "description": "Addresses that bought in the launch block" },
+          "bundleFlag": { "type": "boolean" }
+        }
+      },
+      "TopTrader": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" },
+          "username": { "type": "string", "nullable": true },
+          "avatar": { "type": "string", "nullable": true },
+          "realizedPnlUsd": { "type": "number" },
+          "unrealizedPnlUsd": { "type": "number" },
+          "totalPnlUsd": { "type": "number" },
+          "volumeUsd": { "type": "number" },
+          "isCreator": { "type": "boolean" }
+        }
+      },
+      "WalletStats": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" },
+          "username": { "type": "string", "nullable": true },
+          "avatar": { "type": "string", "nullable": true },
+          "volumeUsd": { "type": "number" },
+          "realizedPnlUsd": { "type": "number" },
+          "unrealizedPnlUsd": { "type": "number" },
+          "totalPnlUsd": { "type": "number" },
+          "roiPct": { "type": "number" },
+          "winRate": { "type": "number", "description": "Share of traded tokens that are net profitable, 0-1" },
+          "tokensTraded": { "type": "integer" },
+          "tradeCount": { "type": "integer" },
+          "holdingValueUsd": { "type": "number" }
+        }
+      }
+    }
+  }
+}
