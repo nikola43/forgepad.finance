@@ -1,0 +1,16 @@
+# The repository root ignores `models/` (the ML model directory). That pattern
+# also matches this package's `src/fyuz/models/` module, which would silently
+# drop it from git *and* from every built wheel — hatchling honours VCS ignores.
+# Re-include it explicitly.
+!src/fyuz/models/
+
+# Python build & tooling artefacts
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.venv/

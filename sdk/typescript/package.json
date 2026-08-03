@@ -1,0 +1,51 @@
+{
+  "name": "@fyuz/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for the Fyuz public REST API — bonding-curve token market data on BNB Smart Chain.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "node -e \"const fs=require('node:fs');for(const d of ['dist','build'])fs.rmSync(d,{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test \"build/test/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "keywords": [
+    "fyuz",
+    "bsc",
+    "bnb",
+    "bonding-curve",
+    "launchpad",
+    "memecoin",
+    "market-data",
+    "sdk"
+  ],
+  "homepage": "https://fyuz.fun",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

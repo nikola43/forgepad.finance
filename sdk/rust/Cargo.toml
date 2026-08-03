@@ -1,0 +1,42 @@
+[package]
+name = "fyuz-sdk"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Async Rust client for the Fyuz public REST API — bonding-curve token market data on BNB Smart Chain."
+documentation = "https://docs.rs/fyuz-sdk"
+homepage = "https://fyuz.fun"
+repository = "https://github.com/DeusData/fyuz"
+license = "MIT"
+readme = "README.md"
+keywords = ["fyuz", "bsc", "bonding-curve", "api-client", "defi"]
+categories = ["api-bindings", "asynchronous"]
+
+[lib]
+name = "fyuz"
+path = "src/lib.rs"
+
+[dependencies]
+# Transport. rustls (not native-tls) so the crate builds without OpenSSL headers;
+# `json` for the one POST body this API takes, `query` for query-string encoding.
+# `http2` and `system-proxy` keep behaviour on par with reqwest's defaults for
+# users behind a corporate proxy, without pulling in native-tls or charset.
+reqwest = { version = "0.13.2", default-features = false, features = [
+    "rustls",
+    "json",
+    "query",
+    "http2",
+    "system-proxy",
+] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+# Only `time` is needed in the library itself: retry back-off sleeps.
+tokio = { version = "1.50", default-features = false, features = ["time"] }
+
+[dev-dependencies]
+# The test suite runs a stub HTTP server on a plain TcpListener — no wiremock.
+tokio = { version = "1.50", features = ["macros", "rt-multi-thread", "net", "io-util", "time"] }
+
+[package.metadata.docs.rs]
+all-features = true

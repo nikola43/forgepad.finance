@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fyuz-sdk"
+dynamic = ["version"]
+description = "Typed, dependency-free Python client for the Fyuz public API (bonding-curve launchpad on BNB Smart Chain)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Fyuz" }]
+keywords = ["fyuz", "bnb", "bsc", "bonding-curve", "launchpad", "defi", "pancakeswap"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://fyuz.fun"
+API = "https://api.fyuz.fun"
+
+[project.optional-dependencies]
+dev = ["mypy>=1.8", "ruff>=0.4"]
+
+[tool.hatch.version]
+path = "src/fyuz/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fyuz"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/README.md", "/pyproject.toml"]
+
+[tool.mypy]
+# No `python_version` pin: current mypy releases refuse targets below 3.10,
+# while the package itself still supports 3.9 (see `requires-python`).
+strict = true
+warn_unreachable = true
+files = ["src/fyuz"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "D"]
+# The UP0xx rules below would rewrite typing.Optional/List/Dict into 3.10+
+# syntax. The package supports 3.9, where those forms break any runtime
+# annotation introspection, so they stay. D107 is off because __init__
+# arguments are documented on the class, Google-style.
+ignore = ["UP006", "UP007", "UP035", "UP045", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]

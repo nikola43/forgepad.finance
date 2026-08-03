@@ -1,0 +1,8 @@
+/target
+Cargo.lock
+
+# The repository root ignores `models/` (the ML model directory). That pattern
+# also matches this crate's `src/models/` module, which would silently drop every
+# response type from git — a fresh clone then fails with `E0583: file not found
+# for module models`. Re-include it explicitly.
+!src/models/
