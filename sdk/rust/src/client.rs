@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 
 use crate::api::distributor::Distributor;
 use crate::error::{message_from_body, truncate, Error, Result};
+use crate::trade::{TradeApi, TradeState};
 
 /// Production base URL, used unless
 /// [`FyuzClientBuilder::base_url`] overrides it.
@@ -63,6 +64,13 @@ struct Inner {
     /// Jitter source. A tiny xorshift keeps `rand` out of the dependency list;
     /// nothing here is security sensitive.
     rng: AtomicU64,
+    /// JSON-RPC override for the trading layer. `None` falls back to whatever
+    /// `GET /config` publishes for the chain.
+    rpc_url: Option<String>,
+    /// Per-call RPC timeout. `None` uses [`DEFAULT_RPC_TIMEOUT`].
+    rpc_timeout: Option<Duration>,
+    /// Memoised `/config` and the per-chain RPC clients.
+    trade_state: TradeState,
 }
 
 impl FyuzClient {
@@ -120,6 +128,42 @@ impl FyuzClient {
     /// ```
     pub fn distributor(&self) -> Distributor<'_> {
         Distributor::new(self)
+    }
+
+    /// Bonding-curve trading: quotes, and unsigned buy/sell/approve transactions.
+    ///
+    /// Builds transactions only — it never handles a key. See [`TradeApi`].
+    ///
+    /// ```no_run
+    /// # async fn demo() -> Result<(), fyuz::Error> {
+    /// use fyuz::{parse_units, BuyParams};
+    ///
+    /// let client = fyuz::FyuzClient::new()?;
+    /// let built = client
+    ///     .trade()
+    ///     .build_buy(
+    ///         &BuyParams::new("0x0000000000000000000000000000000000000001", parse_units("0.5", 18)?)
+    ///             .slippage_bps(100),
+    ///     )
+    ///     .await?;
+    /// println!("{}", built.transaction.data);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn trade(&self) -> TradeApi<'_> {
+        TradeApi::new(self)
+    }
+
+    pub(crate) fn rpc_url(&self) -> Option<&str> {
+        self.inner.rpc_url.as_deref()
+    }
+
+    pub(crate) fn rpc_timeout(&self) -> Option<Duration> {
+        self.inner.rpc_timeout
+    }
+
+    pub(crate) fn trade_state(&self) -> &TradeState {
+        &self.inner.trade_state
     }
 
     pub(crate) async fn get_json<T: DeserializeOwned>(
@@ -258,10 +302,7 @@ impl FyuzClient {
         };
 
         Err(if status.is_server_error() {
-            Failure::Retryable {
-                error,
-                retry_after,
-            }
+            Failure::Retryable { error, retry_after }
         } else {
             Failure::Fatal(error)
         })
@@ -387,6 +428,8 @@ pub struct FyuzClientBuilder {
     max_retries: u32,
     retry_base_delay: Duration,
     max_retry_delay: Duration,
+    rpc_url: Option<String>,
+    rpc_timeout: Option<Duration>,
 }
 
 impl FyuzClientBuilder {
@@ -400,6 +443,8 @@ impl FyuzClientBuilder {
             max_retries: DEFAULT_MAX_RETRIES,
             retry_base_delay: DEFAULT_RETRY_BASE_DELAY,
             max_retry_delay: DEFAULT_MAX_RETRY_DELAY,
+            rpc_url: None,
+            rpc_timeout: None,
         }
     }
 
@@ -423,7 +468,10 @@ impl FyuzClientBuilder {
         if !matches!(parsed.scheme(), "http" | "https") {
             return Err(Error::InvalidBaseUrl {
                 url: base_url.to_string(),
-                message: format!("unsupported scheme {:?}, expected http or https", parsed.scheme()),
+                message: format!(
+                    "unsupported scheme {:?}, expected http or https",
+                    parsed.scheme()
+                ),
             });
         }
 
@@ -484,6 +532,24 @@ impl FyuzClientBuilder {
         self
     }
 
+    /// Point the trading layer at a JSON-RPC endpoint of your choosing.
+    ///
+    /// Without this, [`FyuzClient::trade`] uses whatever `GET /config` publishes
+    /// for the chain. That endpoint belongs to the API operator, is shared by
+    /// every caller, and can change without notice — so set your own for
+    /// anything in production.
+    pub fn rpc_url(mut self, url: impl Into<String>) -> Self {
+        self.rpc_url = Some(url.into());
+        self
+    }
+
+    /// Per-call timeout for JSON-RPC requests. Defaults to
+    /// [`DEFAULT_RPC_TIMEOUT`](crate::DEFAULT_RPC_TIMEOUT).
+    pub fn rpc_timeout(mut self, timeout: Duration) -> Self {
+        self.rpc_timeout = Some(timeout);
+        self
+    }
+
     /// Build the client.
     ///
     /// Fails only if the TLS backend or DNS resolver cannot be initialised.
@@ -508,6 +574,9 @@ impl FyuzClientBuilder {
                 retry_base_delay: self.retry_base_delay,
                 max_retry_delay: self.max_retry_delay,
                 rng: AtomicU64::new(seed),
+                rpc_url: self.rpc_url,
+                rpc_timeout: self.rpc_timeout,
+                trade_state: TradeState::default(),
             }),
         })
     }
@@ -583,20 +652,28 @@ mod tests {
         // Documented limitation of URL semantics, pinned so it cannot drift into
         // something worse: `..` loses its own segment, it does not walk up and
         // pick a different endpoint the way an unencoded `/` used to.
-        let url = build_url(&base("https://api.fyuz.fun"), &format!("/wallet/{}", seg("..")));
+        let url = build_url(
+            &base("https://api.fyuz.fun"),
+            &format!("/wallet/{}", seg("..")),
+        );
         assert_eq!(url.path(), "/");
         assert_eq!(seg(".."), "..");
     }
 
     #[test]
     fn build_url_does_not_escape_an_already_escaped_segment_twice() {
-        let url = build_url(&base("https://api.fyuz.fun"), &format!("/wallet/{}", seg("a b")));
+        let url = build_url(
+            &base("https://api.fyuz.fun"),
+            &format!("/wallet/{}", seg("a b")),
+        );
         assert_eq!(url.as_str(), "https://api.fyuz.fun/wallet/a%20b");
     }
 
     #[test]
     fn rejects_non_http_base_urls() {
-        let err = FyuzClientBuilder::new().base_url("ftp://example.com").unwrap_err();
+        let err = FyuzClientBuilder::new()
+            .base_url("ftp://example.com")
+            .unwrap_err();
         assert!(matches!(err, Error::InvalidBaseUrl { .. }));
         let err = FyuzClientBuilder::new().base_url("not a url").unwrap_err();
         assert!(matches!(err, Error::InvalidBaseUrl { .. }));
@@ -608,7 +685,10 @@ mod tests {
         headers.insert(RETRY_AFTER, "3".parse().unwrap());
         assert_eq!(parse_retry_after(&headers), Some(Duration::from_secs(3)));
 
-        headers.insert(RETRY_AFTER, "Wed, 21 Oct 2026 07:28:00 GMT".parse().unwrap());
+        headers.insert(
+            RETRY_AFTER,
+            "Wed, 21 Oct 2026 07:28:00 GMT".parse().unwrap(),
+        );
         assert_eq!(parse_retry_after(&headers), None);
     }
 

@@ -175,7 +175,7 @@ impl FyuzClient {
             &format!("/tokens/{}/{}", seg(network), seg(token_address)),
             params.to_query(),
         )
-            .await
+        .await
     }
 
     /// `GET /trades/recent` — the platform-wide trade feed.
@@ -264,7 +264,8 @@ impl FyuzClient {
     /// # }
     /// ```
     pub async fn get_chart_data(&self, params: &ChartDataParams) -> Result<Vec<Candle>> {
-        self.get_json("/trades/getChartData", params.to_query()).await
+        self.get_json("/trades/getChartData", params.to_query())
+            .await
     }
 
     /// `GET /analytics/token/{network}/{address}` — holder concentration,

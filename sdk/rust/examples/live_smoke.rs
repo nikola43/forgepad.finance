@@ -8,12 +8,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("health: {:?}", c.health().await?);
 
     let d = c
-        .discover(&DiscoverParams { limit: Some(2), ..Default::default() })
+        .discover(&DiscoverParams {
+            limit: Some(2),
+            ..Default::default()
+        })
         .await?;
-    println!("discover: {} rows; first: {} mcap {}", d.len(), d[0].symbol, d[0].marketcap);
+    println!(
+        "discover: {} rows; first: {} mcap {}",
+        d.len(),
+        d[0].symbol,
+        d[0].marketcap
+    );
 
     let t = c
-        .list_tokens(&ListTokensParams { page_size: Some(2), ..Default::default() })
+        .list_tokens(&ListTokensParams {
+            page_size: Some(2),
+            ..Default::default()
+        })
         .await?;
     println!(
         "listTokens: count={} marketcap={:?} (String)",

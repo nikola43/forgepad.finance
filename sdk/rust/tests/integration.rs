@@ -116,7 +116,11 @@ async fn retries_a_429_then_succeeds() {
     let health = client.health().await.unwrap();
 
     assert_eq!(health.status, "ok");
-    assert_eq!(server.request_count(), 2, "the 429 should have been retried");
+    assert_eq!(
+        server.request_count(),
+        2,
+        "the 429 should have been retried"
+    );
 }
 
 #[tokio::test]
@@ -179,7 +183,11 @@ async fn surfaces_retry_after_when_retries_are_disabled() {
 
 #[tokio::test]
 async fn parses_the_error_envelope_and_does_not_retry_a_404() {
-    let server = StubServer::start(vec![StubResponse::new(404, r#"{"error":"User not found"}"#)]).await;
+    let server = StubServer::start(vec![StubResponse::new(
+        404,
+        r#"{"error":"User not found"}"#,
+    )])
+    .await;
     let client = client_for(&server);
 
     let error = client
@@ -322,11 +330,18 @@ async fn walks_every_page_of_the_token_list() {
     assert_eq!(symbols, vec!["AAA", "BBB", "CCC", "DDD", "EEE"]);
     assert_eq!(pager.total_count(), Some(5));
     assert_eq!(pager.fetched_count(), 5);
-    assert_eq!(server.request_count(), 3, "should stop once tokenCount is covered");
+    assert_eq!(
+        server.request_count(),
+        3,
+        "should stop once tokenCount is covered"
+    );
 
     for (index, expected_page) in [1, 2, 3].iter().enumerate() {
         let query = server.request(index).query().to_string();
-        assert!(query.contains(&format!("pageNumber={expected_page}")), "{query}");
+        assert!(
+            query.contains(&format!("pageNumber={expected_page}")),
+            "{query}"
+        );
         assert!(query.contains("pageSize=2"), "{query}");
     }
 }
@@ -335,8 +350,10 @@ async fn walks_every_page_of_the_token_list() {
 async fn wei_fields_stay_exact_decimal_strings() {
     let total = "987654321098765432109876543210";
     let largest = "12345678901234567890";
-    let server =
-        StubServer::start(vec![StubResponse::ok(fixtures::payout_stats(total, largest))]).await;
+    let server = StubServer::start(vec![StubResponse::ok(fixtures::payout_stats(
+        total, largest,
+    ))])
+    .await;
     let client = client_for(&server);
 
     let stats = client.distributor().get_stats().await.unwrap();
@@ -462,7 +479,11 @@ async fn a_hostile_retry_after_cannot_outlast_the_configured_ceiling() {
     let elapsed = started.elapsed();
 
     assert_eq!(health.status, "ok");
-    assert_eq!(server.request_count(), 2, "the 429 should have been retried");
+    assert_eq!(
+        server.request_count(),
+        2,
+        "the 429 should have been retried"
+    );
     assert!(
         elapsed < Duration::from_secs(5),
         "Retry-After outran max_retry_delay: slept {elapsed:?}"

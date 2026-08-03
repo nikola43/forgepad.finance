@@ -76,6 +76,52 @@ pub enum Error {
         /// Why it was rejected.
         message: String,
     },
+
+    /// An argument failed validation before any request was sent.
+    ///
+    /// Raised by the trading layer for a malformed address, an amount that is
+    /// not a whole number of wei, or a build called without slippage protection.
+    #[error("{message}")]
+    InvalidArgument {
+        /// What was wrong, and usually what to do instead.
+        message: String,
+    },
+
+    /// The contract rejected a call.
+    ///
+    /// Raised from a simulated `eth_call`, so it costs nothing — this is the
+    /// failure you want, rather than paying gas to discover the same thing
+    /// on-chain. [`Error::is_graduated`] picks out the case where the token has
+    /// left the bonding curve.
+    #[error("{message}")]
+    ContractRevert {
+        /// Classification from `shared/test-vectors/trade-errors.json`.
+        kind: crate::revert::RevertKind,
+        /// Human-readable explanation, including what to do about it.
+        message: String,
+        /// Solidity signature, e.g. `SlippageExceeded()`, when recognised.
+        error_name: Option<String>,
+        /// The 4-byte selector, when the revert carried one.
+        selector: Option<String>,
+        /// Raw revert data, kept so an unrecognised revert is still diagnosable.
+        data: String,
+        /// Whether re-quoting and retrying could plausibly succeed.
+        retryable: bool,
+        /// The token, when this is a graduation refusal.
+        token_address: Option<String>,
+    },
+
+    /// A JSON-RPC node returned an error, or something that was not a JSON-RPC
+    /// response.
+    #[error("RPC {method} failed: {message}")]
+    Rpc {
+        /// The method that failed, e.g. `eth_call`.
+        method: String,
+        /// The node's message.
+        message: String,
+        /// JSON-RPC error code, when the node sent a well-formed error object.
+        code: Option<i64>,
+    },
 }
 
 impl Error {
@@ -97,6 +143,32 @@ impl Error {
     /// `true` when the API answered `404` — an unknown token, profile or round.
     pub fn is_not_found(&self) -> bool {
         self.status() == Some(404)
+    }
+
+    /// `true` when a trade was refused because the token left the bonding curve.
+    ///
+    /// The curve is closed once a token graduates, and every swap entrypoint
+    /// reverts. Trade its DEX pair instead.
+    pub fn is_graduated(&self) -> bool {
+        matches!(
+            self,
+            Error::ContractRevert {
+                kind: crate::revert::RevertKind::Graduated,
+                ..
+            }
+        )
+    }
+
+    /// `true` when the contract rejected the call and retrying could plausibly
+    /// help — a slippage miss or an expired deadline, not a closed curve.
+    pub fn is_retryable_revert(&self) -> bool {
+        matches!(
+            self,
+            Error::ContractRevert {
+                retryable: true,
+                ..
+            }
+        )
     }
 
     /// `true` when the request timed out rather than being answered.

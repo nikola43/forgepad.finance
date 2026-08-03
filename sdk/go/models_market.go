@@ -1,12 +1,22 @@
 package fyuz
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
 
 // Integer fields are int64 across every model regardless of whether the API
 // schema declares int32 or int64, so no conversion is ever needed when feeding
 // a value from one call into the options of another.
 
 // TradeType is the side of a trade.
+//
+// The casing is not consistent across endpoints: GET /trades/recent sends
+// "buy"/"sell", while the trades embedded in GET /tokens/{network}/{tokenAddress}
+// send "BUY"/"SELL". The value is passed through exactly as the server sent it —
+// silently rewriting it would hide the inconsistency rather than surface it — so
+// compare with TradeType.Is, not with ==.
 type TradeType string
 
 const (
@@ -15,6 +25,13 @@ const (
 	// TradeSell is a sale of tokens for BNB.
 	TradeSell TradeType = "sell"
 )
+
+// Is reports whether t is the given side, ignoring the casing the endpoint
+// happened to use. Prefer this over t == TradeBuy, which misses every trade
+// returned by GetToken.
+func (t TradeType) Is(side TradeType) bool {
+	return strings.EqualFold(string(t), string(side))
+}
 
 // Pool types returned in Token.PoolType. The API schema types the field as a
 // plain integer with no enum, so treat this set as open and always handle an
@@ -45,14 +62,50 @@ type ChainConfig struct {
 
 // ChainInfo identifies one supported chain.
 //
-// The live endpoint returns further fields (RPC URL, explorer URL, contract
-// address) that are not part of the published API schema; they are ignored
-// here rather than pinned to an undocumented shape.
+// Beyond the two documented fields, the live endpoint publishes the deployment
+// details the trading layer needs: contract address, RPC endpoint, native
+// currency and explorer. They are modelled here because TradeService reads them
+// — that is what keeps the launchpad address out of the SDK source, where a
+// contract upgrade would strand it.
 type ChainInfo struct {
 	// Name is the human-readable chain name, e.g. "BNB Smart Chain".
 	Name string `json:"name"`
 	// ChainID is the EVM chain id, e.g. 56 for BNB Smart Chain mainnet.
 	ChainID int64 `json:"chainId"`
+	// Network is the chain slug used everywhere else in the API, e.g. "bsc".
+	Network string `json:"network"`
+	// ContractAddress is the Fyuz launchpad on this chain — the To of every swap.
+	ContractAddress string `json:"contractAddress"`
+	// RPCURL is a JSON-RPC endpoint, as configured by the API operator.
+	//
+	// Treat it as a default, not an entitlement: it is shared by every caller and
+	// can change without notice. Production consumers should pass their own with
+	// WithRPCURL.
+	RPCURL string `json:"rpcUrl"`
+	// WSURL is the WebSocket sibling of RPCURL.
+	WSURL string `json:"wsUrl"`
+	// Currency is the native gas symbol, e.g. "BNB".
+	Currency string `json:"currency"`
+	// ExplorerURL is the block explorer root, e.g. "https://bscscan.com".
+	ExplorerURL string `json:"explorerUrl"`
+	// Pools lists the DEX venues a graduated token can end up on.
+	Pools []string `json:"pools"`
+	// TargetMarketCap is the USD market cap at which a token graduates.
+	TargetMarketCap float64 `json:"targetMarketCap"`
+	// TotalSupply is the number of tokens minted per launch.
+	TotalSupply float64 `json:"totalSupply"`
+	// VirtualEthAmount is the virtual native reserve a new curve starts with.
+	VirtualEthAmount float64 `json:"virtualEthAmount"`
+	// VirtualTokenAmount is the virtual token reserve a new curve starts with.
+	VirtualTokenAmount float64 `json:"virtualTokenAmount"`
+	// StartBlock is the first block the indexer reads.
+	StartBlock int64 `json:"startBlock"`
+	// ABI is the contract ABI as served.
+	//
+	// The SDK does not use it — every selector it needs is pinned in abi.go and
+	// asserted against the shared test vectors — but it is here so it can be
+	// handed to go-ethereum's abi.JSON without a second request.
+	ABI json.RawMessage `json:"abi"`
 }
 
 // CreatorInfo is the public profile stub attached to tokens, trades and

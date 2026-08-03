@@ -6,8 +6,11 @@ use super::token::Token;
 
 /// Side of a trade.
 ///
-/// Deserialisation is tolerant: a value the API adds later lands in
-/// [`TradeSide::Other`] instead of failing the whole response.
+/// Deserialisation is tolerant in two ways. A value the API adds later lands in
+/// [`TradeSide::Other`] instead of failing the whole response, and the casing is
+/// folded: `/trades/recent` sends `"buy"`/`"sell"` while the trades embedded in
+/// `/tokens/{network}/{token_address}` send `"BUY"`/`"SELL"`, and both map to
+/// [`TradeSide::Buy`] and [`TradeSide::Sell`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TradeSide {
     /// Bought the token (BNB in, tokens out).
@@ -37,8 +40,13 @@ impl std::fmt::Display for TradeSide {
 
 impl<'de> Deserialize<'de> for TradeSide {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // Matched case-insensitively: `/trades/recent` sends "buy"/"sell" while
+        // the trades embedded in `/tokens/{network}/{token_address}` send
+        // "BUY"/"SELL". Folding the case here is what lets callers match on
+        // `TradeSide::Buy` at all; anything genuinely unrecognised still keeps
+        // its exact wire text in `Other`.
         let raw = String::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
+        Ok(match raw.to_ascii_lowercase().as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
             _ => TradeSide::Other(raw),

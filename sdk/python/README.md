@@ -230,24 +230,92 @@ All four pass `None` straight through, so nullable fields stay nullable.
   break a deployed client. Collection fields are tuples (the models are frozen);
   endpoints returning a bare JSON array give you a `list`.
 
+## Trading
+
+``client.trade`` builds **unsigned** bonding-curve transactions. It never sees a private key, never
+signs and never broadcasts — that is why this package still has zero runtime dependencies.
+
+```python
+from fyuz import FyuzClient, parse_units, format_units
+
+with FyuzClient(rpc_url=os.environ["BSC_RPC_URL"]) as fyuz:
+    quote = fyuz.trade.quote_buy(token, parse_units("0.5"))
+    print(f"{format_units(quote.amount_out_wei)} tokens for {format_units(quote.value_wei)} BNB")
+
+    built = fyuz.trade.build_buy(
+        token, parse_units("0.5"),
+        slippage_bps=100,   # 1% — required, there is no default
+    )
+    w3.eth.send_transaction(built.transaction.as_dict())   # your wallet, your key
+```
+
+Selling needs an ERC-20 approval first, because the contract pulls the tokens with ``transferFrom``:
+
+```python
+if fyuz.trade.allowance(token, owner) < amount_wei:
+    w3.eth.send_transaction(fyuz.trade.build_approve(token, amount_wei=amount_wei).as_dict())
+sell = fyuz.trade.build_sell(token, amount_wei, slippage_bps=150)
+```
+
+``transaction.value`` already includes ``getFirstBuyFee(token)``, which is charged on top of the swap
+amount. A token that has graduated raises ``FyuzTokenGraduatedError`` rather than building a
+transaction that would revert. Contract address, chain id and RPC all come from ``GET /config`` —
+nothing is hardcoded — but pass your own ``rpc_url`` in production, since the published one is shared
+by every caller.
+
 ## Development
 
 ```bash
 cd sdk/python
 
-# Tests — a local stub HTTP server, never the network
-python -m unittest discover -s tests
+# Tests — a local stub HTTP server, never the network.
+# tests/ joins src/ on the path: the suite imports its stub server and payload
+# fixtures as top-level modules.
+PYTHONPATH=src:tests python -m unittest discover -s tests -t tests
 
 # Type check (strict) and lint
 pip install -e ".[dev]"
 mypy
-ruff check src tests
-ruff format --check src tests
+ruff check src tests examples
+ruff format --check src tests examples
 
 # Build the distributions
 pip install build
 python -m build
 ```
+
+`tests/test_conformance.py` additionally reads [`../shared/test-vectors`](../shared) from disk — the
+same fixtures drive the TypeScript, Go and Rust suites, so a change to the wire contract fails all
+four at once.
+
+To run every SDK at once, from the repository root:
+
+```bash
+sdk/scripts/test-all.sh
+```
+
+## Examples
+
+Runnable programs in [`examples/`](examples):
+
+| Example | What it shows |
+|---|---|
+| [`01_quickstart.py`](examples/01_quickstart.py) | Health, chain config, the trending feed, king of the hill |
+| [`02_graduation_watch.py`](examples/02_graduation_watch.py) | Tokens closest to the $30k graduation threshold |
+| [`03_token_deep_dive.py`](examples/03_token_deep_dive.py) | One token: detail, holders, trades, hourly candles |
+| [`04_export_tokens.py`](examples/04_export_tokens.py) | Auto-paginate every token to CSV, summing with `Decimal` |
+| [`05_resilient_polling.py`](examples/05_resilient_polling.py) | Incremental trade polling, retry tuning, error classification |
+| [`06_trade.py`](examples/06_trade.py) | Quote a buy and a sell, build the unsigned transactions, handle the approval |
+
+```bash
+PYTHONPATH=src python examples/01_quickstart.py
+PYTHONPATH=src python examples/03_token_deep_dive.py 0x42322852a918f94186b7dfda2e0e3f4ad3528480
+PYTHONPATH=src python examples/04_export_tokens.py dog > tokens.csv
+```
+
+(`PYTHONPATH=src` is only for running against a checkout; after `pip install fyuz-sdk` they run as-is.)
+
+The same five exist in the TypeScript, Go and Rust clients — see [`../README.md`](../README.md).
 
 ## License
 

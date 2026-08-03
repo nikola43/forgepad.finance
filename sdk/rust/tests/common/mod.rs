@@ -199,9 +199,11 @@ async fn serve(
 
     // 418 rather than 500 when the queue runs dry: a 4xx is never retried, so an
     // over-fetching test fails immediately instead of hanging in backoff.
-    let response = responses.lock().unwrap().pop_front().unwrap_or_else(|| {
-        StubResponse::new(418, r#"{"error":"stub: no response queued"}"#)
-    });
+    let response = responses
+        .lock()
+        .unwrap()
+        .pop_front()
+        .unwrap_or_else(|| StubResponse::new(418, r#"{"error":"stub: no response queued"}"#));
 
     let mut head = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",

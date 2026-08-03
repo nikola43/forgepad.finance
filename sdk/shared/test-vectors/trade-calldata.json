@@ -1,0 +1,145 @@
+{
+  "description": "Golden ABI calldata. Every SDK encodes these calls by hand — none of the four has an ABI library, and the arguments here are all static 32-byte words, so encoding is a selector followed by left-padded values. Each client asserts it produces these exact hex strings. Generated with `cast calldata`, so the fixture is foundry's output rather than anything hand-computed.",
+  "generated_with": "forge/cast, checked against the ABI served by GET /config on 2026-08-03",
+  "contract": {
+    "note": "Never hardcode this. GET /config carries contractAddress, chainId and rpcUrl per chain, so a contract upgrade or a new chain needs no SDK release. The address below is only here to make the fixtures reproducible.",
+    "bsc": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
+    "chainId": 56
+  },
+  "selectors": {
+    "swapExactETHForTokens(address,uint256,uint256,uint256)": "0x6bf05b01",
+    "swapETHForExactTokens(address,uint256,uint256,uint256)": "0x0541a872",
+    "swapExactTokensForETH(address,uint256,uint256,uint256)": "0xeacad12a",
+    "getSwapOutput(address,uint256,bool)": "0x908235cc",
+    "getFirstBuyFee(address)": "0xb3cd4902",
+    "getMaxSellableETH(address)": "0x82bfb367",
+    "tokenPools(address)": "0xc3d2c3c1",
+    "approve(address,uint256)": "0x095ea7b3",
+    "allowance(address,address)": "0xdd62ed3e",
+    "balanceOf(address)": "0x70a08231"
+  },
+  "fixture_args": {
+    "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+    "spender": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
+    "owner": "0x000000000000000000000000000000000000dEaD",
+    "deadline": 1767322445,
+    "uint256_max": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+  },
+  "cases": [
+    {
+      "name": "buy_exact_bnb",
+      "builder": "buildBuy",
+      "function": "swapExactETHForTokens(address,uint256,uint256,uint256)",
+      "args": {
+        "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+        "buyAmount": "500000000000000000",
+        "minAmountOut": "12345678901234567890123",
+        "deadline": 1767322445
+      },
+      "calldata": "0x6bf05b0100000000000000000000000042322852a918f94186b7dfda2e0e3f4ad352848000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000029d42b64e76714244cb000000000000000000000000000000000000000000000000000000006957334d",
+      "note": "msg.value must be buyAmount + getFirstBuyFee(token), not buyAmount. The contract refunds any excess, but sending less reverts with InsufficientEthValue."
+    },
+    {
+      "name": "buy_exact_tokens",
+      "builder": "buildBuyExactTokens",
+      "function": "swapETHForExactTokens(address,uint256,uint256,uint256)",
+      "args": {
+        "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+        "buyAmount": "1000000000000000000000000",
+        "maxAmountIn": "600000000000000000",
+        "deadline": 1767322445
+      },
+      "calldata": "0x0541a87200000000000000000000000042322852a918f94186b7dfda2e0e3f4ad352848000000000000000000000000000000000000000000000d3c21bcecceda10000000000000000000000000000000000000000000000000000000853a0d2313c0000000000000000000000000000000000000000000000000000000000006957334d",
+      "note": "buyAmount is the exact token amount wanted; maxAmountIn caps the BNB spent. Slippage protection runs the other way around from buy_exact_bnb."
+    },
+    {
+      "name": "sell_exact_tokens",
+      "builder": "buildSell",
+      "function": "swapExactTokensForETH(address,uint256,uint256,uint256)",
+      "args": {
+        "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+        "sellAmount": "1234567890123456789012345",
+        "minAmountOut": "98765432109876543",
+        "deadline": 1767322445
+      },
+      "calldata": "0xeacad12a00000000000000000000000042322852a918f94186b7dfda2e0e3f4ad352848000000000000000000000000000000000000000000001056e0f36a6443de2df79000000000000000000000000000000000000000000000000015ee2a320ff453f000000000000000000000000000000000000000000000000000000006957334d",
+      "note": "Not payable. The contract pulls the tokens with safeTransferFrom, so the seller must approve the contract first or this reverts inside the ERC-20."
+    },
+    {
+      "name": "approve_unlimited",
+      "builder": "buildApprove",
+      "function": "approve(address,uint256)",
+      "args": {
+        "spender": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "calldata": "0x095ea7b300000000000000000000000033a98bef6496684a8dac83734d9ceb0cefc7019cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "note": "uint256 max. Convenient, but it leaves a standing allowance against an upgradeable contract — approve_exact is the safer default and is what the SDKs build unless asked otherwise."
+    },
+    {
+      "name": "approve_exact",
+      "builder": "buildApprove",
+      "function": "approve(address,uint256)",
+      "args": {
+        "spender": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
+        "amount": "1234567890123456789012345"
+      },
+      "calldata": "0x095ea7b300000000000000000000000033a98bef6496684a8dac83734d9ceb0cefc7019c00000000000000000000000000000000000000000001056e0f36a6443de2df79"
+    },
+    {
+      "name": "quote_buy",
+      "builder": "quoteBuy",
+      "function": "getSwapOutput(address,uint256,bool)",
+      "args": {
+        "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+        "amountIn": "500000000000000000",
+        "isETHInput": true
+      },
+      "calldata": "0x908235cc00000000000000000000000042322852a918f94186b7dfda2e0e3f4ad352848000000000000000000000000000000000000000000000000006f05b59d3b200000000000000000000000000000000000000000000000000000000000000000001",
+      "note": "A bool encodes as a full 32-byte word: 1 for true, 0 for false."
+    },
+    {
+      "name": "quote_sell",
+      "builder": "quoteSell",
+      "function": "getSwapOutput(address,uint256,bool)",
+      "args": {
+        "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480",
+        "amountIn": "1234567890123456789012345",
+        "isETHInput": false
+      },
+      "calldata": "0x908235cc00000000000000000000000042322852a918f94186b7dfda2e0e3f4ad352848000000000000000000000000000000000000000000001056e0f36a6443de2df790000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "allowance",
+      "builder": "allowance",
+      "function": "allowance(address,address)",
+      "args": {
+        "owner": "0x000000000000000000000000000000000000dEaD",
+        "spender": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c"
+      },
+      "calldata": "0xdd62ed3e000000000000000000000000000000000000000000000000000000000000dead00000000000000000000000033a98bef6496684a8dac83734d9ceb0cefc7019c",
+      "note": "The owner here is the burn address, whose short hex makes a padding bug obvious: any encoder that pads on the wrong side produces visibly different output."
+    },
+    {
+      "name": "first_buy_fee",
+      "builder": "firstBuyFee",
+      "function": "getFirstBuyFee(address)",
+      "args": { "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480" },
+      "calldata": "0xb3cd490200000000000000000000000042322852a918f94186b7dfda2e0e3f4ad3528480"
+    },
+    {
+      "name": "token_pools",
+      "builder": "isGraduated",
+      "function": "tokenPools(address)",
+      "args": { "token": "0x42322852a918f94186b7dfda2e0e3f4ad3528480" },
+      "calldata": "0xc3d2c3c100000000000000000000000042322852a918f94186b7dfda2e0e3f4ad3528480",
+      "returns": "(uint256,uint256,uint256,uint256,address,address,uint8,bool)",
+      "note": "The eighth word is the `launched` flag. Once it is true the bonding curve is closed and every swap entrypoint reverts with AlreadyLaunched."
+    }
+  ],
+  "address_casing": {
+    "note": "Addresses are lower-cased before encoding. EIP-55 checksums are validated on input where cheap but never required, because verifying one needs keccak-256 and none of these SDKs carries a hash implementation. The encoded word is identical either way.",
+    "mixed_case_input": "0x33A98BeF6496684a8daC83734D9CEB0CEFC7019c",
+    "encoded_word": "00000000000000000000000033a98bef6496684a8dac83734d9ceb0cefc7019c"
+  }
+}

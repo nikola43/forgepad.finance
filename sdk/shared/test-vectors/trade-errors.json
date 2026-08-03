@@ -1,0 +1,139 @@
+{
+  "description": "Custom-error selectors the Fyuz contract can revert a swap with, and how each SDK must surface them. An eth_call that reverts returns the 4-byte selector as its revert data; without this table a caller sees an opaque `0xcfa6d878` and has no idea the token graduated. Selectors computed with `cast sig` from foundry/src/Fyuz.sol.",
+  "note": "These are NOT in the ABI served by GET /config — that response only carries the OpenZeppelin errors. The table is the only place the mapping exists, which is why all four SDKs read it from here.",
+  "graduated_selector": "0xcfa6d878",
+  "revertible": [
+    {
+      "selector": "0xcfa6d878",
+      "error": "AlreadyLaunched()",
+      "surfaced_as": "graduated",
+      "message": "The token graduated: the bonding curve is closed and every swap entrypoint reverts. Trade the PancakeSwap pair instead.",
+      "retryable": false
+    },
+    {
+      "selector": "0x9c8787c0",
+      "error": "PoolDoesNotExist()",
+      "surfaced_as": "no_pool",
+      "message": "No bonding curve exists for this token on this chain — check the address and the network.",
+      "retryable": false
+    },
+    {
+      "selector": "0x8199f5f3",
+      "error": "SlippageExceeded()",
+      "surfaced_as": "slippage",
+      "message": "The price moved past minAmountOut before the transaction landed. Re-quote and retry, or widen the slippage tolerance.",
+      "retryable": true
+    },
+    {
+      "selector": "0x2b32713d",
+      "error": "SwapExpired()",
+      "surfaced_as": "expired",
+      "message": "The deadline passed before the transaction was mined. Rebuild with a later deadline.",
+      "retryable": true
+    },
+    {
+      "selector": "0xe96d2afe",
+      "error": "MaxPriceImpactExceeded()",
+      "surfaced_as": "price_impact",
+      "message": "The trade would move the curve further than the contract allows. Split it into smaller trades.",
+      "retryable": false
+    },
+    {
+      "selector": "0x9bca8aec",
+      "error": "SellAmountTooLarge()",
+      "surfaced_as": "sell_too_large",
+      "message": "The sell exceeds MAX_SELL_PERCENT of the virtual token reserve. Sell less, or in several transactions.",
+      "retryable": false
+    },
+    {
+      "selector": "0x1985c735",
+      "error": "InsufficientEthValue()",
+      "surfaced_as": "insufficient_value",
+      "message": "msg.value was below buyAmount + getFirstBuyFee(token). The fee is not optional and is not deducted from buyAmount.",
+      "retryable": false
+    },
+    {
+      "selector": "0xe4455cae",
+      "error": "InsufficientTokenBalance()",
+      "surfaced_as": "insufficient_balance",
+      "message": "The wallet does not hold enough of the token to cover this sell.",
+      "retryable": false
+    },
+    {
+      "selector": "0xf8b3bb61",
+      "error": "InsufficientInput()",
+      "surfaced_as": "insufficient_input",
+      "message": "The input amount rounds down to zero output on the curve. Trade a larger amount.",
+      "retryable": false
+    },
+    {
+      "selector": "0xbb55fd27",
+      "error": "InsufficientLiquidity()",
+      "surfaced_as": "insufficient_liquidity",
+      "message": "The curve does not hold enough of the other side to fill this trade.",
+      "retryable": false
+    },
+    {
+      "selector": "0x1f2a2005",
+      "error": "ZeroAmount()",
+      "surfaced_as": "zero_amount",
+      "message": "The amount must be greater than zero.",
+      "retryable": false
+    },
+    {
+      "selector": "0x1087e109",
+      "error": "StalePriceFeed()",
+      "surfaced_as": "stale_feed",
+      "message": "The BNB/USD feed is stale or unavailable, so the contract cannot price this call.",
+      "retryable": true
+    },
+    {
+      "selector": "0xd93c0665",
+      "error": "EnforcedPause()",
+      "surfaced_as": "paused",
+      "message": "Trading is paused on the contract.",
+      "retryable": true
+    }
+  ],
+  "standard": [
+    {
+      "selector": "0x08c379a0",
+      "error": "Error(string)",
+      "note": "The classic require(msg) revert. The reason is an ABI-encoded string starting 4 bytes in: offset word, length word, then the UTF-8 bytes."
+    },
+    {
+      "selector": "0x4e487b71",
+      "error": "Panic(uint256)",
+      "note": "A compiler-inserted assertion: 0x11 is arithmetic overflow, 0x12 division by zero. Reaching one of these from a swap is a contract bug, not a caller error."
+    }
+  ],
+  "decode_cases": [
+    {
+      "name": "graduated",
+      "revert_data": "0xcfa6d878",
+      "expect": { "surfaced_as": "graduated", "error": "AlreadyLaunched()" }
+    },
+    {
+      "name": "slippage",
+      "revert_data": "0x8199f5f3",
+      "expect": { "surfaced_as": "slippage", "error": "SlippageExceeded()" }
+    },
+    {
+      "name": "require_string",
+      "revert_data": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012696e73756666696369656e742066756e64730000000000000000000000000000",
+      "expect": { "surfaced_as": "revert_string", "message": "insufficient funds" }
+    },
+    {
+      "name": "unknown_selector",
+      "revert_data": "0xdeadbeef",
+      "expect": { "surfaced_as": "unknown", "message_contains": "0xdeadbeef" },
+      "note": "An unrecognised selector is reported verbatim rather than swallowed — a future contract version will add errors this table does not know."
+    },
+    {
+      "name": "empty",
+      "revert_data": "0x",
+      "expect": { "surfaced_as": "unknown" },
+      "note": "Some RPC providers strip revert data entirely. The SDK must not crash trying to read a selector out of an empty string."
+    }
+  ]
+}

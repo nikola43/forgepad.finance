@@ -31,15 +31,25 @@ from ._http import (
     USER_AGENT,
 )
 from ._version import __version__
+from .abi import (
+    UINT256_MAX,
+    format_units,
+    normalize_address,
+    parse_amount,
+    parse_units,
+)
 from .client import FyuzClient
 from .distributor import DistributorAPI
 from .errors import (
     FyuzAPIError,
     FyuzConnectionError,
+    FyuzContractRevertError,
     FyuzDecodeError,
     FyuzError,
     FyuzNotFoundError,
     FyuzRateLimitError,
+    FyuzRPCError,
+    FyuzTokenGraduatedError,
 )
 from .helpers import from_unix, parse_datetime, to_decimal, wei_to_bnb
 from .models import (
@@ -83,6 +93,17 @@ from .models import (
     UserSummary,
     WalletStats,
 )
+from .revert import revert_error, revert_selector
+from .rpc import DEFAULT_RPC_TIMEOUT, CallResult, RPCClient
+from .trade import (
+    DEFAULT_DEADLINE_SECONDS,
+    DEFAULT_NETWORK,
+    BuiltTrade,
+    BuyQuote,
+    SellQuote,
+    TradeAPI,
+    UnsignedTransaction,
+)
 
 __all__ = [
     "__version__",
@@ -102,11 +123,32 @@ __all__ = [
     "FyuzNotFoundError",
     "FyuzConnectionError",
     "FyuzDecodeError",
+    "FyuzRPCError",
+    "FyuzContractRevertError",
+    "FyuzTokenGraduatedError",
     # helpers
     "to_decimal",
     "wei_to_bnb",
     "parse_datetime",
     "from_unix",
+    # trading
+    "TradeAPI",
+    "UnsignedTransaction",
+    "BuyQuote",
+    "SellQuote",
+    "BuiltTrade",
+    "DEFAULT_DEADLINE_SECONDS",
+    "DEFAULT_NETWORK",
+    "parse_units",
+    "format_units",
+    "parse_amount",
+    "normalize_address",
+    "UINT256_MAX",
+    "RPCClient",
+    "CallResult",
+    "DEFAULT_RPC_TIMEOUT",
+    "revert_error",
+    "revert_selector",
     # models
     "HealthStatus",
     "ChainInfo",

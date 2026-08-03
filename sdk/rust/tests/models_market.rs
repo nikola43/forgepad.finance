@@ -90,10 +90,7 @@ async fn decodes_the_market_endpoints() {
     assert_eq!(config.chains[0].name, "BNB Smart Chain");
     assert_eq!(config.chains[0].chain_id, 56);
 
-    let discover = client
-        .discover(&fyuz::DiscoverParams::new())
-        .await
-        .unwrap();
+    let discover = client.discover(&fyuz::DiscoverParams::new()).await.unwrap();
     assert_eq!(discover[0].volume24h, 4200.25);
     assert_eq!(discover[0].buys24h, 88);
     assert_eq!(discover[0].sells24h, 31);
@@ -108,7 +105,10 @@ async fn decodes_the_market_endpoints() {
     assert_eq!(detail.trades_count, 1301);
     assert_eq!(detail.token_details.token_symbol, "TEST");
     assert_eq!(detail.holders_details[0].holder_address.len(), 42);
-    assert_eq!(detail.fifteen_min_price.as_deref(), Some("0.000000000000000122"));
+    assert_eq!(
+        detail.fifteen_min_price.as_deref(),
+        Some("0.000000000000000122")
+    );
     assert_eq!(
         detail.one_day_liquidity.as_deref(),
         Some("12345.678901234567890123"),
@@ -136,7 +136,6 @@ async fn decodes_the_market_endpoints() {
     assert_eq!(recent.trades[0].tx_hash, "0xfeed");
     assert_eq!(recent.tokens[0].token_symbol, "TEST");
 }
-
 
 #[tokio::test]
 async fn decodes_the_distributor_endpoints() {
@@ -211,7 +210,10 @@ async fn decodes_the_distributor_endpoints() {
     assert_eq!(shares.from, 1749900000);
     assert_eq!(shares.to, 1750000000);
     assert_eq!(shares.total_points, 98765.5);
-    assert_eq!(shares.holders[0].share, 2147483648, "a u32 share does not fit i32");
+    assert_eq!(
+        shares.holders[0].share, 2147483648,
+        "a u32 share does not fit i32"
+    );
     assert!(shares.packed.starts_with("0x"));
 
     let rounds = client
@@ -227,7 +229,10 @@ async fn decodes_the_distributor_endpoints() {
     assert_eq!(rounds[0].holder_count, None);
     assert_eq!(rounds[0].distributed_at, None);
     assert_eq!(rounds[1].pot_wei.as_deref(), Some("1234567890123456789012"));
-    assert_eq!(rounds[1].winner_amount_wei.as_deref(), Some("123456779012345677901"));
+    assert_eq!(
+        rounds[1].winner_amount_wei.as_deref(),
+        Some("123456779012345677901")
+    );
     assert_eq!(rounds[1].holder_count, Some(2));
 
     let paid = client.distributor().get_payouts("0x2222").await.unwrap();

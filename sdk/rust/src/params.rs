@@ -284,7 +284,11 @@ impl ToQuery for ListTokensParams {
     fn to_query(&self) -> QueryPairs {
         let mut pairs = QueryPairs::new();
         push(&mut pairs, "orderType", &self.order_type);
-        push(&mut pairs, "orderFlag", &self.order_flag.map(|f| f.as_str()));
+        push(
+            &mut pairs,
+            "orderFlag",
+            &self.order_flag.map(|f| f.as_str()),
+        );
         push(&mut pairs, "searchWord", &self.search_word);
         push(&mut pairs, "network", &self.network);
         push(&mut pairs, "style", &self.style);
@@ -434,7 +438,12 @@ pub struct ChartDataParams {
 
 impl ChartDataParams {
     /// The four required arguments.
-    pub fn new(token_address: impl Into<String>, interval: impl Into<String>, from: i64, to: i64) -> Self {
+    pub fn new(
+        token_address: impl Into<String>,
+        interval: impl Into<String>,
+        from: i64,
+        to: i64,
+    ) -> Self {
         Self {
             token_address: token_address.into(),
             interval: interval.into(),

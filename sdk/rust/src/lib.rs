@@ -104,14 +104,26 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![warn(clippy::all)]
 
+mod abi;
 mod api;
 mod client;
 mod error;
 mod pagination;
 mod params;
+mod revert;
+mod rpc;
+mod trade;
 
 pub mod models;
 
+pub use abi::{
+    address_word, bool_word, decode_address_at, decode_bool_at, decode_uint256_at, encode_call,
+    format_units, normalize_address, parse_units, uint256_word, SELECTOR_ALLOWANCE,
+    SELECTOR_APPROVE, SELECTOR_BALANCE_OF, SELECTOR_GET_FIRST_BUY_FEE,
+    SELECTOR_GET_MAX_SELLABLE_ETH, SELECTOR_GET_SWAP_OUTPUT, SELECTOR_SWAP_ETH_FOR_EXACT_TOKENS,
+    SELECTOR_SWAP_EXACT_ETH_FOR_TOKENS, SELECTOR_SWAP_EXACT_TOKENS_FOR_ETH, SELECTOR_TOKEN_POOLS,
+    U256,
+};
 pub use api::distributor::Distributor;
 pub use client::{FyuzClient, FyuzClientBuilder, DEFAULT_BASE_URL, VERSION};
 pub use error::{Error, Result};
@@ -120,6 +132,12 @@ pub use params::{
     ChartDataParams, DiscoverParams, DiscoverTab, ListTokensParams, RecentTradesParams,
     RoundsParams, SharesParams, SortDirection, TokenDetailParams, TokenStatus, TokenTradesParams,
     TopHoldersParams,
+};
+pub use revert::{revert_error, revert_selector, RevertKind, SELECTOR_ALREADY_LAUNCHED};
+pub use rpc::{CallOutcome, RpcClient, DEFAULT_RPC_TIMEOUT};
+pub use trade::{
+    BuiltBuy, BuiltSell, BuyExactTokensParams, BuyParams, BuyQuote, SellParams, SellQuote,
+    TradeApi, UnsignedTransaction, DEFAULT_DEADLINE_SECONDS, DEFAULT_NETWORK,
 };
 
 // Every response model is re-exported at the crate root for convenience; they

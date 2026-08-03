@@ -36,7 +36,16 @@ tokio = { version = "1.50", default-features = false, features = ["time"] }
 
 [dev-dependencies]
 # The test suite runs a stub HTTP server on a plain TcpListener — no wiremock.
-tokio = { version = "1.50", features = ["macros", "rt-multi-thread", "net", "io-util", "time"] }
+# `signal` is only for the resilient_polling example's Ctrl-C handling. Neither
+# this list nor its features reach anyone depending on the published crate.
+tokio = { version = "1.50", features = [
+    "macros",
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "time",
+    "signal",
+] }
 
 [package.metadata.docs.rs]
 all-features = true

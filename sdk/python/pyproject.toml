@@ -69,3 +69,6 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
+# Examples carry a module docstring explaining the whole program; a docstring on
+# every local helper on top of that is noise, not documentation.
+"examples/*" = ["D103"]

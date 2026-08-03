@@ -16,6 +16,7 @@
   "files": [
     "dist",
     "src",
+    "examples",
     "README.md"
   ],
   "sideEffects": false,
@@ -26,6 +27,7 @@
     "clean": "node -e \"const fs=require('node:fs');for(const d of ['dist','build'])fs.rmSync(d,{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "build:examples": "tsc -p tsconfig.test.json",
     "pretest": "tsc -p tsconfig.test.json",
     "test": "node --test \"build/test/*.test.js\""
   },

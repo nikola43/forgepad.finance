@@ -40,6 +40,7 @@ from .models import (
     UserProfile,
     WalletStats,
 )
+from .trade import TradeAPI
 
 __all__ = ["FyuzClient"]
 
@@ -88,6 +89,9 @@ class FyuzClient:
         backoff_max: float = DEFAULT_BACKOFF_MAX,
         user_agent: Optional[str] = None,
         opener: Optional[urllib.request.OpenerDirector] = None,
+        rpc_url: Optional[str] = None,
+        rpc_timeout: Optional[float] = None,
+        rpc_headers: Optional[Dict[str, str]] = None,
     ) -> None:
         self._transport = Transport(
             base_url=base_url,
@@ -100,6 +104,20 @@ class FyuzClient:
         )
         self.distributor = DistributorAPI(self._transport)
         """Distributor endpoints, grouped: ``client.distributor.get_pot()``."""
+
+        self.trade = TradeAPI(
+            self._transport,
+            rpc_url=rpc_url,
+            rpc_timeout=rpc_timeout,
+            rpc_headers=rpc_headers,
+        )
+        """Bonding-curve trading: quotes and unsigned transactions.
+
+        Builds transactions only — it never handles a key. ``rpc_url`` defaults
+        to whatever ``GET /config`` publishes for the chain; that endpoint
+        belongs to the API operator and is shared by every caller, so pass your
+        own for anything in production.
+        """
 
     @property
     def base_url(self) -> str:

@@ -360,8 +360,13 @@ func TestContextCancellationStopsRetries(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
 	}
-	if n := atomic.LoadInt32(&calls); n > 5 {
-		t.Errorf("server calls = %d, expected the retry loop to stop at the deadline", n)
+	// Bounded against the retry budget, not against a predicted attempt count.
+	// Backoff is full jitter over [0, 20ms), so a run that keeps drawing near
+	// zero fits many attempts into the 40ms deadline — asserting a small number
+	// here fails on a fast or loaded machine while testing nothing extra. What
+	// matters is that the deadline stopped the loop rather than the budget.
+	if n := atomic.LoadInt32(&calls); n >= 100 {
+		t.Errorf("server calls = %d, expected the deadline to stop the retry loop before the budget did", n)
 	}
 }
 

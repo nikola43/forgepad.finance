@@ -172,6 +172,122 @@ export class FyuzInvalidArgumentError extends FyuzError {
   }
 }
 
+/**
+ * How a contract revert was classified. Mirrors `surfaced_as` in
+ * `shared/test-vectors/trade-errors.json`.
+ */
+export type RevertKind =
+  | 'graduated'
+  | 'no_pool'
+  | 'slippage'
+  | 'expired'
+  | 'price_impact'
+  | 'sell_too_large'
+  | 'insufficient_value'
+  | 'insufficient_balance'
+  | 'insufficient_input'
+  | 'insufficient_liquidity'
+  | 'zero_amount'
+  | 'stale_feed'
+  | 'paused'
+  | 'revert_string'
+  | 'unknown';
+
+/**
+ * The contract rejected the call.
+ *
+ * Raised from a simulated `eth_call`, so it costs nothing — this is the failure
+ * you want, rather than paying gas to discover the same thing on-chain.
+ */
+export class FyuzContractRevertError extends FyuzError {
+  /** Classification from the shared revert table. */
+  readonly kind: RevertKind;
+  /** Solidity error signature, e.g. `SlippageExceeded()`. Undefined when unrecognised. */
+  readonly errorName: string | undefined;
+  /** The 4-byte selector, when the revert carried one. */
+  readonly selector: string | undefined;
+  /** Raw revert data, kept so an unrecognised revert is still diagnosable. */
+  readonly data: string;
+  /** Whether re-quoting and retrying could plausibly succeed. */
+  readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    init: {
+      kind: RevertKind;
+      errorName?: string;
+      selector?: string;
+      data: string;
+      retryable?: boolean;
+    },
+  ) {
+    super(message);
+    this.name = 'FyuzContractRevertError';
+    this.kind = init.kind;
+    this.errorName = init.errorName;
+    this.selector = init.selector;
+    this.data = init.data;
+    this.retryable = init.retryable ?? false;
+  }
+}
+
+/**
+ * The token graduated: it left the bonding curve and trades on a DEX pair now.
+ *
+ * Every swap entrypoint reverts with `AlreadyLaunched()` for such a token, so
+ * the SDK refuses to build the transaction rather than let you pay gas to find
+ * out. Trade {@link FyuzTokenGraduatedError.pairAddress} on PancakeSwap instead.
+ */
+export class FyuzTokenGraduatedError extends FyuzContractRevertError {
+  /** The token that graduated. */
+  readonly tokenAddress: string;
+  /** Its DEX pair, when the read API knows it. */
+  readonly pairAddress: string | undefined;
+
+  constructor(init: { tokenAddress: string; pairAddress?: string; data?: string }) {
+    super(
+      `${init.tokenAddress} has graduated: the bonding curve is closed and every swap reverts. ` +
+        (init.pairAddress === undefined
+          ? 'Trade its DEX pair instead.'
+          : `Trade the DEX pair ${init.pairAddress} instead.`),
+      {
+        kind: 'graduated',
+        errorName: 'AlreadyLaunched()',
+        selector: '0xcfa6d878',
+        data: init.data ?? '0xcfa6d878',
+        retryable: false,
+      },
+    );
+    this.name = 'FyuzTokenGraduatedError';
+    this.tokenAddress = init.tokenAddress;
+    this.pairAddress = init.pairAddress;
+  }
+}
+
+/** A JSON-RPC node returned an error, or something that was not a JSON-RPC response. */
+export class FyuzRpcError extends FyuzError {
+  /** JSON-RPC error code, when the node sent a well-formed error object. */
+  readonly code: number | undefined;
+  /** The method that failed, e.g. `eth_call`. */
+  readonly method: string;
+  /**
+   * The node's `error.data`, untouched.
+   *
+   * For a reverted `eth_call` this is where the revert payload lives — but only
+   * on providers that send it there, hence keeping the raw value rather than a
+   * parsed one.
+   */
+  readonly data: unknown;
+
+  constructor(message: string, init: { method: string; code?: number; data?: unknown }) {
+    super(message);
+    this.name = 'FyuzRpcError';
+    this.method = init.method;
+    this.code = init.code;
+    this.data = init.data;
+  }
+}
+
 /** Type guard for every error this SDK raises. */
 export function isFyuzError(value: unknown): value is FyuzError {
   return value instanceof FyuzError;

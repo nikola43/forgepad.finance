@@ -64,7 +64,8 @@ impl FyuzClient {
     /// # }
     /// ```
     pub async fn get_user_leaderboard(&self, limit: Option<i64>) -> Result<Vec<LeaderboardEntry>> {
-        self.get_json("/users/leaderboard", limit_query(limit)).await
+        self.get_json("/users/leaderboard", limit_query(limit))
+            .await
     }
 
     /// `GET /users/profile/{address}` — public profile: identity, holdings,
@@ -85,8 +86,11 @@ impl FyuzClient {
     /// # }
     /// ```
     pub async fn get_user_profile(&self, address: &str) -> Result<UserProfile> {
-        self.get_json(&format!("/users/profile/{}", seg(address)), QueryPairs::new())
-            .await
+        self.get_json(
+            &format!("/users/profile/{}", seg(address)),
+            QueryPairs::new(),
+        )
+        .await
     }
 
     /// `GET /users/top/{count}` — the wallets with the most USD volume over a

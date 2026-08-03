@@ -15,6 +15,7 @@ import type { Portfolio, WalletStats } from './models/wallet.js';
 import type { Rewards, TierInfo, TopHolderEntry, UserProfile } from './models/user.js';
 import type { KingReign, LeaderboardEntry, ReferralLeaderEntry, Season } from './models/leaderboard.js';
 import { paginateTokenPages, paginateTokens } from './pagination.js';
+import { TradeClient } from './trade.js';
 import type {
   ChartDataParams,
   DiscoverParams,
@@ -60,6 +61,13 @@ export class FyuzClient {
   /** Distributor endpoints — the on-chain leaderboard fee distribution. */
   readonly distributor: DistributorClient;
 
+  /**
+   * Bonding-curve trading: quotes, and unsigned buy/sell/approve transactions.
+   *
+   * Builds transactions only — it never handles a key. See {@link TradeClient}.
+   */
+  readonly trade: TradeClient;
+
   private readonly http: HttpClient;
 
   /**
@@ -72,6 +80,10 @@ export class FyuzClient {
   constructor(options: FyuzClientOptions = {}) {
     this.http = new HttpClient(options);
     this.distributor = new DistributorClient(this.http);
+    this.trade = new TradeClient(this.http, {
+      ...options.trade,
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    });
   }
 
   /** The base URL every request is sent to. */

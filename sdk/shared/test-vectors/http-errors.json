@@ -1,0 +1,66 @@
+{
+  "description": "Status-code to error-classification map. Every SDK serves each case from a stub server and asserts the same two things: which error variant surfaces, and whether the client retried. The names below are logical; each SDK maps them to its own type (FyuzRateLimitError, ErrRateLimited, Error::RateLimited, ...).",
+  "cases": [
+    {
+      "name": "bad_request",
+      "status": 400,
+      "body": "{\"error\":\"to must be after from\"}",
+      "classification": "api",
+      "retryable": false,
+      "message": "to must be after from"
+    },
+    {
+      "name": "not_found",
+      "status": 404,
+      "body": "{\"error\":\"Token not found\"}",
+      "classification": "not_found",
+      "retryable": false,
+      "message": "Token not found"
+    },
+    {
+      "name": "rate_limited",
+      "status": 429,
+      "body": "{\"error\":\"Too many requests\"}",
+      "classification": "rate_limited",
+      "retryable": true,
+      "message": "Too many requests"
+    },
+    {
+      "name": "server_error",
+      "status": 500,
+      "body": "{\"error\":\"internal\"}",
+      "classification": "api",
+      "retryable": true,
+      "message": "internal"
+    },
+    {
+      "name": "bad_gateway",
+      "status": 502,
+      "body": "upstream is down",
+      "classification": "api",
+      "retryable": true,
+      "message": null
+    },
+    {
+      "name": "service_unavailable",
+      "status": 503,
+      "body": "{\"error\":\"maintenance\"}",
+      "classification": "api",
+      "retryable": true,
+      "message": "maintenance"
+    },
+    {
+      "name": "teapot_is_not_retryable",
+      "status": 418,
+      "body": "{\"error\":\"nope\"}",
+      "classification": "api",
+      "retryable": false,
+      "message": "nope"
+    }
+  ],
+  "notes": {
+    "retryable": "The client retries the request up to max_retries times with exponential backoff and full jitter, honouring Retry-After when present. Non-retryable statuses surface on the first response.",
+    "message": "null means the body is not JSON and no message can be parsed out of it; the SDK falls back to a status-derived message rather than inventing one.",
+    "rate_limit": "The production API allows 120 requests per minute per IP."
+  }
+}

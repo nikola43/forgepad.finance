@@ -241,6 +241,49 @@ Four, all justified:
 | `thiserror` | The `Error` enum |
 | `tokio` | `time` only, for retry backoff sleeps |
 
+## Trading
+
+[`FyuzClient::trade`] builds **unsigned** bonding-curve transactions. It never sees a private key,
+never signs and never broadcasts — you hand the result to `alloy`, `ethers-rs`, a hardware signer or
+a multisig, and that library owns the key.
+
+```rust
+let client = FyuzClient::builder().rpc_url(std::env::var("BSC_RPC_URL")?).build()?;
+
+let spend = parse_units("0.5", 18)?;
+let quote = client.trade().quote_buy("bsc", token, spend).await?;
+println!("{} tokens", format_units(quote.amount_out_wei, 18));
+
+let built = client
+    .trade()
+    .build_buy(&BuyParams::new(token, spend).slippage_bps(100))  // 1% — required
+    .await?;
+// built.transaction is { chain_id, to, data, value } — sign it with your wallet
+```
+
+Selling needs an ERC-20 approval first, because the contract pulls the tokens with `transferFrom`:
+
+```rust
+if client.trade().allowance("bsc", token, owner).await? < amount {
+    let approve = client.trade().build_approve("bsc", token, amount).await?;
+    // sign and send `approve` first
+}
+let sell = client
+    .trade()
+    .build_sell(&SellParams::new(token, amount).slippage_bps(150))
+    .await?;
+```
+
+`transaction.value` already includes `getFirstBuyFee(token)`, which is charged on top of the swap
+amount. A graduated token yields an error satisfying `Error::is_graduated()` rather than a
+transaction that would revert. Contract address, chain id and RPC all come from `GET /config` —
+nothing is hardcoded — but set `rpc_url` in production, since the published endpoint is shared by
+every caller.
+
+Amounts use [`U256`], a big-endian `[u8; 32]` with the handful of operations this crate performs.
+`u128` would not do: an ERC-20 allowance is `2^256 - 1` for every wallet that ever approved unlimited
+spending, and that is the most ordinary value there is.
+
 ## Tests
 
 ```bash
@@ -254,6 +297,39 @@ covers the happy path, 429-then-success retry, 5xx retry, "4xx is never retried"
 error-envelope parsing, decimal-string round-tripping without precision loss,
 `null` vs `0`, the flattened `RoundDetail`, query/body encoding and
 auto-pagination.
+
+`tests/conformance.rs` additionally pulls in [`../shared/test-vectors`](../shared)
+with `include_str!` — the same fixtures drive the TypeScript, Go and Python
+suites, so a change to the wire contract fails all four at once.
+
+To run every SDK at once, from the repository root:
+
+```bash
+sdk/scripts/test-all.sh
+```
+
+## Examples
+
+Runnable programs in [`examples/`](examples), compiled by `cargo build --examples`:
+
+| Example | What it shows |
+|---|---|
+| [`quickstart`](examples/quickstart.rs) | Health, chain config, the trending feed, king of the hill |
+| [`graduation_watch`](examples/graduation_watch.rs) | Tokens closest to the $30k graduation threshold |
+| [`token_deep_dive`](examples/token_deep_dive.rs) | One token: detail, holders, trades, hourly candles |
+| [`export_tokens`](examples/export_tokens.rs) | Auto-paginate every token to CSV with exact decimals |
+| [`resilient_polling`](examples/resilient_polling.rs) | Incremental trade polling, retry tuning, error matching |
+| [`trade`](examples/trade.rs) | Quote a buy and a sell, build the unsigned transactions, handle the approval |
+| [`live_smoke`](examples/live_smoke.rs) | Minimal check against the production API |
+
+```bash
+cargo run --example quickstart
+cargo run --example token_deep_dive -- 0x42322852a918f94186b7dfda2e0e3f4ad3528480
+cargo run --example export_tokens -- dog > tokens.csv
+```
+
+The same five exist in the TypeScript, Go and Python clients — see
+[`../README.md`](../README.md).
 
 ## License
 

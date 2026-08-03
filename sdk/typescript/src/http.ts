@@ -65,6 +65,17 @@ export interface FyuzClientOptions {
    * instrumentation. Defaults to the global `fetch`.
    */
   fetch?: FetchLike;
+  /**
+   * Options for {@link FyuzClient.trade} — RPC endpoint, RPC timeout, RPC headers.
+   *
+   * Typed loosely here so `http.ts` does not have to import the trade module;
+   * {@link TradeClientOptions} is the real shape.
+   */
+  trade?: {
+    rpcUrl?: string;
+    rpcTimeoutMs?: number;
+    rpcHeaders?: Record<string, string>;
+  };
 }
 
 /** Per-call overrides. Every client method takes these as its last argument. */

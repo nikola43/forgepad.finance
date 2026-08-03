@@ -31,6 +31,48 @@ export interface ChainInfo {
   name: string;
   /** EIP-155 chain id, e.g. `56` for BNB Smart Chain mainnet. */
   chainId: number;
+  /** Chain slug used everywhere else in the API, e.g. `"bsc"`. */
+  network?: string;
+  /**
+   * The Fyuz launchpad contract on this chain — the `to` of every swap.
+   *
+   * Read from here rather than hardcoded anywhere in the SDK: it is behind an
+   * upgradeable proxy, and a new chain should not need an SDK release.
+   */
+  contractAddress?: string;
+  /**
+   * A JSON-RPC endpoint for this chain, as configured by the API operator.
+   *
+   * Treat it as a default, not an entitlement — it may be rate-limited, and it
+   * is whatever the operator chose to publish. Production consumers should pass
+   * their own via `rpcUrl` on the trade client.
+   */
+  rpcUrl?: string;
+  /** WebSocket sibling of {@link ChainInfo.rpcUrl}. */
+  wsUrl?: string;
+  /** Native gas currency symbol, e.g. `"BNB"`. */
+  currency?: string;
+  /** Block explorer root, e.g. `"https://bscscan.com"`. */
+  explorerUrl?: string;
+  /** DEX venues a graduated token can end up on, e.g. `["pancakeswap:v2"]`. */
+  pools?: string[];
+  /** USD market cap at which a token graduates off the curve. */
+  targetMarketCap?: number;
+  /** Tokens minted per launch. */
+  totalSupply?: number;
+  /** Bonding-curve virtual reserves a new token starts with. */
+  virtualEthAmount?: number;
+  virtualTokenAmount?: number;
+  /** First block the indexer reads. */
+  startBlock?: number;
+  /**
+   * Contract ABI, as served.
+   *
+   * The SDK does not use it — every selector it needs is pinned in `abi.ts` and
+   * asserted against the shared test vectors — but it is here so you can hand it
+   * to ethers, viem or web3.py without a second request.
+   */
+  abi?: unknown[];
 }
 
 /** Response of `GET /config`. */

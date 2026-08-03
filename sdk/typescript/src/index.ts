@@ -19,6 +19,31 @@
 export { FyuzClient } from './client.js';
 export { DistributorClient } from './distributor.js';
 
+export { DEFAULT_DEADLINE_SECONDS, DEFAULT_NETWORK, TradeClient } from './trade.js';
+export type {
+  BuiltTrade,
+  BuyExactTokensOptions,
+  BuyOptions,
+  BuyQuote,
+  SellOptions,
+  SellQuote,
+  TradeClientOptions,
+  UnsignedTransaction,
+} from './trade.js';
+
+export {
+  UINT256_MAX,
+  formatUnits,
+  normalizeAddress,
+  parseUnits,
+  parseWeiAmount,
+} from './abi.js';
+
+export { DEFAULT_RPC_TIMEOUT_MS, RpcClient } from './rpc.js';
+export type { EthCallParams, RpcClientOptions } from './rpc.js';
+
+export { revertError, revertSelector } from './revert.js';
+
 export {
   DEFAULT_BASE_URL,
   DEFAULT_MAX_RETRIES,
@@ -31,15 +56,19 @@ export type { FetchLike, FyuzClientOptions, RequestOptions } from './http.js';
 export {
   FyuzApiError,
   FyuzConnectionError,
+  FyuzContractRevertError,
   FyuzError,
   FyuzInvalidArgumentError,
   FyuzNotFoundError,
   FyuzParseError,
   FyuzRateLimitError,
+  FyuzRpcError,
   FyuzTimeoutError,
+  FyuzTokenGraduatedError,
   isFyuzError,
   isRateLimitError,
 } from './errors.js';
+export type { RevertKind } from './errors.js';
 
 export type {
   ChartDataParams,

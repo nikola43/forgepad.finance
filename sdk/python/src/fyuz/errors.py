@@ -17,7 +17,7 @@ subclass of it.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 __all__ = [
     "FyuzError",
@@ -109,3 +109,98 @@ class FyuzConnectionError(FyuzError):
 
 class FyuzDecodeError(FyuzError):
     """The response was not the JSON shape this SDK expects."""
+
+
+class FyuzRPCError(FyuzError):
+    """A JSON-RPC node returned an error, or something that was not a JSON-RPC response.
+
+    Attributes:
+        method: The method that failed, e.g. ``"eth_call"``.
+        code: JSON-RPC error code, when the node sent a well-formed error object.
+        data: The node's ``error.data``, untouched. For a reverted ``eth_call``
+            this is where the revert payload lives — on the providers that put it
+            there, hence keeping the raw value rather than a parsed one.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        method: str,
+        code: Optional[int] = None,
+        data: Any = None,
+    ) -> None:
+        super().__init__(message)
+        self.method = method
+        self.code = code
+        self.data = data
+
+
+class FyuzContractRevertError(FyuzError):
+    """The contract rejected the call.
+
+    Raised from a simulated ``eth_call``, so it costs nothing — this is the
+    failure you want, rather than paying gas to discover the same thing on-chain.
+
+    Attributes:
+        kind: Classification from the shared revert table, e.g. ``"slippage"``.
+        error_name: Solidity signature, e.g. ``"SlippageExceeded()"``, or ``None``
+            when the selector was not recognised.
+        selector: The 4-byte selector, when the revert carried one.
+        data: Raw revert data, kept so an unrecognised revert is still diagnosable.
+        retryable: Whether re-quoting and retrying could plausibly succeed.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: str,
+        data: str,
+        error_name: Optional[str] = None,
+        selector: Optional[str] = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.error_name = error_name
+        self.selector = selector
+        self.data = data
+        self.retryable = retryable
+
+
+class FyuzTokenGraduatedError(FyuzContractRevertError):
+    """The token left the bonding curve and trades on a DEX pair now.
+
+    Every swap entrypoint reverts with ``AlreadyLaunched()`` for such a token, so
+    the SDK refuses to build the transaction rather than let you pay gas to find
+    out.
+
+    Attributes:
+        token_address: The token that graduated.
+        pair_address: Its DEX pair, when the read API knows it.
+    """
+
+    def __init__(
+        self,
+        *,
+        token_address: str,
+        pair_address: Optional[str] = None,
+        data: str = "0xcfa6d878",
+    ) -> None:
+        subject = token_address or "the token"
+        where = (
+            "Trade its DEX pair instead."
+            if pair_address is None
+            else f"Trade the DEX pair {pair_address} instead."
+        )
+        super().__init__(
+            f"{subject} has graduated: the bonding curve is closed and every swap "
+            f"reverts. {where}",
+            kind="graduated",
+            error_name="AlreadyLaunched()",
+            selector="0xcfa6d878",
+            data=data,
+        )
+        self.token_address = token_address
+        self.pair_address = pair_address

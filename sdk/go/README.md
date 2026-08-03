@@ -312,6 +312,48 @@ Recording a round (`POST /distributor/rounds`) is API-key gated for the
 internal round-runner and is deliberately absent from this SDK, as is every
 other authenticated route.
 
+## Trading
+
+`client.Trade` builds **unsigned** bonding-curve transactions. It never sees a private key, never
+signs and never broadcasts — that is why this module still has zero dependencies.
+
+```go
+client := fyuz.New(fyuz.WithRPCURL(os.Getenv("BSC_RPC_URL")))
+
+spend, _ := fyuz.ParseUnits("0.5", 18)
+quote, err := client.Trade.QuoteBuy(ctx, "bsc", token, spend)
+// quote.AmountOutWei, quote.ValueWei, quote.PriceImpactBps
+
+built, err := client.Trade.BuildBuy(ctx, &fyuz.BuyOptions{
+    Token:       token,
+    AmountWei:   spend,
+    SlippageBps: 100, // 1% — required, there is no default
+})
+// built.Tx is {ChainID, To, Data, Value} — hand it to your signer
+```
+
+Selling needs an ERC-20 approval first, because the contract pulls the tokens with `transferFrom`:
+
+```go
+allowance, _ := client.Trade.Allowance(ctx, "bsc", token, owner)
+if allowance.Cmp(amount) < 0 {
+    approve, _ := client.Trade.BuildApprove(ctx, &fyuz.ApproveOptions{Token: token, AmountWei: amount})
+    // sign and send `approve` first
+}
+sell, err := client.Trade.BuildSell(ctx, &fyuz.SellOptions{
+    Token: token, AmountWei: amount, SlippageBps: 150,
+})
+```
+
+`Tx.Value` already includes `getFirstBuyFee(token)`, which is charged on top of the swap amount. A
+token that has graduated returns an error satisfying `fyuz.IsGraduated(err)` rather than building a
+transaction that would revert. Contract address, chain id and RPC all come from `GET /config` —
+nothing is hardcoded — but set `WithRPCURL` in production, since the published endpoint is shared by
+every caller.
+
+Trade sides differ in casing between endpoints, so compare with `trade.Type.Is(fyuz.TradeBuy)`
+rather than `==`.
+
 ## Testing
 
 ```bash
@@ -323,6 +365,39 @@ go test -race -count=1 ./...
 
 The test suite runs entirely against `net/http/httptest` stub servers and never
 touches the network.
+
+`conformance_test.go` additionally reads [`../shared/test-vectors`](../shared)
+from disk — the same fixtures drive the TypeScript, Python and Rust suites, so a
+change to the wire contract fails all four at once.
+
+To run every SDK at once, from the repository root:
+
+```bash
+sdk/scripts/test-all.sh
+```
+
+## Examples
+
+Runnable commands in [`examples/`](examples), each its own `package main` and
+built by `go build ./...`:
+
+| Command | What it shows |
+|---|---|
+| [`quickstart`](examples/quickstart) | Health, chain config, the trending feed, king of the hill |
+| [`graduationwatch`](examples/graduationwatch) | Tokens closest to the $30k graduation threshold |
+| [`tokendeepdive`](examples/tokendeepdive) | One token: detail, holders, trades, hourly candles |
+| [`exporttokens`](examples/exporttokens) | Auto-paginate every token to CSV, summing with `big.Rat` |
+| [`resilientpolling`](examples/resilientpolling) | Incremental trade polling, retry tuning, error classification |
+| [`trade`](examples/trade) | Quote a buy and a sell, build the unsigned transactions, handle the approval |
+
+```bash
+go run ./examples/quickstart
+go run ./examples/tokendeepdive 0x42322852a918f94186b7dfda2e0e3f4ad3528480
+go run ./examples/exporttokens dog > tokens.csv
+```
+
+The same five exist in the TypeScript, Python and Rust clients — see
+[`../README.md`](../README.md).
 
 ## License
 

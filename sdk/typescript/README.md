@@ -23,7 +23,7 @@ PancakeSwap V2, `2` = V3, `3` = V4 / direct launch. `network` is the chain slug,
 ## Install
 
 ```bash
-npm install @fyuz/sdk
+pnpm add @fyuz/sdk
 ```
 
 ## Quickstart
@@ -240,14 +240,74 @@ call is a simple request. Either way, browser use requires your origin to be on 
 ## Development
 
 ```bash
-npm install
-npm run build      # tsc -> dist/ with .d.ts declarations
-npm test           # compiles src+test -> build/, then node --test
-npm run typecheck  # type-check without emitting
+pnpm install
+pnpm build           # tsc -> dist/ with .d.ts declarations
+pnpm test            # compiles src+test+examples -> build/, then node --test
+pnpm typecheck       # type-check without emitting
+pnpm build:examples  # compile examples/ -> build/examples/
 ```
 
 Tests run against a local `node:http` stub server on a loopback port — the suite never touches the
 network.
+
+## Trading
+
+`client.trade` builds **unsigned** bonding-curve transactions. It never sees a private key, never
+signs and never broadcasts — that is why this package still has zero runtime dependencies.
+
+```ts
+import { FyuzClient, parseUnits, formatUnits } from '@fyuz/sdk';
+
+const client = new FyuzClient({ trade: { rpcUrl: process.env.BSC_RPC_URL } });
+
+const quote = await client.trade.quoteBuy({ token, amountWei: parseUnits('0.5') });
+console.log(`${formatUnits(quote.amountOutWei)} tokens for ${formatUnits(quote.valueWei)} BNB`);
+
+const { transaction } = await client.trade.buildBuy({
+  token,
+  amountWei: parseUnits('0.5'),
+  slippageBps: 100,   // 1% — required, there is no default
+});
+
+await walletClient.sendTransaction(transaction);   // your wallet, your key
+```
+
+Selling needs an ERC-20 approval first, because the contract pulls the tokens with `transferFrom`:
+
+```ts
+const allowance = await client.trade.allowance({ token, owner });
+if (BigInt(allowance) < BigInt(amountWei)) {
+  await walletClient.sendTransaction(await client.trade.buildApprove({ token, amountWei }));
+}
+const sell = await client.trade.buildSell({ token, amountWei, slippageBps: 150 });
+```
+
+`transaction.value` already includes `getFirstBuyFee(token)`, which is charged on top of the swap
+amount. A token that has graduated raises `FyuzTokenGraduatedError` rather than building a
+transaction that would revert. Contract address, chain id and RPC all come from `GET /config` —
+nothing is hardcoded — but pass your own `rpcUrl` in production, since the published one is shared
+by every caller.
+
+## Examples
+
+Runnable programs in [`examples/`](examples), compiled by `pnpm build:examples`:
+
+| Example | What it shows |
+|---|---|
+| [`01-quickstart.ts`](examples/01-quickstart.ts) | Health, chain config, the trending feed, king of the hill |
+| [`02-graduation-watch.ts`](examples/02-graduation-watch.ts) | Tokens closest to the $30k graduation threshold |
+| [`03-token-deep-dive.ts`](examples/03-token-deep-dive.ts) | One token: detail, holders, trades, hourly candles |
+| [`04-export-tokens.ts`](examples/04-export-tokens.ts) | Auto-paginate every token to CSV with exact decimals |
+| [`05-resilient-polling.ts`](examples/05-resilient-polling.ts) | Incremental trade polling, retries, error classification |
+| [`06-trade.ts`](examples/06-trade.ts) | Quote a buy and a sell, build the unsigned transactions, handle the approval |
+
+```bash
+pnpm build:examples
+node build/examples/01-quickstart.js
+node build/examples/04-export-tokens.js dog > tokens.csv
+```
+
+The same five exist in the Go, Python and Rust clients — see [`../README.md`](../README.md).
 
 ## Versioning
 

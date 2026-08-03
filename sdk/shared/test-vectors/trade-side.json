@@ -1,0 +1,39 @@
+{
+  "description": "The API is not consistent about the casing of Trade.type. GET /trades/recent sends lowercase \"buy\"/\"sell\"; the trades embedded in GET /tokens/{network}/{tokenAddress} send uppercase \"BUY\"/\"SELL\". Both were observed against production on 2026-08-03.",
+  "observed": [
+    { "endpoint": "GET /trades/recent", "values": ["buy", "sell"] },
+    { "endpoint": "GET /tokens/{network}/{tokenAddress}", "values": ["BUY", "SELL"] }
+  ],
+  "contract": "A caller must be able to tell a buy from a sell without knowing which endpoint the trade came from. TypeScript, Go and Python surface Trade.type exactly as the server sent it and offer a case-insensitive comparison (TradeType.Is in Go, .toLowerCase()/.lower() elsewhere); Rust folds the case during deserialisation because its TradeSide is already a normalising enum, and anything genuinely unrecognised still keeps its exact wire text in TradeSide::Other. What none of them do is quietly rewrite an unrecognised value.",
+  "wrong": "trade.type === 'buy'",
+  "right": "trade.type.toLowerCase() === 'buy'",
+  "cases": [
+    { "wire": "buy", "side": "buy" },
+    { "wire": "sell", "side": "sell" },
+    { "wire": "BUY", "side": "buy" },
+    { "wire": "SELL", "side": "sell" }
+  ],
+  "wire_template": {
+    "trades": [
+      {
+        "id": 1,
+        "tokenName": "Conformance Token",
+        "tokenSymbol": "CONF",
+        "tokenAddress": "0x00000000000000000000000000000000000000ff",
+        "tokenImage": null,
+        "swapperAddress": "0x000000000000000000000000000000000000dead",
+        "swapperUsername": null,
+        "swapperAvatar": null,
+        "type": "REPLACED_PER_CASE",
+        "ethAmount": "0.500000000000000000",
+        "tokenAmount": "1234567.890123456789012345",
+        "network": "bsc",
+        "date": 1767322445,
+        "txHash": "0x00000000000000000000000000000000000000000000000000000000000000ab",
+        "tokenPrice": "0.000000000000000001",
+        "ethPrice": "612.345678901234567890"
+      }
+    ],
+    "tokens": []
+  }
+}

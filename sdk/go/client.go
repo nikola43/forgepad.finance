@@ -59,10 +59,20 @@ type Client struct {
 	baseBackoff time.Duration
 	maxBackoff  time.Duration
 
+	rpcURL        string
+	rpcHTTPClient *http.Client
+	rpcHeaders    map[string]string
+
 	// Distributor groups the on-chain fee-distribution endpoints.
 	//
 	//	pot, err := client.Distributor.GetPot(ctx)
 	Distributor *DistributorService
+
+	// Trade builds unsigned bonding-curve transactions: quotes, buys, sells,
+	// approvals. It never handles a private key — see TradeService.
+	//
+	//	built, err := client.Trade.BuildBuy(ctx, &fyuz.BuyOptions{…})
+	Trade *TradeService
 }
 
 // Option configures a Client. Options are applied in order by New.
@@ -138,6 +148,40 @@ func WithUserAgent(ua string) Option {
 	}
 }
 
+// WithRPCURL points the trading layer at a JSON-RPC endpoint of your choosing.
+//
+// Without it, Client.Trade uses whatever GET /config publishes for the chain.
+// That endpoint belongs to the API operator, is shared by every caller, and can
+// change without notice — so set your own for anything in production.
+func WithRPCURL(rpcURL string) Option {
+	return func(c *Client) {
+		if rpcURL != "" {
+			c.rpcURL = rpcURL
+		}
+	}
+}
+
+// WithRPCHTTPClient supplies the http.Client used for JSON-RPC calls, separately
+// from the one used for the REST API. The default has a DefaultRPCTimeout
+// timeout.
+func WithRPCHTTPClient(hc *http.Client) Option {
+	return func(c *Client) {
+		if hc != nil {
+			c.rpcHTTPClient = hc
+		}
+	}
+}
+
+// WithRPCHeaders adds headers to every JSON-RPC request, for providers that
+// authenticate with one.
+func WithRPCHeaders(headers map[string]string) Option {
+	return func(c *Client) {
+		if len(headers) > 0 {
+			c.rpcHeaders = headers
+		}
+	}
+}
+
 // New creates a Client. With no options it targets the production API with a
 // 30 second per-attempt timeout and 3 retries.
 //
@@ -158,6 +202,7 @@ func New(opts ...Option) *Client {
 		}
 	}
 	c.Distributor = &DistributorService{client: c}
+	c.Trade = newTradeService(c)
 	return c
 }
 

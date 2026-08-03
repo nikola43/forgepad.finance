@@ -30,7 +30,12 @@ class Trade:
         swapper_address: Wallet that traded.
         swapper_username: Trader display name, or ``None``.
         swapper_avatar: Trader avatar URL, or ``None``.
-        type: ``"buy"`` or ``"sell"``.
+        type: Trade side, passed through exactly as the server sent it. The
+            casing is **not** consistent across endpoints: ``/trades/recent``
+            sends ``"buy"``/``"sell"``, while the trades embedded in
+            ``/tokens/{network}/{token_address}`` send ``"BUY"``/``"SELL"``.
+            Compare with ``trade.type.lower() == "buy"``, never with
+            ``trade.type == "buy"``.
         eth_amount: BNB amount, decimal string.
         token_amount: Token amount, decimal string.
         network: Chain slug.

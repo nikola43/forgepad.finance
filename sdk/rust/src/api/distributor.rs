@@ -2,7 +2,9 @@
 
 use crate::client::{seg, FyuzClient, QueryPairs};
 use crate::error::Result;
-use crate::models::{AddressPayouts, Claimable, PayoutStats, Pot, RoundDetail, RoundReceipt, Shares};
+use crate::models::{
+    AddressPayouts, Claimable, PayoutStats, Pot, RoundDetail, RoundReceipt, Shares,
+};
 use crate::params::{RoundsParams, SharesParams, ToQuery};
 
 /// The Distributor endpoints, reached with

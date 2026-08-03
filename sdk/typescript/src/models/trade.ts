@@ -6,8 +6,21 @@
 
 import type { Token } from './token.js';
 
-/** Which side of the curve a trade hit. */
-export type TradeSide = 'buy' | 'sell';
+/**
+ * Which side of the curve a trade hit.
+ *
+ * **The casing is not consistent across endpoints.** `GET /trades/recent` sends
+ * `"buy"`/`"sell"`; the trades embedded in `GET /tokens/{network}/{tokenAddress}`
+ * send `"BUY"`/`"SELL"`. The value is passed through exactly as the server sent
+ * it — silently rewriting it would hide the inconsistency rather than surface
+ * it — so compare case-insensitively:
+ *
+ * ```ts
+ * if (trade.type.toLowerCase() === 'buy') { ... }  // correct
+ * if (trade.type === 'buy') { ... }                // misses every detail trade
+ * ```
+ */
+export type TradeSide = 'buy' | 'sell' | 'BUY' | 'SELL';
 
 /** A single swap against the bonding curve or the graduated pair. */
 export interface Trade {

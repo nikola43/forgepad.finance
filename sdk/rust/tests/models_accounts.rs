@@ -115,8 +115,14 @@ async fn decodes_the_leaderboard_and_profile_endpoints() {
     assert_eq!(profile.user.is_admin, None, "null must not become false");
     assert_eq!(profile.user.bio, None);
     assert_eq!(profile.holdings.len(), 1);
-    assert_eq!(profile.holdings[0].token_amount, "1000000.000000000000000001");
-    assert_eq!(profile.holdings[0].user.address, profile.holdings[0].creator_address);
+    assert_eq!(
+        profile.holdings[0].token_amount,
+        "1000000.000000000000000001"
+    );
+    assert_eq!(
+        profile.holdings[0].user.address,
+        profile.holdings[0].creator_address
+    );
     assert_eq!(profile.chats[0].comment, "gm");
     assert_eq!(profile.chats[0].reply_address, None);
     assert_eq!(profile.created_tokens[0].token_symbol, "MADE");
@@ -134,7 +140,6 @@ async fn decodes_the_leaderboard_and_profile_endpoints() {
     assert_eq!(referrals[0].referral_count, 17);
     assert_eq!(referrals[0].referee_volume_usd, 45000.0);
 }
-
 
 #[tokio::test]
 async fn decodes_the_season_tier_reward_and_king_endpoints() {
@@ -275,9 +280,11 @@ async fn decodes_the_season_tier_reward_and_king_endpoints() {
     assert_eq!(kings[0].ended_at, None, "an ongoing reign has no end");
     assert_eq!(kings[0].duration_secs, 3600);
     assert_eq!(kings[1].ended_at, Some(1749990000));
-    assert_eq!(kings[1].image.as_deref(), Some("https://cdn.fyuz.fun/old.png"));
+    assert_eq!(
+        kings[1].image.as_deref(),
+        Some("https://cdn.fyuz.fun/old.png")
+    );
 }
-
 
 #[tokio::test]
 async fn decodes_the_analytics_endpoints() {
@@ -372,7 +379,10 @@ async fn decodes_the_analytics_endpoints() {
     assert_eq!(portfolio.positions[0].image, None);
 
     let analytics = client.get_token_analytics("bsc", "0x23a8").await.unwrap();
-    assert_eq!(analytics.top10_pct, 34.5, "`top10Pct` is not `top10_pct`'s obvious camelCase");
+    assert_eq!(
+        analytics.top10_pct, 34.5,
+        "`top10Pct` is not `top10_pct`'s obvious camelCase"
+    );
     assert_eq!(analytics.creator_pct, 2.1);
     assert_eq!(analytics.graduation_pct, 61.25);
     assert_eq!(analytics.bundle_buyers, 3);
@@ -383,6 +393,8 @@ async fn decodes_the_analytics_endpoints() {
     let traders = client.get_top_traders("bsc", "0x23a8").await.unwrap();
     assert!(traders[0].is_creator);
     assert_eq!(traders[0].total_pnl_usd, 1250.5);
-    assert_eq!(server.request(3).path(), "/analytics/top-traders/bsc/0x23a8");
+    assert_eq!(
+        server.request(3).path(),
+        "/analytics/top-traders/bsc/0x23a8"
+    );
 }
-
